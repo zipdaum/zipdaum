@@ -1,5 +1,8 @@
 HELP.md
 .DS_Store
+.env
+.env.local
+.env.*.local
 target/
 backend/target/
 backend/.mvn/wrapper/maven-wrapper.jar
