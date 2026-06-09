@@ -1,6 +1,11 @@
 HELP.md
+.DS_Store
+.env
+.env.local
+.env.*.local
 target/
-.mvn/wrapper/maven-wrapper.jar
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
@@ -26,6 +31,11 @@ target/
 /nbdist/
 /.nb-gradle/
 build/
+frontend/dist/
+frontend/node_modules/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 !**/src/main/**/build/
 !**/src/test/**/build/
 
