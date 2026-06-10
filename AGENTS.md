@@ -42,9 +42,10 @@ zipdaum
 
 작업 전 반드시 아래 문서를 확인한다.
 
-1. docs/requirements.md
-2. docs/erd.md
+1. docs/requirements/기획서.md
+2. docs/erd.png
 3. docs/api-spec.md
+4. ground-rule.md
 
 문서와 구현 내용이 충돌할 경우 문서를 우선한다.
 
