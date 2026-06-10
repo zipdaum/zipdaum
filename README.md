@@ -100,6 +100,7 @@ docker compose up -d
 
 ```bash
 export PUBLIC_DATA_SERVICE_KEY="공공데이터포털_API_KEY"
+export KAKAO_REST_API_KEY="카카오_REST_API_KEY"
 ```
 
 조회 예시는 다음과 같습니다.
@@ -115,4 +116,12 @@ APARTMENT_SALE
 VILLA_SALE
 APARTMENT_RENT
 VILLA_RENT
+```
+
+## 주소 좌표 조회
+
+카카오 Local API로 주소를 위도/경도로 변환합니다.
+
+```bash
+curl "http://localhost:8080/api/properties/coordinates?address=부산%20해운대구%20우동%201484"
 ```
