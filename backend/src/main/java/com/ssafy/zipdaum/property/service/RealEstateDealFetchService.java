@@ -1,5 +1,7 @@
 package com.ssafy.zipdaum.property.service;
 
+import com.ssafy.zipdaum.global.error.ErrorCode;
+import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.api.RealEstateDealApiClient;
 import com.ssafy.zipdaum.property.config.PropertyApiProperties;
 import com.ssafy.zipdaum.property.domain.DealApiType;
@@ -17,13 +19,13 @@ public class RealEstateDealFetchService {
 
   public List<RealEstateDealItem> fetchDeals(DealApiType apiType, String lawdCd, String dealYmd) {
     if (!properties.hasServiceKey()) {
-      throw new IllegalStateException("PUBLIC_DATA_SERVICE_KEY가 설정되지 않았습니다.");
+      throw new BusinessException(ErrorCode.REAL_ESTATE_API_KEY_NOT_FOUND);
     }
     if (lawdCd == null || !lawdCd.matches("\\d{5}")) {
-      throw new IllegalArgumentException("lawdCd는 법정동 코드 앞 5자리여야 합니다.");
+      throw new BusinessException(ErrorCode.INVALID_LAWD_CODE);
     }
     if (dealYmd == null || !dealYmd.matches("\\d{6}")) {
-      throw new IllegalArgumentException("dealYmd는 계약년월 6자리여야 합니다. 예: 202501");
+      throw new BusinessException(ErrorCode.INVALID_DEAL_YMD);
     }
     return dealApiClient.fetch(apiType, lawdCd, dealYmd);
   }
