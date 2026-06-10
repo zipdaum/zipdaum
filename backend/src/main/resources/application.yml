@@ -17,6 +17,8 @@ spring:
 property:
   real-estate:
     service-key: ${PUBLIC_DATA_SERVICE_KEY:}
+  kakao:
+    rest-api-key: ${KAKAO_REST_API_KEY:}
 
 ---
 
