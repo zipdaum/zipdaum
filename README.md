@@ -93,3 +93,26 @@ Default Schema: zipdaum
 docker compose down -v
 docker compose up -d
 ```
+
+## 실거래가 API 조회
+
+공공데이터포털 실거래가 API 키를 환경변수로 설정한 뒤 백엔드를 실행합니다. 현재는 외부 API를 호출해 데이터를 가져오는 기능만 제공합니다.
+
+```bash
+export PUBLIC_DATA_SERVICE_KEY="공공데이터포털_API_KEY"
+```
+
+조회 예시는 다음과 같습니다.
+
+```bash
+curl "http://localhost:8080/api/properties/real-estate-deals?type=APARTMENT_SALE&lawdCd=26350&dealYmd=202501"
+```
+
+`type` 값은 다음 중 하나를 사용합니다.
+
+```text
+APARTMENT_SALE
+VILLA_SALE
+APARTMENT_RENT
+VILLA_RENT
+```

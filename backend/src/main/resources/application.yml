@@ -1,4 +1,9 @@
 spring:
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+
   datasource:
     url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
     username: sa
@@ -8,6 +13,10 @@ spring:
     console:
       enabled: true
       path: /h2-console
+
+property:
+  real-estate:
+    service-key: ${PUBLIC_DATA_SERVICE_KEY:}
 
 ---
 
