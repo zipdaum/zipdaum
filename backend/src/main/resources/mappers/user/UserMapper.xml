@@ -12,5 +12,8 @@
     SELECT * FROM users WHERE email = #{email}
   </select>
 
+  <select id="findById" parameterType="long" resultType="com.ssafy.zipdaum.user.dto.UserDto">
+    SELECT * FROM users WHERE id = #{id}
+  </select>
 
 </mapper>

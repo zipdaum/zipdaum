@@ -1,12 +1,15 @@
 package com.ssafy.zipdaum.user.controller;
 
+import com.ssafy.zipdaum.global.security.AuthenticatedUser;
+import com.ssafy.zipdaum.user.dto.UserInfoResponse;
 import com.ssafy.zipdaum.user.dto.UserDto;
 import com.ssafy.zipdaum.user.service.UserService;
-import com.ssafy.zipdaum.user.service.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,5 +27,23 @@ public class UserController {
     log.info("POST /users 요청 email={}", userDto.getEmail());
     userService.signUp(userDto);
     return ResponseEntity.status(HttpStatus.CREATED).body("회원가입 성공");
+  }
+
+  @GetMapping("/info")
+  public ResponseEntity<UserInfoResponse> getUserInfo(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser
+  ) {
+    log.info("GET /users/info 요청 userId={}", authenticatedUser.getId());
+
+    UserDto user = userService.findById(authenticatedUser.getId());
+    UserInfoResponse response = new UserInfoResponse(
+        user.getId(),
+        user.getEmail(),
+        user.getName(),
+        user.getCreatedAt(),
+        user.getUpdatedAt()
+    );
+
+    return ResponseEntity.ok(response);
   }
 }

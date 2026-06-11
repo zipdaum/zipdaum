@@ -35,4 +35,18 @@ public class UserServiceImpl implements UserService{
 
     log.info("회원가입 완료 email={}", userDto.getEmail());
   }
+
+  @Override
+  @Transactional(readOnly = true)
+  public UserDto findById(Long id) {
+    log.info("회원 정보 조회 요청 userId={}", id);
+
+    UserDto user = userMapper.findById(id);
+    if (user == null) {
+      log.warn("존재하지 않는 사용자 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    return user;
+  }
 }
