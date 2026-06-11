@@ -10,11 +10,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class KakaoGeocodeService {
+public class KakaoGeocodeServiceImpl implements GeocodeService {
 
   private final KakaoGeocodeApiClient kakaoGeocodeApiClient;
   private final KakaoApiProperties properties;
 
+  @Override
   public CoordinateDto getCoordinate(String address) {
     if (!properties.hasRestApiKey()) {
       throw new BusinessException(ErrorCode.KAKAO_API_KEY_NOT_FOUND);
