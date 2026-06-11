@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.user.controller;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import com.ssafy.zipdaum.user.dto.UserInfoResponse;
 import com.ssafy.zipdaum.user.dto.UserDto;
+import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
 import com.ssafy.zipdaum.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,9 +40,9 @@ public class UserController {
       @ApiResponse(responseCode = "201", description = "회원가입 성공", content = @Content),
       @ApiResponse(responseCode = "400", description = "중복 이메일 또는 입력값 오류", content = @Content)
   })
-  public ResponseEntity<String> signUp(@RequestBody UserDto userDto) {
-    log.info("POST /users 요청 email={}", userDto.getEmail());
-    userService.signUp(userDto);
+  public ResponseEntity<String> signUp(@RequestBody UserSignUpRequest request) {
+    log.info("POST /users 요청 email={}", request.getEmail());
+    userService.signUp(request);
     return ResponseEntity.status(HttpStatus.CREATED).body("회원가입 성공");
   }
 

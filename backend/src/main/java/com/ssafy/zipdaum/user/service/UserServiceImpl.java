@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.user.service;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.user.dto.UserDto;
+import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,21 +20,23 @@ public class UserServiceImpl implements UserService{
   private final PasswordEncoder passwordEncoder;
 
   @Transactional
-  public void signUp(UserDto userDto) {
+  public void signUp(UserSignUpRequest request) {
 
-    log.info("회원가입 요청 도착 email={}", userDto.getEmail());
+    log.info("회원가입 요청 도착 email={}", request.getEmail());
 
-    if (userMapper.findByEmail(userDto.getEmail()) != null) {
-      log.warn("중복 이메일 email={}", userDto.getEmail());
+    if (userMapper.findByEmail(request.getEmail()) != null) {
+      log.warn("중복 이메일 email={}", request.getEmail());
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
     }
 
-    String encodedPassword = passwordEncoder.encode(userDto.getPassword());
-    userDto.setPassword(encodedPassword);
+    UserDto userDto = new UserDto();
+    userDto.setEmail(request.getEmail());
+    userDto.setName(request.getName());
+    userDto.setPassword(passwordEncoder.encode(request.getPassword()));
 
     userMapper.insertUser(userDto);
 
-    log.info("회원가입 완료 email={}", userDto.getEmail());
+    log.info("회원가입 완료 email={}", request.getEmail());
   }
 
   @Override
