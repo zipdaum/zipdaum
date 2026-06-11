@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.zipdaum.property.mapper.PropertyMapper">
+
+  <resultMap id="propertySearchResponseResultMap"
+             type="com.ssafy.zipdaum.property.dto.PropertySearchResponse">
+    <id property="id" column="id"/>
+    <result property="propertyType" column="property_type"/>
+    <result property="name" column="name"/>
+    <result property="sggCd" column="sgg_cd"/>
+    <result property="umdNm" column="umd_nm"/>
+    <result property="jibun" column="jibun"/>
+    <result property="buildYear" column="build_year"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
+    <result property="latestSalePrice" column="latest_sale_price"/>
+    <result property="latestDeposit" column="latest_deposit"/>
+    <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+  </resultMap>
+
+  <resultMap id="propertySaveCommandResultMap"
+             type="com.ssafy.zipdaum.property.dto.PropertySaveCommand">
+    <id property="id" column="id"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
+  </resultMap>
+
+  <select id="selectProperties"
+          parameterType="com.ssafy.zipdaum.property.dto.PropertySearchRequest"
+          resultMap="propertySearchResponseResultMap">
+    SELECT
+      id,
+      property_type,
+      name,
+      sgg_cd,
+      umd_nm,
+      jibun,
+      build_year,
+      latitude,
+      longitude,
+      latest_sale_price,
+      latest_deposit,
+      latest_monthly_rent
+    FROM property
+    <where>
+      <if test="sggCd != null">
+        AND sgg_cd = #{sggCd}
+      </if>
+      <if test="umdNm != null">
+        AND umd_nm = #{umdNm}
+      </if>
+      <if test="name != null">
+        AND name LIKE CONCAT('%', #{name}, '%')
+      </if>
+      <if test="propertyType != null">
+        AND property_type = #{propertyType}
+      </if>
+      <if test="dealType == 'SALE'">
+        AND latest_sale_price &gt; 0
+        <if test="minPrice != null">
+          AND latest_sale_price &gt;= #{minPrice}
+        </if>
+        <if test="maxPrice != null">
+          AND latest_sale_price &lt;= #{maxPrice}
+        </if>
+      </if>
+      <if test="dealType == 'JEONSE'">
+        AND latest_deposit &gt; 0
+        AND latest_monthly_rent = 0
+        <if test="minPrice != null">
+          AND latest_deposit &gt;= #{minPrice}
+        </if>
+        <if test="maxPrice != null">
+          AND latest_deposit &lt;= #{maxPrice}
+        </if>
+      </if>
+      <if test="dealType == 'MONTHLY_RENT'">
+        AND latest_monthly_rent &gt; 0
+        <if test="minPrice != null">
+          AND latest_deposit &gt;= #{minPrice}
+        </if>
+        <if test="maxPrice != null">
+          AND latest_deposit &lt;= #{maxPrice}
+        </if>
+      </if>
+      <if test="dealType == null">
+        <if test="minPrice != null">
+          AND (
+            latest_sale_price &gt;= #{minPrice}
+            OR latest_deposit &gt;= #{minPrice}
+          )
+        </if>
+        <if test="maxPrice != null">
+          AND (
+            (latest_sale_price &gt; 0 AND latest_sale_price &lt;= #{maxPrice})
+            OR (latest_deposit &gt; 0 AND latest_deposit &lt;= #{maxPrice})
+          )
+        </if>
+      </if>
+    </where>
+    ORDER BY updated_at DESC, id DESC
+  </select>
+
+  <select id="findProperty"
+          parameterType="com.ssafy.zipdaum.property.dto.PropertySaveCommand"
+          resultMap="propertySaveCommandResultMap">
+    SELECT id, latitude, longitude
+    FROM property
+    WHERE property_type = #{propertyType}
+      AND sgg_cd = #{sggCd}
+      AND umd_nm = #{umdNm}
+      AND jibun = #{jibun}
+      AND name = #{name}
+      AND build_year = #{buildYear}
+  </select>
+
+  <insert id="insertProperty"
+          parameterType="com.ssafy.zipdaum.property.dto.PropertySaveCommand"
+          useGeneratedKeys="true"
+          keyProperty="id">
+    INSERT INTO property (
+      property_type, name, sgg_cd, umd_nm, jibun, build_year,
+      latitude, longitude, latest_sale_price, latest_deposit, latest_monthly_rent
+    ) VALUES (
+      #{propertyType}, #{name}, #{sggCd}, #{umdNm}, #{jibun}, #{buildYear},
+      #{latitude}, #{longitude}, 0, 0, 0
+    )
+  </insert>
+
+  <update id="updatePropertyCoordinate"
+          parameterType="com.ssafy.zipdaum.property.dto.PropertySaveCommand">
+    UPDATE property
+    SET latitude = #{latitude},
+        longitude = #{longitude}
+    WHERE id = #{id}
+  </update>
+
+  <insert id="insertSaleDeal"
+          parameterType="com.ssafy.zipdaum.property.dto.SaleDealSaveCommand">
+    INSERT IGNORE INTO sale_deal (
+      property_id, exclusive_area, land_area, deal_amount, floor,
+      deal_date, buyer_gbn, seller_gbn
+    ) VALUES (
+      #{propertyId}, #{exclusiveArea}, #{landArea}, #{dealAmount}, #{floor},
+      #{dealDate}, #{buyerGbn}, #{sellerGbn}
+    )
+  </insert>
+
+  <insert id="insertRentDeal"
+          parameterType="com.ssafy.zipdaum.property.dto.RentDealSaveCommand">
+    INSERT IGNORE INTO rent_deal (
+      property_id, exclusive_area, land_area, deposit, monthly_rent, floor,
+      contract_term, contract_type, use_rr_right, pre_deposit, pre_monthly_rent, deal_date
+    ) VALUES (
+      #{propertyId}, #{exclusiveArea}, #{landArea}, #{deposit}, #{monthlyRent}, #{floor},
+      #{contractTerm}, #{contractType}, #{useRrRight}, #{preDeposit}, #{preMonthlyRent}, #{dealDate}
+    )
+  </insert>
+
+  <update id="updateLatestSalePrice">
+    UPDATE property
+    SET latest_sale_price = #{dealAmount}
+    WHERE id = #{propertyId}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM sale_deal newer
+        WHERE newer.property_id = #{propertyId}
+          AND newer.deal_date > #{dealDate}
+      )
+  </update>
+
+  <update id="updateLatestRentPrice">
+    UPDATE property
+    SET latest_deposit = #{deposit},
+        latest_monthly_rent = #{monthlyRent}
+    WHERE id = #{propertyId}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM rent_deal newer
+        WHERE newer.property_id = #{propertyId}
+          AND newer.deal_date > #{dealDate}
+      )
+  </update>
+</mapper>

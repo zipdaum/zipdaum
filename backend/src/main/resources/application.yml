@@ -1,24 +1,8 @@
 spring:
-  datasource:
-    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
-jwt:
-  secret: ${JWT_SECRET}
-  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
-
----
-
-spring:
   config:
-    activate:
-      on-profile: local
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
 
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:zipdaum}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
@@ -26,9 +10,14 @@ spring:
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
-  h2:
-    console:
-      enabled: false
+mybatis:
+  mapper-locations: classpath:/mappers/**/*.xml
+
+property:
+  real-estate:
+    service-key: ${PUBLIC_DATA_SERVICE_KEY:}
+  kakao:
+    rest-api-key: ${KAKAO_REST_API_KEY:}
 
 jwt:
   secret: ${JWT_SECRET}

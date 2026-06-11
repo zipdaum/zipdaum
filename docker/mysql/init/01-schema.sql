@@ -29,7 +29,8 @@ CREATE TABLE property (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_property_region (sgg_cd, umd_nm),
-  KEY idx_property_name (name)
+  KEY idx_property_name (name),
+  UNIQUE KEY uk_property_public_source (property_type, sgg_cd, umd_nm, jibun, name, build_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE sale_deal (
@@ -46,6 +47,7 @@ CREATE TABLE sale_deal (
   PRIMARY KEY (id),
   KEY idx_sale_deal_property_id (property_id),
   KEY idx_sale_deal_date (deal_date),
+  UNIQUE KEY uk_sale_deal_public_source (property_id, exclusive_area, deal_amount, floor, deal_date),
   CONSTRAINT fk_sale_deal_property
     FOREIGN KEY (property_id) REFERENCES property (id)
     ON DELETE CASCADE
@@ -69,6 +71,7 @@ CREATE TABLE rent_deal (
   PRIMARY KEY (id),
   KEY idx_rent_deal_property_id (property_id),
   KEY idx_rent_deal_date (deal_date),
+  UNIQUE KEY uk_rent_deal_public_source (property_id, exclusive_area, deposit, monthly_rent, floor, deal_date),
   CONSTRAINT fk_rent_deal_property
     FOREIGN KEY (property_id) REFERENCES property (id)
     ON DELETE CASCADE
