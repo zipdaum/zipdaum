@@ -108,7 +108,8 @@ const displayedHomes = computed(() => {
 
 const allResultRows = computed(() => searchResults.value.map((property, index) => ({
   ...mapPropertyToHomeCard(property, index),
-  propertyType: getPropertyTypeLabel(property.propertyType)
+  propertyType: getPropertyTypeLabel(property.propertyType),
+  buildYearLabel: getBuildYearLabel(property.buildYear)
 })))
 
 const hasMoreResults = computed(() => hasSearched.value && searchResults.value.length > 0)
@@ -316,9 +317,13 @@ function getDisplayPrice(property) {
 
 function getPropertyDetail(property) {
   const type = getPropertyTypeLabel(property.propertyType)
-  const buildYear = property.buildYear ? `${property.buildYear}년 준공` : '준공연도 미상'
+  const buildYear = getBuildYearLabel(property.buildYear)
 
   return `${type} · ${buildYear}`
+}
+
+function getBuildYearLabel(buildYear) {
+  return buildYear ? `${buildYear}년 준공` : '준공연도 미상'
 }
 
 function getPropertyTypeLabel(propertyType) {
@@ -574,7 +579,7 @@ function formatPrice(price) {
             <span>가격</span>
             <strong>{{ home.price }}</strong>
           </div>
-          <em>{{ home.detail }}</em>
+          <em>{{ home.buildYearLabel }}</em>
         </article>
       </div>
     </section>
