@@ -28,6 +28,10 @@ public enum ErrorCode {
   REAL_ESTATE_API_KEY_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "P005", "공공데이터 API 키가 설정되지 않았습니다."),
   KAKAO_API_KEY_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "P006", "카카오 API 키가 설정되지 않았습니다."),
   COORDINATE_NOT_FOUND(HttpStatus.NOT_FOUND, "P007", "주소에 해당하는 좌표 정보를 찾을 수 없습니다."),
+  INVALID_MIN_PRICE(HttpStatus.BAD_REQUEST, "P008", "최소 가격은 0 이상이어야 합니다."),
+  INVALID_MAX_PRICE(HttpStatus.BAD_REQUEST, "P009", "최대 가격은 0 이상이어야 합니다."),
+  INVALID_PRICE_RANGE(HttpStatus.BAD_REQUEST, "P010", "최소 가격은 최대 가격보다 클 수 없습니다."),
+  INVALID_DEAL_TYPE(HttpStatus.BAD_REQUEST, "P011", "거래 유형은 SALE, JEONSE, MONTHLY_RENT 중 하나여야 합니다."),
 
   // 4. Favorite
   FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "관심 목록에서 해당 정보를 찾을 수 없습니다."),

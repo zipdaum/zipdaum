@@ -2,7 +2,7 @@ package com.ssafy.zipdaum.property.api;
 
 import com.ssafy.zipdaum.property.config.PropertyApiProperties;
 import com.ssafy.zipdaum.property.domain.DealApiType;
-import com.ssafy.zipdaum.property.dto.RealEstateDealItem;
+import com.ssafy.zipdaum.property.dto.PropertyItem;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -19,14 +19,14 @@ import org.w3c.dom.NodeList;
 
 @Component
 @RequiredArgsConstructor
-public class RealEstateDealApiClient {
+public class PropertyApiClient {
 
   private static final int NUM_OF_ROWS = 1000;
 
   private final RestClient restClient;
   private final PropertyApiProperties properties;
 
-  public List<RealEstateDealItem> fetch(DealApiType apiType, String lawdCd, String dealYmd) {
+  public List<PropertyItem> fetch(DealApiType apiType, String lawdCd, String dealYmd) {
     String response = restClient.get()
         .uri(URI.create(apiType.getUrl()
             + "?serviceKey=" + properties.getServiceKey()
@@ -40,7 +40,7 @@ public class RealEstateDealApiClient {
     return parse(apiType, lawdCd, response);
   }
 
-  private List<RealEstateDealItem> parse(DealApiType apiType, String lawdCd, String xml) {
+  private List<PropertyItem> parse(DealApiType apiType, String lawdCd, String xml) {
     if (xml == null || xml.isBlank()) {
       return List.of();
     }
@@ -53,7 +53,7 @@ public class RealEstateDealApiClient {
           .getDocumentElement();
 
       NodeList items = root.getElementsByTagName("item");
-      List<RealEstateDealItem> results = new ArrayList<>(items.getLength());
+      List<PropertyItem> results = new ArrayList<>(items.getLength());
       for (int i = 0; i < items.getLength(); i++) {
         Element item = (Element) items.item(i);
         results.add(toDealItem(apiType, lawdCd, item));
@@ -64,14 +64,14 @@ public class RealEstateDealApiClient {
     }
   }
 
-  private RealEstateDealItem toDealItem(DealApiType apiType, String lawdCd, Element item) {
+  private PropertyItem toDealItem(DealApiType apiType, String lawdCd, Element item) {
     LocalDate dealDate = LocalDate.of(
         parseInt(firstText(item, "dealYear", "년"), 1),
         parseInt(firstText(item, "dealMonth", "월"), 1),
         parseInt(firstText(item, "dealDay", "일"), 1)
     );
 
-    return new RealEstateDealItem(
+    return new PropertyItem(
         apiType,
         firstTextOrDefault(item, lawdCd, "sggCd", "지역코드"),
         firstText(item, "umdNm", "법정동"),
