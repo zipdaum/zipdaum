@@ -14,7 +14,9 @@ import com.ssafy.zipdaum.property.dto.RentDealSaveCommand;
 import com.ssafy.zipdaum.property.dto.SaleDealSaveCommand;
 import com.ssafy.zipdaum.property.mapper.PropertyDealMapper;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,10 +32,11 @@ public class RealEstateDealFetchServiceImpl implements RealEstateDealFetchServic
   @Override
   public RealEstateDealSaveResult fetchAndSaveDeals(DealApiType apiType, String lawdCd, String dealYmd) {
     List<RealEstateDealItem> realEstateDeals = fetchDeals(apiType, lawdCd, dealYmd);
+    Map<String, CoordinateDto> coordinateCache = new HashMap<>();
     int savedDealCount = 0;
 
     for (RealEstateDealItem realEstateDeal : realEstateDeals) {
-      Long propertyId = savePropertyWithCoordinate(realEstateDeal);
+      Long propertyId = savePropertyWithCoordinate(realEstateDeal, coordinateCache);
       savedDealCount += saveRealEstateDeal(apiType, propertyId, realEstateDeal);
     }
 
@@ -57,21 +60,36 @@ public class RealEstateDealFetchServiceImpl implements RealEstateDealFetchServic
     }
   }
 
-  private Long savePropertyWithCoordinate(RealEstateDealItem realEstateDeal) {
+  private Long savePropertyWithCoordinate(RealEstateDealItem realEstateDeal,
+      Map<String, CoordinateDto> coordinateCache) {
     PropertySaveCommand propertyCommand = toPropertySaveCommand(realEstateDeal);
-    CoordinateDto coordinate = geocodeService.getCoordinate(toAddress(realEstateDeal));
-    propertyCommand.setLatitude(coordinate.latitude());
-    propertyCommand.setLongitude(coordinate.longitude());
+    PropertySaveCommand savedProperty = propertyDealMapper.findProperty(propertyCommand);
 
-    Long propertyId = propertyDealMapper.findPropertyId(propertyCommand);
-    if (propertyId == null) {
+    if (savedProperty == null) {
+      setCoordinate(propertyCommand, realEstateDeal, coordinateCache);
       propertyDealMapper.insertProperty(propertyCommand);
       return propertyCommand.getId();
     }
 
+    Long propertyId = savedProperty.getId();
     propertyCommand.setId(propertyId);
-    propertyDealMapper.updatePropertyCoordinate(propertyCommand);
+    if (!hasCoordinate(savedProperty)) {
+      setCoordinate(propertyCommand, realEstateDeal, coordinateCache);
+      propertyDealMapper.updatePropertyCoordinate(propertyCommand);
+    }
     return propertyId;
+  }
+
+  private void setCoordinate(PropertySaveCommand propertyCommand, RealEstateDealItem realEstateDeal,
+      Map<String, CoordinateDto> coordinateCache) {
+    String address = toAddress(realEstateDeal);
+    CoordinateDto coordinate = coordinateCache.computeIfAbsent(address, geocodeService::getCoordinate);
+    propertyCommand.setLatitude(coordinate.latitude());
+    propertyCommand.setLongitude(coordinate.longitude());
+  }
+
+  private boolean hasCoordinate(PropertySaveCommand propertyCommand) {
+    return propertyCommand.getLatitude() != null && propertyCommand.getLongitude() != null;
   }
 
   private PropertySaveCommand toPropertySaveCommand(RealEstateDealItem realEstateDeal) {

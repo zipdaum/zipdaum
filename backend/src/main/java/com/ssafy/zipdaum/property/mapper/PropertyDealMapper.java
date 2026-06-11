@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface PropertyDealMapper {
 
-  Long findPropertyId(PropertySaveCommand command);
+  PropertySaveCommand findProperty(PropertySaveCommand command);
 
   int insertProperty(PropertySaveCommand command);
 
