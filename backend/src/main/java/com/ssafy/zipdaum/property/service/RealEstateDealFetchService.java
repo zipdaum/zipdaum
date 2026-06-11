@@ -5,6 +5,7 @@ import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.api.RealEstateDealApiClient;
 import com.ssafy.zipdaum.property.config.PropertyApiProperties;
 import com.ssafy.zipdaum.property.domain.DealApiType;
+import com.ssafy.zipdaum.property.domain.RegionCode;
 import com.ssafy.zipdaum.property.dto.CoordinateDto;
 import com.ssafy.zipdaum.property.dto.PropertySaveCommand;
 import com.ssafy.zipdaum.property.dto.RealEstateDealSaveResult;
@@ -14,7 +15,6 @@ import com.ssafy.zipdaum.property.dto.SaleDealSaveCommand;
 import com.ssafy.zipdaum.property.mapper.PropertyDealMapper;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,10 +24,27 @@ public class RealEstateDealFetchService {
 
   private final RealEstateDealApiClient dealApiClient;
   private final KakaoGeocodeService kakaoGeocodeService;
-  private final PropertyDealMapper propertyDealSaveMapper;
+  private final PropertyDealMapper propertyDealMapper;
   private final PropertyApiProperties properties;
 
-  public List<RealEstateDealItem> fetchDeals(DealApiType apiType, String lawdCd, String dealYmd) {
+  public RealEstateDealSaveResult fetchAndSaveDeals(DealApiType apiType, String lawdCd, String dealYmd) {
+    List<RealEstateDealItem> realEstateDeals = fetchDeals(apiType, lawdCd, dealYmd);
+    int savedDealCount = 0;
+
+    for (RealEstateDealItem realEstateDeal : realEstateDeals) {
+      Long propertyId = savePropertyWithCoordinate(realEstateDeal);
+      savedDealCount += saveRealEstateDeal(apiType, propertyId, realEstateDeal);
+    }
+
+    return new RealEstateDealSaveResult(realEstateDeals.size(), savedDealCount);
+  }
+
+  private List<RealEstateDealItem> fetchDeals(DealApiType apiType, String lawdCd, String dealYmd) {
+    validateFetchRequest(lawdCd, dealYmd);
+    return dealApiClient.fetch(apiType, lawdCd, dealYmd);
+  }
+
+  private void validateFetchRequest(String lawdCd, String dealYmd) {
     if (!properties.hasServiceKey()) {
       throw new BusinessException(ErrorCode.REAL_ESTATE_API_KEY_NOT_FOUND);
     }
@@ -37,89 +54,91 @@ public class RealEstateDealFetchService {
     if (dealYmd == null || !dealYmd.matches("\\d{6}")) {
       throw new BusinessException(ErrorCode.INVALID_DEAL_YMD);
     }
-    return dealApiClient.fetch(apiType, lawdCd, dealYmd);
   }
 
-  public RealEstateDealSaveResult fetchAndSaveDeals(DealApiType apiType, String lawdCd, String dealYmd) {
-    List<RealEstateDealItem> deals = fetchDeals(apiType, lawdCd, dealYmd);
-    int savedCount = 0;
-    for (RealEstateDealItem deal : deals) {
-      Long propertyId = saveProperty(deal);
-      savedCount += saveDeal(apiType, propertyId, deal);
-    }
-    return new RealEstateDealSaveResult(deals.size(), savedCount);
-  }
+  private Long savePropertyWithCoordinate(RealEstateDealItem realEstateDeal) {
+    PropertySaveCommand propertyCommand = toPropertySaveCommand(realEstateDeal);
+    CoordinateDto coordinate = kakaoGeocodeService.getCoordinate(toAddress(realEstateDeal));
+    propertyCommand.setLatitude(coordinate.latitude());
+    propertyCommand.setLongitude(coordinate.longitude());
 
-  private Long saveProperty(RealEstateDealItem deal) {
-    PropertySaveCommand command = new PropertySaveCommand();
-    command.setPropertyType(deal.apiType().getPropertyType());
-    command.setName(defaultText(deal.propertyName()));
-    command.setSggCd(defaultText(deal.sggCd()));
-    command.setUmdNm(defaultText(deal.umdNm()));
-    command.setJibun(defaultText(deal.jibun()));
-    command.setBuildYear(defaultInt(deal.buildYear()));
-
-    CoordinateDto coordinate = kakaoGeocodeService.getCoordinate(toAddress(deal));
-    command.setLatitude(coordinate.latitude());
-    command.setLongitude(coordinate.longitude());
-
-    Long propertyId = propertyDealSaveMapper.findPropertyId(command);
+    Long propertyId = propertyDealMapper.findPropertyId(propertyCommand);
     if (propertyId == null) {
-      propertyDealSaveMapper.insertProperty(command);
-      return command.getId();
+      propertyDealMapper.insertProperty(propertyCommand);
+      return propertyCommand.getId();
     }
 
-    command.setId(propertyId);
-    propertyDealSaveMapper.updatePropertyCoordinate(command);
+    propertyCommand.setId(propertyId);
+    propertyDealMapper.updatePropertyCoordinate(propertyCommand);
     return propertyId;
   }
 
-  private int saveDeal(DealApiType apiType, Long propertyId, RealEstateDealItem deal) {
+  private PropertySaveCommand toPropertySaveCommand(RealEstateDealItem realEstateDeal) {
+    PropertySaveCommand propertyCommand = new PropertySaveCommand();
+    propertyCommand.setPropertyType(realEstateDeal.apiType().getPropertyType());
+    propertyCommand.setName(defaultText(realEstateDeal.propertyName()));
+    propertyCommand.setSggCd(defaultText(realEstateDeal.sggCd()));
+    propertyCommand.setUmdNm(defaultText(realEstateDeal.umdNm()));
+    propertyCommand.setJibun(defaultText(realEstateDeal.jibun()));
+    propertyCommand.setBuildYear(defaultInt(realEstateDeal.buildYear()));
+    return propertyCommand;
+  }
+
+  private int saveRealEstateDeal(DealApiType apiType, Long propertyId, RealEstateDealItem realEstateDeal) {
     if (apiType.isSale()) {
-      int inserted = propertyDealSaveMapper.insertSaleDeal(new SaleDealSaveCommand(
-          propertyId,
-          defaultDecimal(deal.exclusiveArea()),
-          deal.landArea(),
-          defaultLong(deal.dealAmount()),
-          defaultInt(deal.floor()),
-          deal.dealDate(),
-          defaultText(deal.buyerGbn()),
-          defaultText(deal.sellerGbn())
-      ));
-      propertyDealSaveMapper.updateLatestSalePrice(propertyId, defaultLong(deal.dealAmount()), deal.dealDate());
-      return inserted;
+      return saveSaleDeal(propertyId, realEstateDeal);
     }
+    return saveRentDeal(propertyId, realEstateDeal);
+  }
 
-    int inserted = propertyDealSaveMapper.insertRentDeal(new RentDealSaveCommand(
+  private int saveSaleDeal(Long propertyId, RealEstateDealItem realEstateDeal) {
+    int insertedCount = propertyDealMapper.insertSaleDeal(new SaleDealSaveCommand(
         propertyId,
-        defaultDecimal(deal.exclusiveArea()),
-        deal.landArea(),
-        defaultLong(deal.deposit()),
-        defaultLong(deal.monthlyRent()),
-        defaultInt(deal.floor()),
-        defaultText(deal.contractTerm()),
-        defaultText(deal.contractType()),
-        Boolean.TRUE.equals(deal.useRrRight()),
-        deal.preDeposit(),
-        deal.preMonthlyRent(),
-        deal.dealDate()
+        defaultDecimal(realEstateDeal.exclusiveArea()),
+        realEstateDeal.landArea(),
+        defaultLong(realEstateDeal.dealAmount()),
+        defaultInt(realEstateDeal.floor()),
+        realEstateDeal.dealDate(),
+        defaultText(realEstateDeal.buyerGbn()),
+        defaultText(realEstateDeal.sellerGbn())
     ));
-    propertyDealSaveMapper.updateLatestRentPrice(
+
+    propertyDealMapper.updateLatestSalePrice(
         propertyId,
-        defaultLong(deal.deposit()),
-        defaultLong(deal.monthlyRent()),
-        deal.dealDate()
+        defaultLong(realEstateDeal.dealAmount()),
+        realEstateDeal.dealDate()
     );
-    return inserted;
+    return insertedCount;
   }
 
-  private String toAddress(RealEstateDealItem deal) {
-    String regionName = regionName(deal.sggCd());
-    return String.join(" ", regionName, defaultText(deal.umdNm()), defaultText(deal.jibun()));
+  private int saveRentDeal(Long propertyId, RealEstateDealItem realEstateDeal) {
+    int insertedCount = propertyDealMapper.insertRentDeal(new RentDealSaveCommand(
+        propertyId,
+        defaultDecimal(realEstateDeal.exclusiveArea()),
+        realEstateDeal.landArea(),
+        defaultLong(realEstateDeal.deposit()),
+        defaultLong(realEstateDeal.monthlyRent()),
+        defaultInt(realEstateDeal.floor()),
+        defaultText(realEstateDeal.contractTerm()),
+        defaultText(realEstateDeal.contractType()),
+        Boolean.TRUE.equals(realEstateDeal.useRrRight()),
+        realEstateDeal.preDeposit(),
+        realEstateDeal.preMonthlyRent(),
+        realEstateDeal.dealDate()
+    ));
+
+    propertyDealMapper.updateLatestRentPrice(
+        propertyId,
+        defaultLong(realEstateDeal.deposit()),
+        defaultLong(realEstateDeal.monthlyRent()),
+        realEstateDeal.dealDate()
+    );
+    return insertedCount;
   }
 
-  private String regionName(String sggCd) {
-    return BUSAN_REGIONS.getOrDefault(sggCd, "부산");
+  private String toAddress(RealEstateDealItem realEstateDeal) {
+    String regionName = RegionCode.nameOf(realEstateDeal.sggCd());
+    return String.join(" ", regionName, defaultText(realEstateDeal.umdNm()), defaultText(realEstateDeal.jibun()));
   }
 
   private String defaultText(String value) {
@@ -138,22 +157,4 @@ public class RealEstateDealFetchService {
     return value == null ? BigDecimal.ZERO : value;
   }
 
-  private static final Map<String, String> BUSAN_REGIONS = Map.ofEntries(
-      Map.entry("26110", "부산 중구"),
-      Map.entry("26140", "부산 서구"),
-      Map.entry("26170", "부산 동구"),
-      Map.entry("26200", "부산 영도구"),
-      Map.entry("26230", "부산진구"),
-      Map.entry("26260", "부산 동래구"),
-      Map.entry("26290", "부산 남구"),
-      Map.entry("26320", "부산 북구"),
-      Map.entry("26350", "부산 해운대구"),
-      Map.entry("26380", "부산 사하구"),
-      Map.entry("26410", "부산 금정구"),
-      Map.entry("26440", "부산 강서구"),
-      Map.entry("26470", "부산 연제구"),
-      Map.entry("26500", "부산 수영구"),
-      Map.entry("26530", "부산 사상구"),
-      Map.entry("26710", "부산 기장군")
-  );
 }
