@@ -9,11 +9,18 @@
   </insert>
 
   <select id="findByEmail" parameterType="string" resultType="com.ssafy.zipdaum.user.dto.UserDto">
-    SELECT * FROM users WHERE email = #{email}
+    SELECT * FROM users WHERE email = #{email} AND is_deleted = FALSE
   </select>
 
   <select id="findById" parameterType="long" resultType="com.ssafy.zipdaum.user.dto.UserDto">
-    SELECT * FROM users WHERE id = #{id}
+    SELECT * FROM users WHERE id = #{id} AND is_deleted = FALSE
   </select>
+
+  <update id="softDeleteById" parameterType="long">
+    UPDATE users
+    SET is_deleted = TRUE
+    WHERE id = #{id}
+      AND is_deleted = FALSE
+  </update>
 
 </mapper>

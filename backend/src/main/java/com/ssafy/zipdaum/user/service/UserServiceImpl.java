@@ -49,4 +49,18 @@ public class UserServiceImpl implements UserService{
 
     return user;
   }
+
+  @Override
+  @Transactional
+  public void deleteById(Long id) {
+    log.info("회원 탈퇴 요청 userId={}", id);
+
+    int updatedRows = userMapper.softDeleteById(id);
+    if (updatedRows == 0) {
+      log.warn("탈퇴 처리할 대상이 없음 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    log.info("회원 탈퇴 완료 userId={}", id);
+  }
 }
