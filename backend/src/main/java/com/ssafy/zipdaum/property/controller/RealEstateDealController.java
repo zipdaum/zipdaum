@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/properties/real-estate-deals")
+@RequestMapping("/properties")
 @RequiredArgsConstructor
 @Tag(name = "실거래가", description = "공공데이터 실거래가 조회 및 저장 API")
 public class RealEstateDealController {
