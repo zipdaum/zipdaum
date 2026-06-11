@@ -1,10 +1,13 @@
 package com.ssafy.zipdaum.user.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
+@Schema(description = "회원 정보 수정 요청")
 public class UserUpdateRequest {
+  @Schema(description = "수정할 이름", example = "김집다움")
   private String name;
 }
