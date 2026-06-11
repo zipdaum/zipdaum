@@ -23,6 +23,11 @@ public enum ErrorCode {
   // 3. Property / Deal
   PROPERTY_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "주택 정보를 찾을 수 없습니다."),
   DEAL_NOT_FOUND(HttpStatus.NOT_FOUND, "P002", "실거래가 정보를 찾을 수 없습니다."),
+  INVALID_LAWD_CODE(HttpStatus.BAD_REQUEST, "P003", "법정동 코드는 5자리 숫자여야 합니다."),
+  INVALID_DEAL_YMD(HttpStatus.BAD_REQUEST, "P004", "계약년월은 6자리 숫자여야 합니다."),
+  REAL_ESTATE_API_KEY_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "P005", "공공데이터 API 키가 설정되지 않았습니다."),
+  KAKAO_API_KEY_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "P006", "카카오 API 키가 설정되지 않았습니다."),
+  COORDINATE_NOT_FOUND(HttpStatus.NOT_FOUND, "P007", "주소에 해당하는 좌표 정보를 찾을 수 없습니다."),
 
   // 4. Favorite
   FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "관심 목록에서 해당 정보를 찾을 수 없습니다."),
