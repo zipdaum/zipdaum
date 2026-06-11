@@ -5,10 +5,17 @@
 
 <mapper namespace="com.ssafy.zipdaum.property.mapper.PropertyDealMapper">
 
-  <select id="findPropertyId"
+  <resultMap id="propertySaveCommandResultMap"
+             type="com.ssafy.zipdaum.property.dto.PropertySaveCommand">
+    <id property="id" column="id"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
+  </resultMap>
+
+  <select id="findProperty"
           parameterType="com.ssafy.zipdaum.property.dto.PropertySaveCommand"
-          resultType="long">
-    SELECT id
+          resultMap="propertySaveCommandResultMap">
+    SELECT id, latitude, longitude
     FROM property
     WHERE property_type = #{propertyType}
       AND sgg_cd = #{sggCd}
