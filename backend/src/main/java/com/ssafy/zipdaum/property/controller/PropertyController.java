@@ -1,8 +1,11 @@
 package com.ssafy.zipdaum.property.controller;
 
 import com.ssafy.zipdaum.property.domain.DealApiType;
-import com.ssafy.zipdaum.property.dto.RealEstateDealSaveResult;
-import com.ssafy.zipdaum.property.service.RealEstateDealFetchService;
+import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
+import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
+import com.ssafy.zipdaum.property.dto.PropertySaveResult;
+import com.ssafy.zipdaum.property.service.PropertyFetchService;
+import com.ssafy.zipdaum.property.service.PropertyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,8 +13,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,9 +27,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/properties")
 @RequiredArgsConstructor
 @Tag(name = "실거래가", description = "공공데이터 실거래가 조회 및 저장 API")
-public class RealEstateDealController {
+public class PropertyController {
 
-  private final RealEstateDealFetchService fetchService;
+  private final PropertyFetchService fetchService;
+  private final PropertyService propertyService;
+
+  @GetMapping
+  @Operation(
+      summary = "주택 실거래가 조회",
+      description = "지역, 주택명, 주택 유형, 거래 유형, 가격 조건으로 주택 실거래가 목록을 조회합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "주택 실거래가 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertySearchResponse.class))
+      ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content)
+  })
+  public ResponseEntity<List<PropertySearchResponse>> searchProperties(
+      @ModelAttribute PropertySearchRequest request
+  ) {
+    return ResponseEntity.ok(propertyService.searchProperties(request));
+  }
 
   @PostMapping
   @Operation(
@@ -34,13 +60,13 @@ public class RealEstateDealController {
       @ApiResponse(
           responseCode = "200",
           description = "실거래가 저장 성공",
-          content = @Content(schema = @Schema(implementation = RealEstateDealSaveResult.class))
+          content = @Content(schema = @Schema(implementation = PropertySaveResult.class))
       ),
       @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
       @ApiResponse(responseCode = "404", description = "주소 좌표 정보 없음", content = @Content),
       @ApiResponse(responseCode = "500", description = "외부 API 키 누락 또는 외부 API 연동 오류", content = @Content)
   })
-  public ResponseEntity<RealEstateDealSaveResult> saveRealEstateDeals(
+  public ResponseEntity<PropertySaveResult> saveProperties(
       @Parameter(description = "실거래가 API 유형", example = "APARTMENT_SALE", required = true)
       @RequestParam DealApiType type,
       @Parameter(description = "법정동 코드 앞 5자리", example = "26350", required = true)
@@ -48,6 +74,6 @@ public class RealEstateDealController {
       @Parameter(description = "계약년월 6자리", example = "202501", required = true)
       @RequestParam String dealYmd
   ) {
-    return ResponseEntity.ok(fetchService.fetchAndSaveDeals(type, lawdCd, dealYmd));
+    return ResponseEntity.ok(fetchService.fetchAndSaveProperties(type, lawdCd, dealYmd));
   }
 }
