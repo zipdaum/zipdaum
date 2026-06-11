@@ -52,6 +52,20 @@ public class UserServiceImpl implements UserService{
 
   @Override
   @Transactional
+  public void updateName(Long id, String name) {
+    log.info("회원 정보 수정 요청 userId={}", id);
+
+    int updatedRows = userMapper.updateNameById(id, name);
+    if (updatedRows == 0) {
+      log.warn("수정 처리할 대상이 없음 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    log.info("회원 정보 수정 완료 userId={}", id);
+  }
+
+  @Override
+  @Transactional
   public void deleteById(Long id) {
     log.info("회원 탈퇴 요청 userId={}", id);
 

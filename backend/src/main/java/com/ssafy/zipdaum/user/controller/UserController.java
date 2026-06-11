@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.user.controller;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import com.ssafy.zipdaum.user.dto.UserInfoResponse;
 import com.ssafy.zipdaum.user.dto.UserDto;
+import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
 import com.ssafy.zipdaum.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,16 @@ public class UserController {
     );
 
     return ResponseEntity.ok(response);
+  }
+
+  @PatchMapping("/info")
+  public ResponseEntity<String> updateUserInfo(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @RequestBody UserUpdateRequest userUpdateRequest
+  ) {
+    log.info("PATCH /users/info 요청 userId={}", authenticatedUser.getId());
+    userService.updateName(authenticatedUser.getId(), userUpdateRequest.getName());
+    return ResponseEntity.ok("회원 정보 수정 성공");
   }
 
   @DeleteMapping("/info")
