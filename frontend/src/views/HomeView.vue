@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { searchProperties } from '../api/property'
 
 const dealTypes = [
@@ -54,7 +54,15 @@ const searchForm = ref({
 const searchResults = ref([])
 const hasSearched = ref(false)
 const isLoading = ref(false)
+const isResultHighlighted = ref(false)
 const errorMessage = ref('')
+const resultPanel = ref(null)
+const appliedSearchSummary = ref([])
+let resultHighlightTimer = null
+
+onUnmounted(() => {
+  clearResultHighlightTimer()
+})
 
 const userSummary = [
   { label: '예산', value: '3억 - 5억' },
@@ -119,13 +127,38 @@ const resultTitle = computed(() => {
   return '부산 추천 지역 TOP 3'
 })
 
+const resultNotice = computed(() => {
+  if (!hasSearched.value) {
+    return '검색 조건을 입력하면 이 영역이 실거래가 결과로 바뀝니다.'
+  }
+
+  if (isLoading.value) {
+    return '조건에 맞는 실거래가를 조회하고 있습니다.'
+  }
+
+  if (errorMessage.value) {
+    return '검색 요청을 완료하지 못했습니다.'
+  }
+
+  if (searchResults.value.length === 0) {
+    return '검색은 완료됐지만 조건에 맞는 매물이 없습니다.'
+  }
+
+  return `검색 완료: 조건에 맞는 실거래가 ${searchResults.value.length.toLocaleString()}건을 찾았습니다.`
+})
+
 function selectDealType(dealType) {
   searchForm.value.dealType = dealType
 }
 
 async function handleSearch() {
   isLoading.value = true
+  isResultHighlighted.value = true
   errorMessage.value = ''
+  hasSearched.value = true
+  appliedSearchSummary.value = getSearchSummary()
+  clearResultHighlightTimer()
+  await scrollToResults()
 
   try {
     const selectedPriceRange = priceRanges[searchForm.value.priceRangeIndex]
@@ -140,14 +173,45 @@ async function handleSearch() {
     })
 
     searchResults.value = await searchProperties(params)
-    hasSearched.value = true
   } catch (error) {
     searchResults.value = []
-    hasSearched.value = true
     errorMessage.value = '실거래가 검색 결과를 불러오지 못했습니다. 백엔드 서버와 검색 조건을 확인해주세요.'
   } finally {
     isLoading.value = false
+    resultHighlightTimer = window.setTimeout(() => {
+      isResultHighlighted.value = false
+      resultHighlightTimer = null
+    }, 1600)
+    await scrollToResults()
   }
+}
+
+function clearResultHighlightTimer() {
+  if (resultHighlightTimer) {
+    window.clearTimeout(resultHighlightTimer)
+    resultHighlightTimer = null
+  }
+}
+
+async function scrollToResults() {
+  await nextTick()
+  resultPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function getSearchSummary() {
+  const selectedRegion = regions.find((region) => region.value === searchForm.value.sggCd)
+  const selectedDealType = dealTypes.find((dealType) => dealType.value === searchForm.value.dealType)
+  const selectedPropertyType = propertyTypes.find((type) => type.value === searchForm.value.propertyType)
+  const selectedPriceRange = priceRanges[searchForm.value.priceRangeIndex]
+
+  return [
+    selectedRegion?.label,
+    selectedDealType?.label !== '전체' ? selectedDealType?.label : null,
+    searchForm.value.umdNm ? `읍면동 ${searchForm.value.umdNm}` : null,
+    searchForm.value.name ? `주택명 ${searchForm.value.name}` : null,
+    selectedPropertyType?.label !== '전체' ? selectedPropertyType?.label : null,
+    selectedPriceRange?.label !== '전체' ? selectedPriceRange?.label : null
+  ].filter(Boolean)
 }
 
 function removeEmptyValues(params) {
@@ -173,10 +237,15 @@ function getDisplayPrice(property) {
 }
 
 function getPropertyDetail(property) {
-  const type = property.propertyType || '주택'
+  const type = getPropertyTypeLabel(property.propertyType)
   const buildYear = property.buildYear ? `${property.buildYear}년 준공` : '준공연도 미상'
 
   return `${type} · ${buildYear}`
+}
+
+function getPropertyTypeLabel(propertyType) {
+  const type = propertyTypes.find((item) => item.value === propertyType)
+  return type?.label || '주택'
 }
 
 function formatPrice(price) {
@@ -216,7 +285,7 @@ function formatPrice(price) {
 
     <section class="hero-section" aria-labelledby="home-title">
       <div class="hero-copy">
-        <h1 id="home-title">부산에서 내 조건에 맞는 주거 정보를 찾아보세요</h1>
+        <h1 id="home-title">내 조건에 맞는 주거 정보를 찾아보세요</h1>
         <p>부산 지역 실거래가를 기준으로 관심 지역과 주택 후보를 비교합니다.</p>
       </div>
     </section>
@@ -289,10 +358,20 @@ function formatPrice(price) {
     </section>
 
     <section class="content-grid">
-      <article class="panel recommend-panel">
+      <article ref="resultPanel" :class="['panel', 'recommend-panel', { 'searched-panel': isResultHighlighted }]">
         <div class="panel-title-row">
-          <h2>{{ resultTitle }}</h2>
+          <div>
+            <p class="result-kicker">{{ hasSearched ? 'Search Result' : 'Recommendation' }}</p>
+            <h2>{{ resultTitle }}</h2>
+          </div>
           <span>{{ resultCountText }}</span>
+        </div>
+
+        <div :class="['result-notice', { 'is-searched': hasSearched, 'is-error': errorMessage }]">
+          <strong>{{ resultNotice }}</strong>
+          <div v-if="appliedSearchSummary.length > 0" class="condition-chips" aria-label="적용된 검색 조건">
+            <span v-for="condition in appliedSearchSummary" :key="condition">{{ condition }}</span>
+          </div>
         </div>
 
         <p v-if="hasSearched && displayedHomes.length === 0" class="empty-message">
