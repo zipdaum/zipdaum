@@ -4,7 +4,7 @@ import com.ssafy.zipdaum.property.domain.DealApiType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record RealEstateDealItem(
+public record PropertyItem(
     DealApiType apiType,
     String sggCd,
     String umdNm,
