@@ -101,7 +101,37 @@
         </if>
       </if>
     </where>
-    ORDER BY updated_at DESC, id DESC
+    ORDER BY
+    <choose>
+      <when test="sortBy == 'PRICE'">
+        <choose>
+          <when test="dealType == 'SALE'">
+            latest_sale_price
+          </when>
+          <when test="dealType == 'JEONSE' or dealType == 'MONTHLY_RENT'">
+            latest_deposit
+          </when>
+          <otherwise>
+            GREATEST(latest_sale_price, latest_deposit)
+          </otherwise>
+        </choose>
+      </when>
+      <when test="sortBy == 'NAME'">
+        name
+      </when>
+      <otherwise>
+        updated_at
+      </otherwise>
+    </choose>
+    <choose>
+      <when test="sortDirection == 'ASC'">
+        ASC
+      </when>
+      <otherwise>
+        DESC
+      </otherwise>
+    </choose>
+    , id DESC
   </select>
 
   <select id="findProperty"
