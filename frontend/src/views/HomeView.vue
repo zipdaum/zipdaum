@@ -42,15 +42,24 @@ const propertyTypes = [
   { label: '연립/다세대', value: 'VILLA' }
 ]
 
+const sortOptions = [
+  { label: '최신순', sortBy: 'LATEST', sortDirection: 'DESC' },
+  { label: '가격 높은순', sortBy: 'PRICE', sortDirection: 'DESC' },
+  { label: '가격 낮은순', sortBy: 'PRICE', sortDirection: 'ASC' },
+  { label: '이름순', sortBy: 'NAME', sortDirection: 'ASC' }
+]
+
 const searchForm = ref({
   sggCd: '26350',
   umdNm: '',
   name: '',
   propertyType: '',
   dealType: '',
-  priceRangeIndex: 0
+  priceRangeIndex: 0,
+  sortIndex: 0
 })
 
+const currentView = ref('home')
 const searchResults = ref([])
 const hasSearched = ref(false)
 const isLoading = ref(false)
@@ -94,14 +103,25 @@ const displayedHomes = computed(() => {
     return recommendedHomes
   }
 
-  return searchResults.value.slice(0, 5).map((property, index) => ({
+  return searchResults.value.slice(0, 5).map(mapPropertyToHomeCard)
+})
+
+const allResultRows = computed(() => searchResults.value.map((property, index) => ({
+  ...mapPropertyToHomeCard(property, index),
+  propertyType: getPropertyTypeLabel(property.propertyType)
+})))
+
+const hasMoreResults = computed(() => hasSearched.value && searchResults.value.length > 0)
+
+function mapPropertyToHomeCard(property, index) {
+  return {
     rank: index + 1,
     name: property.name || '주택명 미상',
     region: [property.umdNm, property.jibun].filter(Boolean).join(' ') || property.sggCd,
     price: getDisplayPrice(property),
     detail: getPropertyDetail(property)
-  }))
-})
+  }
+}
 
 const resultCountText = computed(() => {
   if (isLoading.value) {
@@ -152,6 +172,11 @@ function selectDealType(dealType) {
 }
 
 async function handleSearch() {
+  searchForm.value.sortIndex = 0
+  await runSearch()
+}
+
+async function runSearch() {
   isLoading.value = true
   isResultHighlighted.value = true
   errorMessage.value = ''
@@ -162,6 +187,7 @@ async function handleSearch() {
 
   try {
     const selectedPriceRange = priceRanges[searchForm.value.priceRangeIndex]
+    const selectedSort = sortOptions[searchForm.value.sortIndex]
     const params = removeEmptyValues({
       sggCd: searchForm.value.sggCd,
       umdNm: searchForm.value.umdNm,
@@ -169,10 +195,13 @@ async function handleSearch() {
       propertyType: searchForm.value.propertyType,
       dealType: searchForm.value.dealType,
       minPrice: selectedPriceRange.minPrice,
-      maxPrice: selectedPriceRange.maxPrice
+      maxPrice: selectedPriceRange.maxPrice,
+      sortBy: selectedSort.sortBy,
+      sortDirection: selectedSort.sortDirection
     })
 
-    searchResults.value = await searchProperties(params)
+    const properties = await searchProperties(params)
+    searchResults.value = sortProperties(properties, selectedSort)
   } catch (error) {
     searchResults.value = []
     errorMessage.value = '실거래가 검색 결과를 불러오지 못했습니다. 백엔드 서버와 검색 조건을 확인해주세요.'
@@ -184,6 +213,55 @@ async function handleSearch() {
     }, 1600)
     await scrollToResults()
   }
+}
+
+async function handleSortChange() {
+  if (!hasSearched.value) {
+    return
+  }
+
+  await runSearch()
+}
+
+function openResultsView() {
+  currentView.value = 'results'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function openHomeView() {
+  currentView.value = 'home'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function sortProperties(properties, selectedSort) {
+  if (selectedSort.sortBy === 'LATEST') {
+    return properties
+  }
+
+  return [...properties].sort((left, right) => {
+    if (selectedSort.sortBy === 'NAME') {
+      const comparison = (left.name || '').localeCompare(right.name || '', 'ko')
+      return selectedSort.sortDirection === 'ASC' ? comparison : -comparison
+    }
+
+    const leftPrice = getComparablePrice(left)
+    const rightPrice = getComparablePrice(right)
+    const comparison = leftPrice - rightPrice
+
+    return selectedSort.sortDirection === 'ASC' ? comparison : -comparison
+  })
+}
+
+function getComparablePrice(property) {
+  if (searchForm.value.dealType === 'SALE') {
+    return property.latestSalePrice || 0
+  }
+
+  if (searchForm.value.dealType === 'JEONSE' || searchForm.value.dealType === 'MONTHLY_RENT') {
+    return property.latestDeposit || 0
+  }
+
+  return Math.max(property.latestSalePrice || 0, property.latestDeposit || 0)
 }
 
 function clearResultHighlightTimer() {
@@ -265,13 +343,13 @@ function formatPrice(price) {
 <template>
   <main class="app-shell">
     <header class="top-bar">
-      <a class="brand" href="#" aria-label="집다움 홈">
+      <a class="brand" href="#" aria-label="집다움 홈" @click.prevent="openHomeView">
         <span class="brand-mark">Z</span>
         <span>집다움</span>
       </a>
 
       <nav class="main-nav" aria-label="주요 메뉴">
-        <a class="active" href="#">실거래가 검색</a>
+        <a class="active" href="#" @click.prevent="openHomeView">실거래가 검색</a>
         <a href="#">관심지역</a>
         <a href="#">알림</a>
         <a href="#">마이페이지</a>
@@ -283,149 +361,222 @@ function formatPrice(price) {
       </div>
     </header>
 
-    <section class="hero-section" aria-labelledby="home-title">
-      <div class="hero-copy">
-        <h1 id="home-title">내 조건에 맞는 주거 정보를 찾아보세요</h1>
-        <p>부산 지역 실거래가를 기준으로 관심 지역과 주택 후보를 비교합니다.</p>
-      </div>
-    </section>
+    <template v-if="currentView === 'home'">
+      <section class="hero-section" aria-labelledby="home-title">
+        <div class="hero-copy">
+          <h1 id="home-title">내 조건에 맞는 주거 정보를 찾아보세요</h1>
+          <p>부산 지역 실거래가를 기준으로 관심 지역과 주택 후보를 비교합니다.</p>
+        </div>
+      </section>
 
-    <form class="search-card" aria-label="실거래가 검색" @submit.prevent="handleSearch">
-      <div class="deal-tabs" aria-label="거래 유형">
-        <button
-          v-for="dealType in dealTypes"
-          :key="dealType.value"
-          :class="['deal-tab', { active: searchForm.dealType === dealType.value }]"
-          type="button"
-          @click="selectDealType(dealType.value)"
-        >
-          {{ dealType.label }}
-        </button>
+      <form class="search-card" aria-label="실거래가 검색" @submit.prevent="handleSearch">
+        <div class="deal-tabs" aria-label="거래 유형">
+          <button
+            v-for="dealType in dealTypes"
+            :key="dealType.value"
+            :class="['deal-tab', { active: searchForm.dealType === dealType.value }]"
+            type="button"
+            @click="selectDealType(dealType.value)"
+          >
+            {{ dealType.label }}
+          </button>
+        </div>
+
+        <div class="search-grid">
+          <label>
+            <span>지역</span>
+            <select v-model="searchForm.sggCd">
+              <option v-for="region in regions" :key="region.value" :value="region.value">
+                {{ region.label }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span>읍면동</span>
+            <input v-model.trim="searchForm.umdNm" type="text" placeholder="예: 우동" />
+          </label>
+          <label>
+            <span>주택명</span>
+            <input v-model.trim="searchForm.name" type="search" placeholder="예: 해운대" />
+          </label>
+          <label>
+            <span>주택 유형</span>
+            <select v-model="searchForm.propertyType">
+              <option v-for="type in propertyTypes" :key="type.value" :value="type.value">
+                {{ type.label }}
+              </option>
+            </select>
+          </label>
+          <label>
+            <span>가격 범위</span>
+            <select v-model.number="searchForm.priceRangeIndex">
+              <option v-for="(range, index) in priceRanges" :key="range.label" :value="index">
+                {{ range.label }}
+              </option>
+            </select>
+          </label>
+          <button class="search-button" type="submit" :disabled="isLoading">
+            {{ isLoading ? '검색 중' : '검색하기' }}
+          </button>
+        </div>
+
+        <p v-if="errorMessage" class="form-message" role="alert">{{ errorMessage }}</p>
+      </form>
+
+      <section class="summary-card" aria-labelledby="summary-title">
+        <div class="section-heading">
+          <p>내 맞춤 요약</p>
+          <h2 id="summary-title">설정한 조건에 가까운 거래를 우선 확인하세요</h2>
+        </div>
+        <div class="summary-list">
+          <article v-for="item in userSummary" :key="item.label" class="summary-item">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <article ref="resultPanel" :class="['panel', 'recommend-panel', { 'searched-panel': isResultHighlighted }]">
+          <div class="panel-title-row">
+            <div>
+              <p class="result-kicker">{{ hasSearched ? 'Search Result' : 'Recommendation' }}</p>
+              <h2>{{ resultTitle }}</h2>
+            </div>
+            <div class="panel-actions">
+              <span>{{ resultCountText }}</span>
+              <label v-if="hasSearched" class="sort-control compact-sort-control">
+                <span>정렬</span>
+                <select v-model.number="searchForm.sortIndex" @change="handleSortChange">
+                  <option v-for="(sort, index) in sortOptions" :key="sort.label" :value="index">
+                    {{ sort.label }}
+                  </option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div :class="['result-notice', { 'is-searched': hasSearched, 'is-error': errorMessage }]">
+            <strong>{{ resultNotice }}</strong>
+            <div v-if="appliedSearchSummary.length > 0" class="condition-chips" aria-label="적용된 검색 조건">
+              <span v-for="condition in appliedSearchSummary" :key="condition">{{ condition }}</span>
+            </div>
+          </div>
+
+          <p v-if="hasSearched && displayedHomes.length === 0" class="empty-message">
+            조건에 맞는 실거래가 검색 결과가 없습니다.
+          </p>
+
+          <div v-else class="recommend-list">
+            <article v-for="home in displayedHomes" :key="`${home.rank}-${home.name}`" class="home-card">
+              <div class="home-image" aria-hidden="true">
+                <span>{{ home.rank }}</span>
+              </div>
+              <div>
+                <h3>{{ home.name }}</h3>
+                <p>{{ home.region }}</p>
+                <strong>{{ home.price }}</strong>
+              </div>
+              <em>{{ home.detail }}</em>
+            </article>
+          </div>
+
+          <button
+            v-if="hasMoreResults"
+            class="secondary-button full-result-button"
+            type="button"
+            @click="openResultsView"
+          >
+            전체 결과 보기
+          </button>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title-row">
+            <h2>최근 실거래 하이라이트</h2>
+            <a href="#">전체 보기</a>
+          </div>
+
+          <ul class="deal-list">
+            <li v-for="deal in recentDeals" :key="deal.name">
+              <div>
+                <strong>{{ deal.name }}</strong>
+                <span>{{ deal.date }}</span>
+              </div>
+              <p>{{ deal.price }}</p>
+            </li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title-row">
+            <h2>관심지역 동향</h2>
+            <a href="#">상세 보기</a>
+          </div>
+
+          <div class="trend-list">
+            <article v-for="trend in regionTrends" :key="trend.name" class="trend-item">
+              <div>
+                <strong>{{ trend.name }}</strong>
+                <span class="spark-line" aria-hidden="true"></span>
+              </div>
+              <p>{{ trend.change }}</p>
+            </article>
+          </div>
+        </article>
+      </section>
+    </template>
+
+    <section v-else class="result-page" aria-labelledby="all-result-title">
+      <div class="result-page-header">
+        <div>
+          <p class="result-kicker">All Search Results</p>
+          <h1 id="all-result-title">실거래가 전체 검색 결과</h1>
+          <p>{{ resultNotice }}</p>
+        </div>
+        <button class="secondary-button" type="button" @click="openHomeView">홈으로 돌아가기</button>
       </div>
 
-      <div class="search-grid">
-        <label>
-          <span>지역</span>
-          <select v-model="searchForm.sggCd">
-            <option v-for="region in regions" :key="region.value" :value="region.value">
-              {{ region.label }}
+      <div class="result-toolbar">
+        <div class="condition-chips" aria-label="적용된 검색 조건">
+          <span v-for="condition in appliedSearchSummary" :key="condition">{{ condition }}</span>
+        </div>
+
+        <label class="sort-control">
+          <span>정렬</span>
+          <select v-model.number="searchForm.sortIndex" @change="handleSortChange">
+            <option v-for="(sort, index) in sortOptions" :key="sort.label" :value="index">
+              {{ sort.label }}
             </option>
           </select>
         </label>
-        <label>
-          <span>읍면동</span>
-          <input v-model.trim="searchForm.umdNm" type="text" placeholder="예: 우동" />
-        </label>
-        <label>
-          <span>주택명</span>
-          <input v-model.trim="searchForm.name" type="search" placeholder="예: 해운대" />
-        </label>
-        <label>
-          <span>주택 유형</span>
-          <select v-model="searchForm.propertyType">
-            <option v-for="type in propertyTypes" :key="type.value" :value="type.value">
-              {{ type.label }}
-            </option>
-          </select>
-        </label>
-        <label>
-          <span>가격 범위</span>
-          <select v-model.number="searchForm.priceRangeIndex">
-            <option v-for="(range, index) in priceRanges" :key="range.label" :value="index">
-              {{ range.label }}
-            </option>
-          </select>
-        </label>
-        <button class="search-button" type="submit" :disabled="isLoading">
-          {{ isLoading ? '검색 중' : '검색하기' }}
-        </button>
       </div>
 
       <p v-if="errorMessage" class="form-message" role="alert">{{ errorMessage }}</p>
-    </form>
+      <p v-else-if="allResultRows.length === 0" class="empty-message">
+        조건에 맞는 실거래가 검색 결과가 없습니다.
+      </p>
 
-    <section class="summary-card" aria-labelledby="summary-title">
-      <div class="section-heading">
-        <p>내 맞춤 요약</p>
-        <h2 id="summary-title">설정한 조건에 가까운 거래를 우선 확인하세요</h2>
-      </div>
-      <div class="summary-list">
-        <article v-for="item in userSummary" :key="item.label" class="summary-item">
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
+      <div v-else class="all-result-list">
+        <article v-for="home in allResultRows" :key="`${home.rank}-${home.name}`" class="result-row">
+          <div class="home-image result-image" aria-hidden="true">
+            <span>{{ home.rank }}</span>
+          </div>
+          <div>
+            <h2>{{ home.name }}</h2>
+            <p>{{ home.region }}</p>
+          </div>
+          <div>
+            <span>주택 유형</span>
+            <strong>{{ home.propertyType }}</strong>
+          </div>
+          <div>
+            <span>가격</span>
+            <strong>{{ home.price }}</strong>
+          </div>
+          <em>{{ home.detail }}</em>
         </article>
       </div>
-    </section>
-
-    <section class="content-grid">
-      <article ref="resultPanel" :class="['panel', 'recommend-panel', { 'searched-panel': isResultHighlighted }]">
-        <div class="panel-title-row">
-          <div>
-            <p class="result-kicker">{{ hasSearched ? 'Search Result' : 'Recommendation' }}</p>
-            <h2>{{ resultTitle }}</h2>
-          </div>
-          <span>{{ resultCountText }}</span>
-        </div>
-
-        <div :class="['result-notice', { 'is-searched': hasSearched, 'is-error': errorMessage }]">
-          <strong>{{ resultNotice }}</strong>
-          <div v-if="appliedSearchSummary.length > 0" class="condition-chips" aria-label="적용된 검색 조건">
-            <span v-for="condition in appliedSearchSummary" :key="condition">{{ condition }}</span>
-          </div>
-        </div>
-
-        <p v-if="hasSearched && displayedHomes.length === 0" class="empty-message">
-          조건에 맞는 실거래가 검색 결과가 없습니다.
-        </p>
-
-        <div v-else class="recommend-list">
-          <article v-for="home in displayedHomes" :key="`${home.rank}-${home.name}`" class="home-card">
-            <div class="home-image" aria-hidden="true">
-              <span>{{ home.rank }}</span>
-            </div>
-            <div>
-              <h3>{{ home.name }}</h3>
-              <p>{{ home.region }}</p>
-              <strong>{{ home.price }}</strong>
-            </div>
-            <em>{{ home.detail }}</em>
-          </article>
-        </div>
-      </article>
-
-      <article class="panel">
-        <div class="panel-title-row">
-          <h2>최근 실거래 하이라이트</h2>
-          <a href="#">전체 보기</a>
-        </div>
-
-        <ul class="deal-list">
-          <li v-for="deal in recentDeals" :key="deal.name">
-            <div>
-              <strong>{{ deal.name }}</strong>
-              <span>{{ deal.date }}</span>
-            </div>
-            <p>{{ deal.price }}</p>
-          </li>
-        </ul>
-      </article>
-
-      <article class="panel">
-        <div class="panel-title-row">
-          <h2>관심지역 동향</h2>
-          <a href="#">상세 보기</a>
-        </div>
-
-        <div class="trend-list">
-          <article v-for="trend in regionTrends" :key="trend.name" class="trend-item">
-            <div>
-              <strong>{{ trend.name }}</strong>
-              <span class="spark-line" aria-hidden="true"></span>
-            </div>
-            <p>{{ trend.change }}</p>
-          </article>
-        </div>
-      </article>
     </section>
   </main>
 </template>
