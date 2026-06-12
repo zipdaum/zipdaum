@@ -54,7 +54,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       filterChain.doFilter(request, response);
     } catch (BusinessException e) {
-      // 7. 토큰이 만료되었거나 유효하지 않으면 SecurityContext를 비우고 에러 응답 반환
       SecurityContextHolder.clearContext();
       writeErrorResponse(response, e);
     }
