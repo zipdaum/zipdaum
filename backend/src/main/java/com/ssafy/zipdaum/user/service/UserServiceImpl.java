@@ -7,6 +7,7 @@ import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,12 @@ public class UserServiceImpl implements UserService{
     userDto.setName(request.getName());
     userDto.setPassword(passwordEncoder.encode(request.getPassword()));
 
-    userMapper.insertUser(userDto);
+    try {
+      userMapper.insertUser(userDto);
+    } catch (DuplicateKeyException e) {
+      log.warn("회원가입 중 중복 이메일 발생 email={}", request.getEmail());
+      throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
+    }
 
     log.info("회원가입 완료 email={}", request.getEmail());
   }

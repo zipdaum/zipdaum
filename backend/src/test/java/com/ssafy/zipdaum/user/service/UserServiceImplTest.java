@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 
 import com.ssafy.zipdaum.global.error.ErrorCode;
@@ -13,6 +14,7 @@ import com.ssafy.zipdaum.user.dto.UserDto;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class UserServiceImplTest {
@@ -45,6 +47,24 @@ class UserServiceImplTest {
     request.setName("홍길동");
 
     given(userMapper.findByEmail("user@example.com")).willReturn(new UserDto());
+
+    assertThatThrownBy(() -> service.signUp(request))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DUPLICATED_EMAIL)
+        );
+  }
+
+  @Test
+  void signUp_회원_저장시_중복키가_발생하면_DUPLICATED_EMAIL_예외가_발생한다() {
+    UserSignUpRequest request = new UserSignUpRequest();
+    request.setEmail("user@example.com");
+    request.setPassword("password1234");
+    request.setName("홍길동");
+
+    given(userMapper.findByEmail("user@example.com")).willReturn(null);
+    given(passwordEncoder.encode("password1234")).willReturn("encoded-password");
+    willThrow(new DuplicateKeyException("중복 이메일"))
+        .given(userMapper).insertUser(any(UserDto.class));
 
     assertThatThrownBy(() -> service.signUp(request))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
