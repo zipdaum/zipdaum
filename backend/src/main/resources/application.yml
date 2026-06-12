@@ -10,10 +10,6 @@ spring:
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
-  h2:
-    console:
-      enabled: false
-
 mybatis:
   mapper-locations: classpath:/mappers/**/*.xml
 
@@ -22,3 +18,7 @@ property:
     service-key: ${PUBLIC_DATA_SERVICE_KEY:}
   kakao:
     rest-api-key: ${KAKAO_REST_API_KEY:}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}

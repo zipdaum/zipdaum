@@ -1,0 +1,89 @@
+package com.ssafy.zipdaum.user.service;
+
+import com.ssafy.zipdaum.global.error.ErrorCode;
+import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.user.dto.UserDto;
+import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
+import com.ssafy.zipdaum.user.mapper.UserMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService{
+
+  private final UserMapper userMapper;
+  private final PasswordEncoder passwordEncoder;
+
+  @Transactional
+  public void signUp(UserSignUpRequest request) {
+
+    log.info("회원가입 요청 도착 email={}", request.getEmail());
+
+    if (userMapper.findByEmail(request.getEmail()) != null) {
+      log.warn("중복 이메일 email={}", request.getEmail());
+      throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
+    }
+
+    UserDto userDto = new UserDto();
+    userDto.setEmail(request.getEmail());
+    userDto.setName(request.getName());
+    userDto.setPassword(passwordEncoder.encode(request.getPassword()));
+
+    try {
+      userMapper.insertUser(userDto);
+    } catch (DuplicateKeyException e) {
+      log.warn("회원가입 중 중복 이메일 발생 email={}", request.getEmail());
+      throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
+    }
+
+    log.info("회원가입 완료 email={}", request.getEmail());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public UserDto findById(Long id) {
+    log.info("회원 정보 조회 요청 userId={}", id);
+
+    UserDto user = userMapper.findById(id);
+    if (user == null) {
+      log.warn("존재하지 않는 사용자 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    return user;
+  }
+
+  @Override
+  @Transactional
+  public void updateName(Long id, String name) {
+    log.info("회원 정보 수정 요청 userId={}", id);
+
+    int updatedRows = userMapper.updateNameById(id, name);
+    if (updatedRows == 0) {
+      log.warn("수정 처리할 대상이 없음 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    log.info("회원 정보 수정 완료 userId={}", id);
+  }
+
+  @Override
+  @Transactional
+  public void deleteById(Long id) {
+    log.info("회원 탈퇴 요청 userId={}", id);
+
+    int updatedRows = userMapper.softDeleteById(id);
+    if (updatedRows == 0) {
+      log.warn("탈퇴 처리할 대상이 없음 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    log.info("회원 탈퇴 완료 userId={}", id);
+  }
+}
