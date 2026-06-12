@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -40,7 +41,7 @@ public class UserController {
       @ApiResponse(responseCode = "201", description = "회원가입 성공", content = @Content),
       @ApiResponse(responseCode = "400", description = "중복 이메일 또는 입력값 오류", content = @Content)
   })
-  public ResponseEntity<String> signUp(@RequestBody UserSignUpRequest request) {
+  public ResponseEntity<String> signUp(@Valid @RequestBody UserSignUpRequest request) {
     log.info("POST /users 요청 email={}", request.getEmail());
     userService.signUp(request);
     return ResponseEntity.status(HttpStatus.CREATED).body("회원가입 성공");
@@ -85,7 +86,7 @@ public class UserController {
   @SecurityRequirement(name = "bearerAuth")
   public ResponseEntity<String> updateUserInfo(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
-      @RequestBody UserUpdateRequest userUpdateRequest
+      @Valid @RequestBody UserUpdateRequest userUpdateRequest
   ) {
     log.info("PATCH /users/info 요청 userId={}", authenticatedUser.getId());
     userService.updateName(authenticatedUser.getId(), userUpdateRequest.getName());
