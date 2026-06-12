@@ -36,7 +36,7 @@ public class AuthServiceImpl implements AuthService {
 
     if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
       log.warn("비밀번호 불일치 email={}", authRequest.getEmail());
-      throw new BusinessException(ErrorCode.INVALID_PASSWORD);
+      throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
     }
 
     String accessToken = jwtTokenProvider.createAccessToken(user);

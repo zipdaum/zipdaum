@@ -68,7 +68,7 @@ class AuthServiceImplTest {
   }
 
   @Test
-  void login_비밀번호가_일치하지_않으면_INVALID_PASSWORD_예외가_발생한다() {
+  void login_비밀번호가_일치하지_않으면_INVALID_CREDENTIALS_예외가_발생한다() {
     AuthRequest request = new AuthRequest();
     request.setEmail("user@example.com");
     request.setPassword("wrong-password");
@@ -84,7 +84,7 @@ class AuthServiceImplTest {
 
     assertThatThrownBy(() -> service.login(request))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
-            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_PASSWORD)
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_CREDENTIALS)
         );
 
     then(jwtTokenProvider).shouldHaveNoInteractions();

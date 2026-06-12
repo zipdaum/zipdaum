@@ -13,7 +13,7 @@ public enum ErrorCode {
 
   // 2. Auth
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
-  INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "U002", "잘못된 비밀번호입니다."),
+  INVALID_CREDENTIALS(HttpStatus.BAD_REQUEST, "U002", "이메일 또는 비밀번호가 올바르지 않습니다."),
   DUPLICATED_EMAIL(HttpStatus.BAD_REQUEST, "U003", "이미 존재하는 이메일입니다."),
   UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "U004", "인증 자격 증명이 유효하지 않습니다."),
   FORBIDDEN_MEMBER_ONLY(HttpStatus.FORBIDDEN, "U005", "회원가입을 하면 예산, 면적, 선호지역 등을 기준으로 내 조건에 맞는 주택 정보를 확인할 수 있습니다."),
