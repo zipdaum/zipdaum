@@ -13,9 +13,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/properties")
 @RequiredArgsConstructor
+@Validated
+@Slf4j
 @Tag(name = "실거래가", description = "공공데이터 실거래가 조회 및 저장 API")
 public class PropertyController {
 
@@ -46,9 +52,15 @@ public class PropertyController {
       @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content)
   })
   public ResponseEntity<List<PropertySearchResponse>> searchProperties(
-      @ModelAttribute PropertySearchRequest request
+      @Valid @ModelAttribute PropertySearchRequest request
   ) {
-    return ResponseEntity.ok(propertyService.searchProperties(request));
+    log.info("GET /properties 요청 sggCd={}, dealType={}, minPrice={}, maxPrice={}, sortBy={}, sortDirection={}",
+        request.getSggCd(), request.getDealType(), request.getMinPrice(), request.getMaxPrice(),
+        request.getSortBy(), request.getSortDirection());
+
+    List<PropertySearchResponse> response = propertyService.searchProperties(request);
+    log.info("GET /properties 완료 count={}", response.size());
+    return ResponseEntity.ok(response);
   }
 
   @PostMapping
@@ -70,10 +82,15 @@ public class PropertyController {
       @Parameter(description = "실거래가 API 유형", example = "APARTMENT_SALE", required = true)
       @RequestParam DealApiType type,
       @Parameter(description = "법정동 코드 앞 5자리", example = "26350", required = true)
-      @RequestParam String lawdCd,
+      @RequestParam @Pattern(regexp = "\\d{5}") String lawdCd,
       @Parameter(description = "계약년월 6자리", example = "202501", required = true)
-      @RequestParam String dealYmd
+      @RequestParam @Pattern(regexp = "\\d{6}") String dealYmd
   ) {
-    return ResponseEntity.ok(fetchService.fetchAndSaveProperties(type, lawdCd, dealYmd));
+    log.info("POST /properties 요청 type={}, lawdCd={}, dealYmd={}", type, lawdCd, dealYmd);
+
+    PropertySaveResult response = fetchService.fetchAndSaveProperties(type, lawdCd, dealYmd);
+    log.info("POST /properties 완료 fetchedCount={}, savedCount={}",
+        response.fetchedCount(), response.savedCount());
+    return ResponseEntity.ok(response);
   }
 }
