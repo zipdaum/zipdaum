@@ -1,0 +1,67 @@
+package com.ssafy.zipdaum.validation;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.ssafy.zipdaum.auth.dto.AuthRequest;
+import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
+import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import org.junit.jupiter.api.Test;
+
+class RequestValidationTest {
+
+  private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+
+  @Test
+  void validate_유효한_요청이면_검증_오류가_발생하지_않는다() {
+    UserSignUpRequest signUpRequest = new UserSignUpRequest();
+    signUpRequest.setEmail("user@example.com");
+    signUpRequest.setPassword("password1234");
+    signUpRequest.setName("홍길동");
+
+    AuthRequest authRequest = new AuthRequest();
+    authRequest.setEmail("user@example.com");
+    authRequest.setPassword("password1234");
+
+    UserUpdateRequest updateRequest = new UserUpdateRequest();
+    updateRequest.setName("김집다움");
+
+    assertThat(validator.validate(signUpRequest)).isEmpty();
+    assertThat(validator.validate(authRequest)).isEmpty();
+    assertThat(validator.validate(updateRequest)).isEmpty();
+  }
+
+  @Test
+  void validate_회원가입_요청값이_유효하지_않으면_각_필드의_검증_오류가_발생한다() {
+    UserSignUpRequest request = new UserSignUpRequest();
+    request.setEmail("invalid-email");
+    request.setPassword("short");
+    request.setName(" ");
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("email", "password", "name");
+  }
+
+  @Test
+  void validate_로그인_요청값이_유효하지_않으면_각_필드의_검증_오류가_발생한다() {
+    AuthRequest request = new AuthRequest();
+    request.setEmail("invalid-email");
+    request.setPassword("short");
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("email", "password");
+  }
+
+  @Test
+  void validate_회원정보_수정_이름이_유효하지_않으면_검증_오류가_발생한다() {
+    UserUpdateRequest request = new UserUpdateRequest();
+    request.setName(" ");
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("name");
+  }
+}
