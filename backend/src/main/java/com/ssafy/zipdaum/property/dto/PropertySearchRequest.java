@@ -14,4 +14,6 @@ public class PropertySearchRequest {
   private String dealType;
   private Long minPrice;
   private Long maxPrice;
+  private String sortBy;
+  private String sortDirection;
 }
