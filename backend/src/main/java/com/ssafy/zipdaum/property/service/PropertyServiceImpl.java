@@ -7,12 +7,16 @@ import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class PropertyServiceImpl implements PropertyService {
+
+  private static final Set<String> SORT_OPTIONS = Set.of("LATEST", "PRICE", "NAME");
+  private static final Set<String> SORT_DIRECTIONS = Set.of("ASC", "DESC");
 
   private final PropertyMapper propertyMapper;
 
@@ -45,6 +49,14 @@ public class PropertyServiceImpl implements PropertyService {
         throw new BusinessException(ErrorCode.INVALID_DEAL_TYPE);
       }
     }
+    if (request.getSortBy() != null && !request.getSortBy().isBlank()
+        && !SORT_OPTIONS.contains(request.getSortBy().trim().toUpperCase())) {
+      throw new BusinessException(ErrorCode.INVALID_SORT_OPTION);
+    }
+    if (request.getSortDirection() != null && !request.getSortDirection().isBlank()
+        && !SORT_DIRECTIONS.contains(request.getSortDirection().trim().toUpperCase())) {
+      throw new BusinessException(ErrorCode.INVALID_SORT_DIRECTION);
+    }
   }
 
   private void normalizeRequest(PropertySearchRequest request) {
@@ -57,6 +69,8 @@ public class PropertyServiceImpl implements PropertyService {
     } else {
       request.setDealType(null);
     }
+    request.setSortBy(normalizeSortBy(request.getSortBy()));
+    request.setSortDirection(normalizeSortDirection(request.getSortDirection()));
   }
 
   private String normalizeBlankToNull(String value) {
@@ -64,5 +78,19 @@ public class PropertyServiceImpl implements PropertyService {
       return null;
     }
     return value.trim();
+  }
+
+  private String normalizeSortBy(String value) {
+    if (value == null || value.isBlank()) {
+      return "LATEST";
+    }
+    return value.trim().toUpperCase();
+  }
+
+  private String normalizeSortDirection(String value) {
+    if (value == null || value.isBlank()) {
+      return "DESC";
+    }
+    return value.trim().toUpperCase();
   }
 }

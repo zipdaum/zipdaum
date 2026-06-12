@@ -33,6 +33,24 @@ class PropertyServiceImplTest {
     assertThat(actual.getSggCd()).isEqualTo("26350");
     assertThat(actual.getName()).isEqualTo("테스트");
     assertThat(actual.getDealType()).isEqualTo("SALE");
+    assertThat(actual.getSortBy()).isEqualTo("LATEST");
+    assertThat(actual.getSortDirection()).isEqualTo("DESC");
+  }
+
+  @Test
+  void searchProperties_정렬조건을_대문자로_정리한_뒤_조회한다() {
+    PropertySearchRequest request = new PropertySearchRequest();
+    request.setSortBy("price");
+    request.setSortDirection("asc");
+
+    service.searchProperties(request);
+
+    ArgumentCaptor<PropertySearchRequest> captor = ArgumentCaptor.forClass(PropertySearchRequest.class);
+    then(propertyMapper).should().selectProperties(captor.capture());
+
+    PropertySearchRequest actual = captor.getValue();
+    assertThat(actual.getSortBy()).isEqualTo("PRICE");
+    assertThat(actual.getSortDirection()).isEqualTo("ASC");
   }
 
   @Test
@@ -88,6 +106,28 @@ class PropertyServiceImplTest {
     assertThatThrownBy(() -> service.searchProperties(request))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_DEAL_TYPE)
+        );
+  }
+
+  @Test
+  void searchProperties_정렬기준이_올바르지_않으면_예외가_발생한다() {
+    PropertySearchRequest request = new PropertySearchRequest();
+    request.setSortBy("INVALID");
+
+    assertThatThrownBy(() -> service.searchProperties(request))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_SORT_OPTION)
+        );
+  }
+
+  @Test
+  void searchProperties_정렬방향이_올바르지_않으면_예외가_발생한다() {
+    PropertySearchRequest request = new PropertySearchRequest();
+    request.setSortDirection("INVALID");
+
+    assertThatThrownBy(() -> service.searchProperties(request))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_SORT_DIRECTION)
         );
   }
 }
