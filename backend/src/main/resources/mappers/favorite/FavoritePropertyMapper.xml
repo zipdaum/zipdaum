@@ -8,4 +8,10 @@
     VALUES (#{userId}, #{propertyId})
   </insert>
 
+  <delete id="deleteFavoriteProperty">
+    DELETE FROM favorite_property
+    WHERE user_id = #{userId}
+      AND property_id = #{propertyId}
+  </delete>
+
 </mapper>

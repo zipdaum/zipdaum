@@ -54,4 +54,25 @@ class FavoritePropertyServiceImplTest {
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FAVORITE_ALREADY_EXISTS)
         );
   }
+
+  @Test
+  void removeFavoriteProperty_관심_목록에_있는_주택이면_해제한다() {
+    given(favoritePropertyMapper.deleteFavoriteProperty(1L, 10L)).willReturn(1);
+
+    service.removeFavoriteProperty(1L, 10L);
+
+    then(favoritePropertyMapper).should().deleteFavoriteProperty(1L, 10L);
+  }
+
+  @Test
+  void removeFavoriteProperty_관심_목록에_없는_주택이면_FAVORITE_NOT_FOUND_예외가_발생한다() {
+    given(favoritePropertyMapper.deleteFavoriteProperty(1L, 10L)).willReturn(0);
+
+    assertThatThrownBy(() -> service.removeFavoriteProperty(1L, 10L))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FAVORITE_NOT_FOUND)
+        );
+
+    then(favoritePropertyMapper).should().deleteFavoriteProperty(1L, 10L);
+  }
 }

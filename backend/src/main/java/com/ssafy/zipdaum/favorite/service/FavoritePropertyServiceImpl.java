@@ -35,4 +35,17 @@ public class FavoritePropertyServiceImpl implements FavoritePropertyService {
 
     log.info("관심 주택 등록 완료 userId={}, propertyId={}", userId, propertyId);
   }
+
+  @Override
+  @Transactional
+  public void removeFavoriteProperty(Long userId, Long propertyId) {
+    int deletedCount = favoritePropertyMapper.deleteFavoriteProperty(userId, propertyId);
+
+    if (deletedCount == 0) {
+      log.warn("관심 목록에 없는 주택 userId={}, propertyId={}", userId, propertyId);
+      throw new BusinessException(ErrorCode.FAVORITE_NOT_FOUND);
+    }
+
+    log.info("관심 주택 해제 완료 userId={}, propertyId={}", userId, propertyId);
+  }
 }

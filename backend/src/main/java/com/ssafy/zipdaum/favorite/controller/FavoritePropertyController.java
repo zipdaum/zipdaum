@@ -15,9 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -54,5 +56,31 @@ public class FavoritePropertyController {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body("관심 주택 등록 성공");
+  }
+
+  @DeleteMapping
+  @Operation(summary = "관심 주택 해제", description = "현재 로그인한 사용자의 관심 주택을 해제합니다.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "관심 주택 해제 성공", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "관심 목록에서 주택 정보를 찾을 수 없음", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<String> deleteFavoriteProperty(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @RequestParam Long propertyId
+  ) {
+    log.info(
+        "DELETE /users/info/properties 요청 userId={}, propertyId={}",
+        authenticatedUser.getId(),
+        propertyId
+    );
+
+    favoritePropertyService.removeFavoriteProperty(
+        authenticatedUser.getId(),
+        propertyId
+    );
+
+    return ResponseEntity.ok("관심 주택 해제 성공");
   }
 }
