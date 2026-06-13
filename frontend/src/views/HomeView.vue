@@ -433,6 +433,7 @@ function getDetailSummaryItems(property) {
   const representativeDeal = getRecentDealRows(property)[0]
 
   return [
+    getPropertyTypeLabel(property.propertyType),
     representativeDeal?.floor,
     representativeDeal?.area !== '-' ? `전용면적 ${representativeDeal.area}` : null,
     getBuildYearLabel(property.buildYear)
@@ -449,25 +450,6 @@ function getLatestRentPrice(property) {
   }
 
   return formatPrice(property.latestDeposit)
-}
-
-function getTotalDealCount(property) {
-  return getAllDealRows(property).length
-}
-
-function getLatestDealDate(property) {
-  const latestDeal = getAllDealRows(property)[0]
-  return latestDeal ? formatDealDate(latestDeal.date) : '-'
-}
-
-function getPropertyInfoItems(property) {
-  return [
-    { label: '주택 유형', value: getPropertyTypeLabel(property.propertyType) },
-    { label: '최근 매매가', value: property.latestSalePrice > 0 ? formatPrice(property.latestSalePrice) : '-' },
-    { label: '최근 전월세', value: getLatestRentPrice(property) },
-    { label: '최근 거래일', value: getLatestDealDate(property) },
-    { label: '전체 거래 이력', value: `${getTotalDealCount(property).toLocaleString()}건` }
-  ]
 }
 
 function formatArea(area) {
@@ -545,10 +527,6 @@ function getPrimaryDealType(property) {
   }
 
   return '거래'
-}
-
-function getDetailInfoItems(property) {
-  return getPropertyInfoItems(property)
 }
 
 function getDealRowsByType(property, dealType) {
@@ -1051,43 +1029,39 @@ function formatPrice(price) {
 
       <template v-else-if="selectedPropertyDetail">
         <template v-if="currentView !== 'deal-history'">
-        <section class="detail-top-grid">
-          <article class="detail-hero">
-            <div>
-              <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 거래 상세</p>
-              <div class="detail-title-row">
-                <h1 id="deal-detail-title">{{ selectedPropertyDetail.name }}</h1>
-                <span class="deal-badge">{{ getPrimaryDealType(selectedPropertyDetail) }}</span>
-                <button
-                  :class="['favorite-star-button', { active: isFavoriteProperty(selectedPropertyDetail.id) }]"
-                  type="button"
-                  :aria-pressed="isFavoriteProperty(selectedPropertyDetail.id)"
-                  aria-label="관심 주택 등록"
-                  @click="toggleFavoriteProperty(selectedPropertyDetail.id)"
-                >
-                  ★
-                </button>
-              </div>
-              <p class="detail-address">{{ getPropertyAddress(selectedPropertyDetail) }}</p>
-              <div class="detail-tags">
-                <span v-for="item in getDetailSummaryItems(selectedPropertyDetail)" :key="item">
-                  {{ item }}
-                </span>
-              </div>
+        <section class="detail-hero">
+          <div>
+            <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 거래 상세</p>
+            <div class="detail-title-row">
+              <h1 id="deal-detail-title">{{ selectedPropertyDetail.name }}</h1>
+              <span class="deal-badge">{{ getPrimaryDealType(selectedPropertyDetail) }}</span>
+              <button
+                :class="['favorite-star-button', { active: isFavoriteProperty(selectedPropertyDetail.id) }]"
+                type="button"
+                :aria-pressed="isFavoriteProperty(selectedPropertyDetail.id)"
+                aria-label="관심 주택 등록"
+                @click="toggleFavoriteProperty(selectedPropertyDetail.id)"
+              >
+                ★
+              </button>
             </div>
-          </article>
+            <p class="detail-address">{{ getPropertyAddress(selectedPropertyDetail) }}</p>
+            <div class="detail-tags">
+              <span v-for="item in getDetailSummaryItems(selectedPropertyDetail)" :key="item">
+                {{ item }}
+              </span>
+            </div>
+          </div>
 
-          <article class="panel guest-fit-panel" aria-label="비회원 조건 적합도 안내">
+          <aside class="guest-fit-panel" aria-label="비회원 조건 적합도 안내">
             <div class="panel-title-row">
               <h2>내 조건 적합도</h2>
-              <span>로그인 필요</span>
             </div>
             <div class="fit-login-content">
-              <strong>로그인하면 확인 가능</strong>
               <p>로그인하면 예산, 선호 지역, 생활 편의 조건을 기준으로 이 거래가 내 조건에 맞는지 확인할 수 있습니다.</p>
-              <button class="secondary-button" type="button">로그인하고 확인</button>
+              <button class="secondary-button" type="button">로그인하러가기</button>
             </div>
-          </article>
+          </aside>
         </section>
 
         <section class="detail-dashboard">
@@ -1186,38 +1160,28 @@ function formatPrice(price) {
           </article>
         </section>
 
-        <section class="detail-lower-grid">
-          <article class="panel">
-            <div class="panel-title-row">
-              <h2>주택 정보</h2>
-            </div>
-            <dl class="info-list">
-              <div v-for="item in getDetailInfoItems(selectedPropertyDetail)" :key="item.label">
-                <dt>{{ item.label }}</dt>
-                <dd>{{ item.value }}</dd>
+        <section class="panel nearby-map-panel" aria-label="주변 생활 편의 시설과 지도">
+          <div class="nearby-map-content">
+            <div class="nearby-info-section">
+              <div class="panel-title-row">
+                <h2>주변 생활 편의 시설</h2>
               </div>
-            </dl>
-          </article>
+              <div class="locked-feature">
+                <strong>주변 생활 편의 시설 정보 준비 중</strong>
+                <p>교통, 학교, 편의시설, 병원 등 주변 생활 편의 정보를 확인할 수 있도록 공간만 먼저 마련했습니다.</p>
+              </div>
+            </div>
 
-          <article class="panel">
-            <div class="panel-title-row">
-              <h2>주변 생활 편의 시설</h2>
+            <div class="map-section">
+              <div class="panel-title-row">
+                <h2>지도</h2>
+              </div>
+              <div class="map-placeholder">
+                <strong>지도 화면 준비 중</strong>
+                <p>거래 위치와 주변 정보를 지도에서 확인할 수 있도록 공간만 먼저 마련했습니다.</p>
+              </div>
             </div>
-            <div class="locked-feature">
-              <strong>로그인하면 확인 가능</strong>
-              <p>로그인하면 교통, 학교, 편의시설, 병원 등 주변 생활 편의 정보를 확인할 수 있습니다.</p>
-            </div>
-          </article>
-
-          <article class="panel map-panel" aria-label="지도 섹션">
-            <div class="panel-title-row">
-              <h2>지도</h2>
-            </div>
-            <div class="map-placeholder">
-              <strong>지도 화면 준비 중</strong>
-              <p>거래 위치와 주변 정보를 지도에서 확인할 수 있도록 공간만 먼저 마련했습니다.</p>
-            </div>
-          </article>
+          </div>
         </section>
         </template>
 
