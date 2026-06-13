@@ -3,6 +3,86 @@
 
 <mapper namespace="com.ssafy.zipdaum.favorite.mapper.FavoritePropertyMapper">
 
+  <resultMap id="favoritePropertyResponseResultMap"
+             type="com.ssafy.zipdaum.favorite.dto.FavoritePropertyResponse">
+    <id property="propertyId" column="property_id"/>
+    <result property="name" column="name"/>
+    <result property="propertyType" column="property_type"/>
+    <result property="sggCd" column="sgg_cd"/>
+    <result property="umdNm" column="umd_nm"/>
+    <result property="latestSalePrice" column="latest_sale_price"/>
+    <result property="latestJeonseDeposit" column="latest_jeonse_deposit"/>
+    <result property="latestMonthlyRentDeposit" column="latest_monthly_rent_deposit"/>
+    <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+    <result property="saleDealCount" column="sale_deal_count"/>
+    <result property="jeonseDealCount" column="jeonse_deal_count"/>
+    <result property="monthlyRentDealCount" column="monthly_rent_deal_count"/>
+  </resultMap>
+
+  <select id="selectFavoriteProperties" resultMap="favoritePropertyResponseResultMap">
+    SELECT
+      p.id AS property_id,
+      p.name,
+      p.property_type,
+      p.sgg_cd,
+      p.umd_nm,
+      (
+        SELECT sd.deal_amount
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        ORDER BY sd.deal_date DESC, sd.id DESC
+        LIMIT 1
+      ) AS latest_sale_price,
+      (
+        SELECT rd.deposit
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+          AND rd.monthly_rent = 0
+        ORDER BY rd.deal_date DESC, rd.id DESC
+        LIMIT 1
+      ) AS latest_jeonse_deposit,
+      (
+        SELECT rd.deposit
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+          AND rd.monthly_rent &gt; 0
+        ORDER BY rd.deal_date DESC, rd.id DESC
+        LIMIT 1
+      ) AS latest_monthly_rent_deposit,
+      (
+        SELECT rd.monthly_rent
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+          AND rd.monthly_rent &gt; 0
+        ORDER BY rd.deal_date DESC, rd.id DESC
+        LIMIT 1
+      ) AS latest_monthly_rent,
+      (
+        SELECT COUNT(*)
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+          AND sd.deal_date &gt;= #{oneYearAgo}
+      ) AS sale_deal_count,
+      (
+        SELECT COUNT(*)
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+          AND rd.monthly_rent = 0
+          AND rd.deal_date &gt;= #{oneYearAgo}
+      ) AS jeonse_deal_count,
+      (
+        SELECT COUNT(*)
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+          AND rd.monthly_rent &gt; 0
+          AND rd.deal_date &gt;= #{oneYearAgo}
+      ) AS monthly_rent_deal_count
+    FROM favorite_property fp
+    JOIN property p ON p.id = fp.property_id
+    WHERE fp.user_id = #{userId}
+    ORDER BY fp.created_at DESC, fp.id DESC
+  </select>
+
   <insert id="insertFavoriteProperty">
     INSERT INTO favorite_property (user_id, property_id)
     VALUES (#{userId}, #{propertyId})
