@@ -1,0 +1,58 @@
+package com.ssafy.zipdaum.favorite.controller;
+
+import com.ssafy.zipdaum.favorite.dto.FavoritePropertyCreateRequest;
+import com.ssafy.zipdaum.favorite.service.FavoritePropertyService;
+import com.ssafy.zipdaum.global.security.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@Slf4j
+@RestController
+@RequestMapping("/users/info/properties")
+@RequiredArgsConstructor
+@Tag(name = "관심 주택", description = "관심 주택 관리 API")
+public class FavoritePropertyController {
+
+  private final FavoritePropertyService favoritePropertyService;
+
+  @PostMapping
+  @Operation(summary = "관심 주택 등록", description = "현재 로그인한 사용자의 관심 주택을 등록합니다.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "관심 주택 등록 성공", content = @Content),
+      @ApiResponse(responseCode = "400", description = "입력값 오류 또는 이미 등록된 관심 주택", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "주택 정보를 찾을 수 없음", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<String> addFavoriteProperty(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @Valid @RequestBody FavoritePropertyCreateRequest request
+  ) {
+    log.info(
+        "POST /users/info/properties 요청 userId={}, propertyId={}",
+        authenticatedUser.getId(),
+        request.getPropertyId()
+    );
+
+    favoritePropertyService.saveFavoriteProperty(
+        authenticatedUser.getId(),
+        request.getPropertyId()
+    );
+
+    return ResponseEntity.status(HttpStatus.CREATED).body("관심 주택 등록 성공");
+  }
+}

@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.validation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ssafy.zipdaum.auth.dto.AuthRequest;
+import com.ssafy.zipdaum.favorite.dto.FavoritePropertyCreateRequest;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
 import jakarta.validation.Validation;
@@ -63,5 +64,15 @@ class RequestValidationTest {
     assertThat(validator.validate(request))
         .extracting(violation -> violation.getPropertyPath().toString())
         .contains("name");
+  }
+
+  @Test
+  void validate_관심_주택_ID가_양수가_아니면_검증_오류가_발생한다() {
+    FavoritePropertyCreateRequest request = new FavoritePropertyCreateRequest();
+    request.setPropertyId(0L);
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("propertyId");
   }
 }
