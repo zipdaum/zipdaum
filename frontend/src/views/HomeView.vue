@@ -85,8 +85,8 @@ const appliedSearchSummary = ref([])
 const historyPageSize = 5
 let resultHighlightTimer = null
 
-onMounted(() => {
-  window.history.replaceState({ view: 'home' }, '')
+onMounted(async () => {
+  await restoreViewFromUrl()
   window.addEventListener('popstate', handleBrowserBack)
 })
 
@@ -252,7 +252,10 @@ function openResultsView() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function openHomeView() {
+function openHomeView({ updateHistory = true } = {}) {
+  if (updateHistory) {
+    window.history.pushState({ view: 'home' }, '', getViewUrl('home'))
+  }
   currentView.value = 'home'
   selectedPropertyDetail.value = null
   detailErrorMessage.value = ''
@@ -265,7 +268,7 @@ async function openPropertyDetail(propertyId) {
     return
   }
 
-  window.history.pushState({ view: 'detail', propertyId }, '')
+  window.history.pushState({ view: 'detail', propertyId }, '', getViewUrl('detail', propertyId))
   await loadPropertyDetailView(propertyId, 'detail')
 }
 
@@ -310,27 +313,68 @@ function openDealHistoryView() {
   activeRentHistoryType.value = getJeonseDealCount(selectedPropertyDetail.value.rentDeals || []) > 0
     ? 'JEONSE'
     : 'MONTHLY_RENT'
-  window.history.pushState({ view: 'deal-history', propertyId: selectedPropertyDetail.value.id }, '')
+  window.history.pushState(
+    { view: 'deal-history', propertyId: selectedPropertyDetail.value.id },
+    '',
+    getViewUrl('deal-history', selectedPropertyDetail.value.id)
+  )
   currentView.value = 'deal-history'
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function handleBrowserBack(event) {
-  if (event.state?.view === 'deal-history') {
-    await loadPropertyDetailView(event.state.propertyId, 'deal-history')
+  const route = event.state?.view ? event.state : getCurrentRoute()
+
+  if (route.view === 'deal-history') {
+    await loadPropertyDetailView(route.propertyId, 'deal-history')
     return
   }
 
-  if (event.state?.view === 'detail') {
-    await loadPropertyDetailView(event.state.propertyId, 'detail')
+  if (route.view === 'detail') {
+    await loadPropertyDetailView(route.propertyId, 'detail')
     return
   }
 
-  currentView.value = 'home'
-  selectedPropertyDetail.value = null
-  detailErrorMessage.value = ''
-  isDetailLoading.value = false
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  openHomeView({ updateHistory: false })
+}
+
+async function restoreViewFromUrl() {
+  const route = getCurrentRoute()
+
+  window.history.replaceState(route, '', getViewUrl(route.view, route.propertyId))
+
+  if (route.view === 'deal-history') {
+    await loadPropertyDetailView(route.propertyId, 'deal-history')
+    return
+  }
+
+  if (route.view === 'detail') {
+    await loadPropertyDetailView(route.propertyId, 'detail')
+    return
+  }
+
+  openHomeView({ updateHistory: false })
+}
+
+function getCurrentRoute() {
+  const params = new URLSearchParams(window.location.search)
+  const view = params.get('view')
+  const propertyId = params.get('propertyId')
+
+  if ((view === 'detail' || view === 'deal-history') && propertyId) {
+    return { view, propertyId }
+  }
+
+  return { view: 'home' }
+}
+
+function getViewUrl(view, propertyId) {
+  if (view === 'detail' || view === 'deal-history') {
+    const params = new URLSearchParams({ view, propertyId: String(propertyId) })
+    return `${window.location.pathname}?${params.toString()}`
+  }
+
+  return window.location.pathname
 }
 
 function sortProperties(properties, selectedSort) {
