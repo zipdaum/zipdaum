@@ -1,6 +1,6 @@
 <script setup>
-import { computed, nextTick, onUnmounted, ref } from 'vue'
-import { searchProperties } from '../api/property'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { getPropertyDetail as fetchPropertyDetail, searchProperties } from '../api/property'
 
 const dealTypes = [
   { label: '전체', value: '' },
@@ -49,6 +49,12 @@ const sortOptions = [
   { label: '이름순', sortBy: 'NAME', sortDirection: 'ASC' }
 ]
 
+const trendTypes = [
+  { label: '매매', value: 'SALE' },
+  { label: '전세', value: 'JEONSE' },
+  { label: '월세', value: 'MONTHLY_RENT' }
+]
+
 const searchForm = ref({
   sggCd: '26350',
   umdNm: '',
@@ -65,12 +71,28 @@ const hasSearched = ref(false)
 const isLoading = ref(false)
 const isResultHighlighted = ref(false)
 const errorMessage = ref('')
+const isDetailLoading = ref(false)
+const detailErrorMessage = ref('')
+const selectedPropertyDetail = ref(null)
+const activeTrendType = ref('SALE')
+const hoveredTrendDot = ref(null)
+const activeRentHistoryType = ref('JEONSE')
+const saleHistoryPage = ref(1)
+const rentHistoryPage = ref(1)
+const favoritePropertyIds = ref([])
 const resultPanel = ref(null)
 const appliedSearchSummary = ref([])
+const historyPageSize = 5
 let resultHighlightTimer = null
+
+onMounted(() => {
+  window.history.replaceState({ view: 'home' }, '')
+  window.addEventListener('popstate', handleBrowserBack)
+})
 
 onUnmounted(() => {
   clearResultHighlightTimer()
+  window.removeEventListener('popstate', handleBrowserBack)
 })
 
 const userSummary = [
@@ -116,6 +138,7 @@ const hasMoreResults = computed(() => hasSearched.value && searchResults.value.l
 
 function mapPropertyToHomeCard(property, index) {
   return {
+    id: property.id,
     rank: index + 1,
     name: property.name || '주택명 미상',
     region: [property.umdNm, property.jibun].filter(Boolean).join(' ') || property.sggCd,
@@ -231,6 +254,82 @@ function openResultsView() {
 
 function openHomeView() {
   currentView.value = 'home'
+  selectedPropertyDetail.value = null
+  detailErrorMessage.value = ''
+  isDetailLoading.value = false
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function openPropertyDetail(propertyId) {
+  if (!propertyId) {
+    return
+  }
+
+  window.history.pushState({ view: 'detail', propertyId }, '')
+  await loadPropertyDetailView(propertyId, 'detail')
+}
+
+async function loadPropertyDetailView(propertyId, view = 'detail') {
+  currentView.value = view
+  if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== propertyId) {
+    selectedPropertyDetail.value = null
+    isDetailLoading.value = true
+  }
+  detailErrorMessage.value = ''
+  activeTrendType.value = 'SALE'
+  activeRentHistoryType.value = 'JEONSE'
+  saleHistoryPage.value = 1
+  rentHistoryPage.value = 1
+  hoveredTrendDot.value = null
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+
+  try {
+    if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== propertyId) {
+      selectedPropertyDetail.value = await fetchPropertyDetail(propertyId)
+    }
+    activeTrendType.value = getDefaultTrendType(selectedPropertyDetail.value)
+    if (view === 'deal-history') {
+      activeRentHistoryType.value = getJeonseDealCount(selectedPropertyDetail.value.rentDeals || []) > 0
+        ? 'JEONSE'
+        : 'MONTHLY_RENT'
+    }
+  } catch (error) {
+    detailErrorMessage.value = '거래 상세 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+  } finally {
+    isDetailLoading.value = false
+  }
+}
+
+function openDealHistoryView() {
+  if (!selectedPropertyDetail.value) {
+    return
+  }
+
+  saleHistoryPage.value = 1
+  rentHistoryPage.value = 1
+  activeRentHistoryType.value = getJeonseDealCount(selectedPropertyDetail.value.rentDeals || []) > 0
+    ? 'JEONSE'
+    : 'MONTHLY_RENT'
+  window.history.pushState({ view: 'deal-history', propertyId: selectedPropertyDetail.value.id }, '')
+  currentView.value = 'deal-history'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function handleBrowserBack(event) {
+  if (event.state?.view === 'deal-history') {
+    await loadPropertyDetailView(event.state.propertyId, 'deal-history')
+    return
+  }
+
+  if (event.state?.view === 'detail') {
+    await loadPropertyDetailView(event.state.propertyId, 'detail')
+    return
+  }
+
+  currentView.value = 'home'
+  selectedPropertyDetail.value = null
+  detailErrorMessage.value = ''
+  isDetailLoading.value = false
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -320,6 +419,342 @@ function getPropertyDetail(property) {
   const buildYear = getBuildYearLabel(property.buildYear)
 
   return `${type} · ${buildYear}`
+}
+
+function getPropertyAddress(property) {
+  return [property?.umdNm, property?.jibun].filter(Boolean).join(' ') || property?.sggCd || '-'
+}
+
+function getDetailSummaryItems(property) {
+  if (!property) {
+    return []
+  }
+
+  const representativeDeal = getRecentDealRows(property)[0]
+
+  return [
+    representativeDeal?.floor,
+    representativeDeal?.area !== '-' ? `전용면적 ${representativeDeal.area}` : null,
+    getBuildYearLabel(property.buildYear)
+  ].filter(Boolean)
+}
+
+function getLatestRentPrice(property) {
+  if (!(property.latestDeposit > 0)) {
+    return '-'
+  }
+
+  if (property.latestMonthlyRent > 0) {
+    return `${formatPrice(property.latestDeposit)} / 월세 ${property.latestMonthlyRent.toLocaleString()}만원`
+  }
+
+  return formatPrice(property.latestDeposit)
+}
+
+function getTotalDealCount(property) {
+  return getAllDealRows(property).length
+}
+
+function getLatestDealDate(property) {
+  const latestDeal = getAllDealRows(property)[0]
+  return latestDeal ? formatDealDate(latestDeal.date) : '-'
+}
+
+function getPropertyInfoItems(property) {
+  return [
+    { label: '주택 유형', value: getPropertyTypeLabel(property.propertyType) },
+    { label: '최근 매매가', value: property.latestSalePrice > 0 ? formatPrice(property.latestSalePrice) : '-' },
+    { label: '최근 전월세', value: getLatestRentPrice(property) },
+    { label: '최근 거래일', value: getLatestDealDate(property) },
+    { label: '전체 거래 이력', value: `${getTotalDealCount(property).toLocaleString()}건` }
+  ]
+}
+
+function formatArea(area) {
+  if (!area) {
+    return '-'
+  }
+
+  return `${Number(area).toLocaleString()}㎡`
+}
+
+function formatDealDate(date) {
+  return date ? date.replaceAll('-', '.') : '-'
+}
+
+function getRentDealType(deal) {
+  return deal.monthlyRent > 0 ? '월세' : '전세'
+}
+
+function getRentDealPrice(deal) {
+  if (deal.monthlyRent > 0) {
+    return `보증금 ${formatPrice(deal.deposit)} / 월세 ${deal.monthlyRent.toLocaleString()}만원`
+  }
+
+  return formatPrice(deal.deposit)
+}
+
+function getJeonseDealCount(rentDeals) {
+  return rentDeals.filter((deal) => !deal.monthlyRent || deal.monthlyRent === 0).length
+}
+
+function getMonthlyRentDealCount(rentDeals) {
+  return rentDeals.filter((deal) => deal.monthlyRent > 0).length
+}
+
+function getDefaultTrendType(property) {
+  if ((property.saleDeals || []).length > 0) {
+    return 'SALE'
+  }
+
+  if (getJeonseDealCount(property.rentDeals || []) > 0) {
+    return 'JEONSE'
+  }
+
+  if (getMonthlyRentDealCount(property.rentDeals || []) > 0) {
+    return 'MONTHLY_RENT'
+  }
+
+  return 'SALE'
+}
+
+function isFavoriteProperty(propertyId) {
+  return favoritePropertyIds.value.includes(propertyId)
+}
+
+function toggleFavoriteProperty(propertyId) {
+  if (isFavoriteProperty(propertyId)) {
+    favoritePropertyIds.value = favoritePropertyIds.value.filter((id) => id !== propertyId)
+    return
+  }
+
+  favoritePropertyIds.value = [...favoritePropertyIds.value, propertyId]
+}
+
+function getPrimaryDealType(property) {
+  if (property.latestSalePrice > 0) {
+    return '매매'
+  }
+
+  if (property.latestMonthlyRent > 0) {
+    return '월세'
+  }
+
+  if (property.latestDeposit > 0) {
+    return '전세'
+  }
+
+  return '거래'
+}
+
+function getDetailInfoItems(property) {
+  return getPropertyInfoItems(property)
+}
+
+function getDealRowsByType(property, dealType) {
+  const saleRows = (property.saleDeals || []).map((deal) => ({
+    id: `sale-${deal.id}`,
+    type: '매매',
+    date: deal.dealDate,
+    price: formatPrice(deal.dealAmount),
+    numericPrice: deal.dealAmount || 0,
+    area: formatArea(deal.exclusiveArea),
+    floor: `${deal.floor}층`
+  }))
+  const jeonseRows = (property.rentDeals || [])
+    .filter((deal) => !deal.monthlyRent || deal.monthlyRent === 0)
+    .map((deal) => ({
+      id: `jeonse-${deal.id}`,
+      type: '전세',
+      date: deal.dealDate,
+      price: getRentDealPrice(deal),
+      numericPrice: deal.deposit || 0,
+      area: formatArea(deal.exclusiveArea),
+      floor: `${deal.floor}층`
+    }))
+  const monthlyRentRows = (property.rentDeals || [])
+    .filter((deal) => deal.monthlyRent > 0)
+    .map((deal) => ({
+      id: `monthly-rent-${deal.id}`,
+      type: '월세',
+      date: deal.dealDate,
+      price: getRentDealPrice(deal),
+      numericPrice: deal.monthlyRent || 0,
+      area: formatArea(deal.exclusiveArea),
+      floor: `${deal.floor}층`
+    }))
+
+  const rowsByType = {
+    SALE: saleRows,
+    JEONSE: jeonseRows,
+    MONTHLY_RENT: monthlyRentRows
+  }
+
+  return rowsByType[dealType].sort((left, right) => {
+    const dateCompare = (right.date || '').localeCompare(left.date || '')
+    if (dateCompare !== 0) {
+      return dateCompare
+    }
+
+    return right.numericPrice - left.numericPrice
+  })
+}
+
+function getAllDealRows(property) {
+  return [
+    ...getDealRowsByType(property, 'SALE'),
+    ...getDealRowsByType(property, 'JEONSE'),
+    ...getDealRowsByType(property, 'MONTHLY_RENT')
+  ].sort((left, right) => {
+    const dateCompare = (right.date || '').localeCompare(left.date || '')
+    if (dateCompare !== 0) {
+      return dateCompare
+    }
+
+    return right.numericPrice - left.numericPrice
+  })
+}
+
+function getLimitedDealRows(property, dealType) {
+  return getDealRowsByType(property, dealType).slice(0, 5)
+}
+
+function getPaginatedDealRows(property, dealType, page) {
+  const startIndex = (page - 1) * historyPageSize
+  return getDealRowsByType(property, dealType).slice(startIndex, startIndex + historyPageSize)
+}
+
+function getDealPageCount(property, dealType) {
+  if (!property) {
+    return 1
+  }
+
+  const rowCount = getDealRowsByType(property, dealType).length
+  return Math.max(Math.ceil(rowCount / historyPageSize), 1)
+}
+
+function getVisibleHistoryPages(property, dealType, currentPage) {
+  const pageCount = getDealPageCount(property, dealType)
+  const groupStart = Math.floor((currentPage - 1) / 5) * 5 + 1
+  const groupEnd = Math.min(groupStart + 4, pageCount)
+  return Array.from({ length: groupEnd - groupStart + 1 }, (_, index) => groupStart + index)
+}
+
+function setSaleHistoryPage(page) {
+  saleHistoryPage.value = Math.min(Math.max(page, 1), getDealPageCount(selectedPropertyDetail.value, 'SALE'))
+}
+
+function setRentHistoryPage(page) {
+  rentHistoryPage.value = Math.min(Math.max(page, 1), getDealPageCount(selectedPropertyDetail.value, activeRentHistoryType.value))
+}
+
+function selectRentHistoryType(dealType) {
+  activeRentHistoryType.value = dealType
+  rentHistoryPage.value = 1
+}
+
+function getDealCountByType(property, dealType) {
+  return getDealRowsByType(property, dealType).length
+}
+
+function getRecentDealRows(property) {
+  return getAllDealRows(property).slice(0, 5)
+}
+
+function getTrendRows(property, dealType = activeTrendType.value) {
+  const saleRows = (property.saleDeals || [])
+    .map((deal) => ({ date: deal.dealDate, price: deal.dealAmount || 0 }))
+    .filter((deal) => deal.price > 0)
+  const jeonseRows = (property.rentDeals || [])
+    .filter((deal) => !deal.monthlyRent || deal.monthlyRent === 0)
+    .map((deal) => ({ date: deal.dealDate, price: deal.deposit || 0 }))
+    .filter((deal) => deal.price > 0)
+  const monthlyRentRows = (property.rentDeals || [])
+    .filter((deal) => deal.monthlyRent > 0)
+    .map((deal) => ({ date: deal.dealDate, price: deal.monthlyRent || 0 }))
+    .filter((deal) => deal.price > 0)
+
+  const rowsByType = {
+    SALE: saleRows,
+    JEONSE: jeonseRows,
+    MONTHLY_RENT: monthlyRentRows
+  }
+
+  return rowsByType[dealType]
+    .sort((left, right) => (left.date || '').localeCompare(right.date || ''))
+    .slice(-8)
+}
+
+function getTrendScale(property, dealType = activeTrendType.value) {
+  const rows = getTrendRows(property, dealType)
+  if (rows.length === 0) {
+    return null
+  }
+
+  const prices = rows.map((row) => row.price)
+  const minPrice = Math.min(...prices)
+  const maxPrice = Math.max(...prices)
+  const padding = Math.max((maxPrice - minPrice) * 0.12, maxPrice * 0.04, 1)
+  const min = Math.max(minPrice - padding, 0)
+  const max = maxPrice + padding
+
+  return {
+    min,
+    max,
+    range: Math.max(max - min, 1)
+  }
+}
+
+function getTrendPoints(property, dealType = activeTrendType.value) {
+  const rows = getTrendRows(property, dealType)
+  const scale = getTrendScale(property, dealType)
+  if (!scale) {
+    return ''
+  }
+
+  return rows.map((row, index) => {
+    const x = rows.length === 1 ? 190 : 78 + (index * 222) / (rows.length - 1)
+    const y = 110 - ((row.price - scale.min) / scale.range) * 80
+    return `${x},${y}`
+  }).join(' ')
+}
+
+function getTrendYAxisTicks(property, dealType = activeTrendType.value) {
+  const scale = getTrendScale(property, dealType)
+  if (!scale) {
+    return []
+  }
+
+  return [
+    { y: 30, label: formatPrice(scale.max) },
+    { y: 70, label: formatPrice((scale.max + scale.min) / 2) },
+    { y: 110, label: formatPrice(scale.min) }
+  ]
+}
+
+function getTrendDots(property, dealType = activeTrendType.value) {
+  const points = getTrendPoints(property, dealType)
+  if (!points) {
+    return []
+  }
+
+  const rows = getTrendRows(property, dealType)
+
+  return points.split(' ').map((point, index) => {
+    const [x, y] = point.split(',').map(Number)
+    return {
+      x,
+      y,
+      label: formatPrice(rows[index]?.price),
+      rawPrice: rows[index]?.price || 0,
+      date: rows[index]?.date ? rows[index].date.slice(2, 7).replace('-', '.') : ''
+    }
+  })
+}
+
+function getTrendEmptyText(dealType) {
+  const trendType = trendTypes.find((type) => type.value === dealType)
+  return `${trendType?.label || '거래'} 가격 추이 데이터가 없습니다.`
 }
 
 function getBuildYearLabel(buildYear) {
@@ -473,7 +908,14 @@ function formatPrice(price) {
           </p>
 
           <div v-else class="recommend-list">
-            <article v-for="home in displayedHomes" :key="`${home.rank}-${home.name}`" class="home-card">
+            <button
+              v-for="home in displayedHomes"
+              :key="`${home.rank}-${home.name}`"
+              :class="['home-card', 'property-card-button', { 'is-clickable': home.id }]"
+              type="button"
+              :disabled="!home.id"
+              @click="openPropertyDetail(home.id)"
+            >
               <div class="home-image" aria-hidden="true">
                 <span>{{ home.rank }}</span>
               </div>
@@ -483,7 +925,7 @@ function formatPrice(price) {
                 <strong>{{ home.price }}</strong>
               </div>
               <em>{{ home.detail }}</em>
-            </article>
+            </button>
           </div>
 
           <button
@@ -532,7 +974,7 @@ function formatPrice(price) {
       </section>
     </template>
 
-    <section v-else class="result-page" aria-labelledby="all-result-title">
+    <section v-else-if="currentView === 'results'" class="result-page" aria-labelledby="all-result-title">
       <div class="result-page-header">
         <div>
           <p class="result-kicker">All Search Results</p>
@@ -563,7 +1005,13 @@ function formatPrice(price) {
       </p>
 
       <div v-else class="all-result-list">
-        <article v-for="home in allResultRows" :key="`${home.rank}-${home.name}`" class="result-row">
+        <button
+          v-for="home in allResultRows"
+          :key="`${home.rank}-${home.name}`"
+          class="result-row property-card-button is-clickable"
+          type="button"
+          @click="openPropertyDetail(home.id)"
+        >
           <div class="home-image result-image" aria-hidden="true">
             <span>{{ home.rank }}</span>
           </div>
@@ -580,8 +1028,347 @@ function formatPrice(price) {
             <strong>{{ home.price }}</strong>
           </div>
           <em>{{ home.buildYearLabel }}</em>
-        </article>
+        </button>
       </div>
+    </section>
+
+    <section v-else class="detail-page" aria-labelledby="deal-detail-title">
+      <div v-if="isDetailLoading || detailErrorMessage || !selectedPropertyDetail" class="detail-header">
+        <div v-if="selectedPropertyDetail">
+          <p class="result-kicker">Deal Detail</p>
+          <h1 id="deal-detail-title">{{ selectedPropertyDetail.name }}</h1>
+          <p>{{ getPropertyAddress(selectedPropertyDetail) }}</p>
+        </div>
+        <div v-else>
+          <p class="result-kicker">Deal Detail</p>
+          <h1 id="deal-detail-title">거래 상세 조회</h1>
+          <p>선택한 거래의 상세 정보를 불러오고 있습니다.</p>
+        </div>
+      </div>
+
+      <p v-if="isDetailLoading" class="empty-message">거래 상세 정보를 불러오는 중입니다.</p>
+      <p v-else-if="detailErrorMessage" class="form-message" role="alert">{{ detailErrorMessage }}</p>
+
+      <template v-else-if="selectedPropertyDetail">
+        <template v-if="currentView !== 'deal-history'">
+        <section class="detail-top-grid">
+          <article class="detail-hero">
+            <div>
+              <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 거래 상세</p>
+              <div class="detail-title-row">
+                <h1 id="deal-detail-title">{{ selectedPropertyDetail.name }}</h1>
+                <span class="deal-badge">{{ getPrimaryDealType(selectedPropertyDetail) }}</span>
+                <button
+                  :class="['favorite-star-button', { active: isFavoriteProperty(selectedPropertyDetail.id) }]"
+                  type="button"
+                  :aria-pressed="isFavoriteProperty(selectedPropertyDetail.id)"
+                  aria-label="관심 주택 등록"
+                  @click="toggleFavoriteProperty(selectedPropertyDetail.id)"
+                >
+                  ★
+                </button>
+              </div>
+              <p class="detail-address">{{ getPropertyAddress(selectedPropertyDetail) }}</p>
+              <div class="detail-tags">
+                <span v-for="item in getDetailSummaryItems(selectedPropertyDetail)" :key="item">
+                  {{ item }}
+                </span>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel guest-fit-panel" aria-label="비회원 조건 적합도 안내">
+            <div class="panel-title-row">
+              <h2>내 조건 적합도</h2>
+              <span>로그인 필요</span>
+            </div>
+            <div class="fit-login-content">
+              <strong>로그인하면 확인 가능</strong>
+              <p>로그인하면 예산, 선호 지역, 생활 편의 조건을 기준으로 이 거래가 내 조건에 맞는지 확인할 수 있습니다.</p>
+              <button class="secondary-button" type="button">로그인하고 확인</button>
+            </div>
+          </article>
+        </section>
+
+        <section class="detail-dashboard">
+          <article class="panel trend-panel">
+            <div class="panel-title-row">
+              <h2>거래 가격 추이</h2>
+              <span>{{ trendTypes.find((type) => type.value === activeTrendType)?.label }} 기준</span>
+            </div>
+            <div class="deal-tabs compact-tabs" aria-label="거래 유형 표시">
+              <button
+                v-for="trendType in trendTypes"
+                :key="trendType.value"
+                :class="['deal-tab', { active: activeTrendType === trendType.value }]"
+                type="button"
+                @click="activeTrendType = trendType.value"
+              >
+                {{ trendType.label }}
+              </button>
+            </div>
+            <div class="trend-chart" aria-label="거래 가격 추이 차트">
+              <svg
+                v-if="getTrendPoints(selectedPropertyDetail, activeTrendType)"
+                viewBox="0 0 320 140"
+                role="img"
+                aria-label="최근 거래 가격 추이"
+              >
+                <g v-for="tick in getTrendYAxisTicks(selectedPropertyDetail, activeTrendType)" :key="tick.y">
+                  <line :x1="70" :y1="tick.y" :x2="300" :y2="tick.y" />
+                  <text class="trend-axis-label" x="48" :y="tick.y + 4">{{ tick.label }}</text>
+                </g>
+                <polyline :points="getTrendPoints(selectedPropertyDetail, activeTrendType)" />
+                <g
+                  v-for="dot in getTrendDots(selectedPropertyDetail, activeTrendType)"
+                  :key="`${dot.x}-${dot.y}`"
+                  class="trend-dot-group"
+                >
+                  <circle :cx="dot.x" :cy="dot.y" r="3.5" />
+                  <circle
+                    class="trend-hit-area"
+                    :cx="dot.x"
+                    :cy="dot.y"
+                    r="14"
+                    tabindex="0"
+                    @mouseover="hoveredTrendDot = dot"
+                    @focus="hoveredTrendDot = dot"
+                    @mouseleave="hoveredTrendDot = null"
+                    @blur="hoveredTrendDot = null"
+                  >
+                    <title>{{ dot.date }} {{ dot.label }}</title>
+                  </circle>
+                </g>
+                <g v-if="hoveredTrendDot" class="trend-tooltip">
+                  <rect
+                    :x="Math.min(Math.max(hoveredTrendDot.x - 48, 58), 222)"
+                    :y="Math.max(hoveredTrendDot.y - 54, 6)"
+                    width="96"
+                    height="42"
+                    rx="6"
+                  />
+                  <text
+                    :x="Math.min(Math.max(hoveredTrendDot.x, 106), 270)"
+                    :y="Math.max(hoveredTrendDot.y - 35, 25)"
+                  >
+                    {{ hoveredTrendDot.label }}
+                  </text>
+                  <text
+                    class="trend-tooltip-date"
+                    :x="Math.min(Math.max(hoveredTrendDot.x, 106), 270)"
+                    :y="Math.max(hoveredTrendDot.y - 19, 41)"
+                  >
+                    {{ hoveredTrendDot.date }}
+                  </text>
+                </g>
+              </svg>
+              <p v-else class="trend-empty-message">{{ getTrendEmptyText(activeTrendType) }}</p>
+            </div>
+          </article>
+
+          <article class="panel recent-deal-panel">
+            <div class="panel-title-row">
+              <h2>최근 실거래</h2>
+              <div class="panel-actions">
+                <span>{{ getAllDealRows(selectedPropertyDetail).length.toLocaleString() }}건</span>
+                <button class="text-action-button" type="button" @click="openDealHistoryView">
+                  전체 거래 보러가기
+                </button>
+              </div>
+            </div>
+            <ul class="recent-detail-list">
+              <li v-for="deal in getRecentDealRows(selectedPropertyDetail)" :key="deal.id">
+                <span>{{ formatDealDate(deal.date) }}</span>
+                <strong>{{ deal.price }} <em>({{ deal.type }})</em></strong>
+                <span>{{ deal.floor }}</span>
+              </li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="detail-lower-grid">
+          <article class="panel">
+            <div class="panel-title-row">
+              <h2>주택 정보</h2>
+            </div>
+            <dl class="info-list">
+              <div v-for="item in getDetailInfoItems(selectedPropertyDetail)" :key="item.label">
+                <dt>{{ item.label }}</dt>
+                <dd>{{ item.value }}</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title-row">
+              <h2>주변 생활 편의 시설</h2>
+            </div>
+            <div class="locked-feature">
+              <strong>로그인하면 확인 가능</strong>
+              <p>로그인하면 교통, 학교, 편의시설, 병원 등 주변 생활 편의 정보를 확인할 수 있습니다.</p>
+            </div>
+          </article>
+
+          <article class="panel map-panel" aria-label="지도 섹션">
+            <div class="panel-title-row">
+              <h2>지도</h2>
+            </div>
+            <div class="map-placeholder">
+              <strong>지도 화면 준비 중</strong>
+              <p>거래 위치와 주변 정보를 지도에서 확인할 수 있도록 공간만 먼저 마련했습니다.</p>
+            </div>
+          </article>
+        </section>
+        </template>
+
+        <template v-else>
+        <section class="detail-header history-page-header">
+          <div>
+            <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 거래 상세 &gt; 거래 이력</p>
+            <h1>전체 거래 이력</h1>
+            <p>{{ selectedPropertyDetail.name }} · {{ getPropertyAddress(selectedPropertyDetail) }}</p>
+          </div>
+
+          <div class="history-counts header-history-counts" aria-label="거래 이력 요약">
+            <article>
+              <span>매매</span>
+              <strong>{{ selectedPropertyDetail.saleDeals.length.toLocaleString() }}건</strong>
+            </article>
+            <article>
+              <span>전세</span>
+              <strong>{{ getJeonseDealCount(selectedPropertyDetail.rentDeals).toLocaleString() }}건</strong>
+            </article>
+            <article>
+              <span>월세</span>
+              <strong>{{ getMonthlyRentDealCount(selectedPropertyDetail.rentDeals).toLocaleString() }}건</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="history-panel-grid" aria-label="전체 거래 이력 목록">
+          <article class="history-section" aria-labelledby="sale-history-title">
+            <div class="panel-title-row">
+              <h2 id="sale-history-title">매매 거래 이력</h2>
+              <span>{{ selectedPropertyDetail.saleDeals.length.toLocaleString() }}건</span>
+            </div>
+
+            <p v-if="selectedPropertyDetail.saleDeals.length === 0" class="empty-message">
+              매매 거래 이력이 없습니다.
+            </p>
+            <template v-else>
+              <div class="history-table">
+                <div class="history-table-head">
+                  <span>거래일</span>
+                  <span>거래금액</span>
+                  <span>전용면적</span>
+                  <span>층</span>
+                </div>
+                <article v-for="deal in getPaginatedDealRows(selectedPropertyDetail, 'SALE', saleHistoryPage)" :key="deal.id">
+                  <span>{{ formatDealDate(deal.date) }}</span>
+                  <strong>{{ deal.price }}</strong>
+                  <span>{{ deal.area }}</span>
+                  <span>{{ deal.floor }}</span>
+                </article>
+              </div>
+              <div class="history-pagination" aria-label="매매 거래 이력 페이지">
+                <button type="button" :disabled="saleHistoryPage === 1" @click="setSaleHistoryPage(saleHistoryPage - 1)">
+                  이전
+                </button>
+                <button
+                  v-for="page in getVisibleHistoryPages(selectedPropertyDetail, 'SALE', saleHistoryPage)"
+                  :key="`sale-page-${page}`"
+                  :class="{ active: saleHistoryPage === page }"
+                  type="button"
+                  :aria-current="saleHistoryPage === page ? 'page' : undefined"
+                  @click="setSaleHistoryPage(page)"
+                >
+                  {{ page }}
+                </button>
+                <button
+                  type="button"
+                  :disabled="saleHistoryPage === getDealPageCount(selectedPropertyDetail, 'SALE')"
+                  @click="setSaleHistoryPage(saleHistoryPage + 1)"
+                >
+                  다음
+                </button>
+              </div>
+            </template>
+          </article>
+
+          <article class="history-section" aria-labelledby="rent-history-title">
+            <div class="panel-title-row">
+              <h2 id="rent-history-title">전월세 거래 이력</h2>
+              <div class="history-title-actions">
+                <div class="deal-tabs history-tabs" aria-label="전월세 거래 유형">
+                  <button
+                    type="button"
+                    :class="['deal-tab', { active: activeRentHistoryType === 'JEONSE' }]"
+                    @click="selectRentHistoryType('JEONSE')"
+                  >
+                    전세
+                  </button>
+                  <button
+                    type="button"
+                    :class="['deal-tab', { active: activeRentHistoryType === 'MONTHLY_RENT' }]"
+                    @click="selectRentHistoryType('MONTHLY_RENT')"
+                  >
+                    월세
+                  </button>
+                </div>
+                <span>{{ getDealCountByType(selectedPropertyDetail, activeRentHistoryType).toLocaleString() }}건</span>
+              </div>
+            </div>
+
+            <p v-if="getDealCountByType(selectedPropertyDetail, activeRentHistoryType) === 0" class="empty-message">
+              {{ activeRentHistoryType === 'JEONSE' ? '전세' : '월세' }} 거래 이력이 없습니다.
+            </p>
+            <template v-else>
+              <div class="history-table rent-history-table">
+                <div class="history-table-head">
+                  <span>거래일</span>
+                  <span>유형</span>
+                  <span>거래금액</span>
+                  <span>전용면적</span>
+                  <span>층</span>
+                </div>
+                <article
+                  v-for="deal in getPaginatedDealRows(selectedPropertyDetail, activeRentHistoryType, rentHistoryPage)"
+                  :key="deal.id"
+                >
+                  <span>{{ formatDealDate(deal.date) }}</span>
+                  <strong>{{ deal.type }}</strong>
+                  <span>{{ deal.price }}</span>
+                  <span>{{ deal.area }}</span>
+                  <span>{{ deal.floor }}</span>
+                </article>
+              </div>
+              <div class="history-pagination" aria-label="전월세 거래 이력 페이지">
+                <button type="button" :disabled="rentHistoryPage === 1" @click="setRentHistoryPage(rentHistoryPage - 1)">
+                  이전
+                </button>
+                <button
+                  v-for="page in getVisibleHistoryPages(selectedPropertyDetail, activeRentHistoryType, rentHistoryPage)"
+                  :key="`${activeRentHistoryType}-page-${page}`"
+                  :class="{ active: rentHistoryPage === page }"
+                  type="button"
+                  :aria-current="rentHistoryPage === page ? 'page' : undefined"
+                  @click="setRentHistoryPage(page)"
+                >
+                  {{ page }}
+                </button>
+                <button
+                  type="button"
+                  :disabled="rentHistoryPage === getDealPageCount(selectedPropertyDetail, activeRentHistoryType)"
+                  @click="setRentHistoryPage(rentHistoryPage + 1)"
+                >
+                  다음
+                </button>
+              </div>
+            </template>
+          </article>
+        </section>
+        </template>
+      </template>
     </section>
   </main>
 </template>
