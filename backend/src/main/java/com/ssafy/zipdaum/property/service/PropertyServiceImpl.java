@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.property.service;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.domain.DealType;
+import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
@@ -25,6 +26,18 @@ public class PropertyServiceImpl implements PropertyService {
     validateSearchRequest(request);
     normalizeRequest(request);
     return propertyMapper.selectProperties(request);
+  }
+
+  @Override
+  public PropertyDetailResponse findPropertyDetail(Long propertyId) {
+    PropertyDetailResponse detail = propertyMapper.selectPropertyById(propertyId);
+    if (detail == null) {
+      throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
+    }
+
+    detail.setSaleDeals(propertyMapper.selectSaleDealsByPropertyId(propertyId));
+    detail.setRentDeals(propertyMapper.selectRentDealsByPropertyId(propertyId));
+    return detail;
   }
 
   private void validateSearchRequest(PropertySearchRequest request) {

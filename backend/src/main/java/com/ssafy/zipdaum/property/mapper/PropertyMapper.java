@@ -1,5 +1,8 @@
 package com.ssafy.zipdaum.property.mapper;
 
+import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
+import com.ssafy.zipdaum.property.dto.PropertyRentDealResponse;
+import com.ssafy.zipdaum.property.dto.PropertySaleDealResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaveCommand;
@@ -14,6 +17,12 @@ import org.apache.ibatis.annotations.Param;
 public interface PropertyMapper {
 
   List<PropertySearchResponse> selectProperties(PropertySearchRequest request);
+
+  PropertyDetailResponse selectPropertyById(@Param("propertyId") Long propertyId);
+
+  List<PropertySaleDealResponse> selectSaleDealsByPropertyId(@Param("propertyId") Long propertyId);
+
+  List<PropertyRentDealResponse> selectRentDealsByPropertyId(@Param("propertyId") Long propertyId);
 
   PropertySaveCommand findProperty(PropertySaveCommand command);
 

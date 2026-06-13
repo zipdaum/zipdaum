@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.property.controller;
 
 import com.ssafy.zipdaum.property.domain.DealApiType;
+import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaveResult;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -49,6 +51,26 @@ public class PropertyController {
       @ModelAttribute PropertySearchRequest request
   ) {
     return ResponseEntity.ok(propertyService.searchProperties(request));
+  }
+
+  @GetMapping("/{propertyId}")
+  @Operation(
+      summary = "주택 상세 조회",
+      description = "주택 기본 정보와 매매/전월세 거래 이력을 조회합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "주택 상세 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyDetailResponse.class))
+      ),
+      @ApiResponse(responseCode = "404", description = "주택 정보 없음", content = @Content)
+  })
+  public ResponseEntity<PropertyDetailResponse> getPropertyDetail(
+      @Parameter(description = "주택 ID", example = "1", required = true)
+      @PathVariable Long propertyId
+  ) {
+    return ResponseEntity.ok(propertyService.findPropertyDetail(propertyId));
   }
 
   @PostMapping

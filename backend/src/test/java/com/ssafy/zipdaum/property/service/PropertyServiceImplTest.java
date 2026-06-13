@@ -2,13 +2,18 @@ package com.ssafy.zipdaum.property.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
+import com.ssafy.zipdaum.property.dto.PropertyRentDealResponse;
+import com.ssafy.zipdaum.property.dto.PropertySaleDealResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -16,6 +21,35 @@ class PropertyServiceImplTest {
 
   private final PropertyMapper propertyMapper = mock(PropertyMapper.class);
   private final PropertyServiceImpl service = new PropertyServiceImpl(propertyMapper);
+
+  @Test
+  void findPropertyDetail_주택정보와_거래이력을_조회한다() {
+    Long propertyId = 1L;
+    PropertyDetailResponse detail = new PropertyDetailResponse();
+    detail.setId(propertyId);
+    List<PropertySaleDealResponse> saleDeals = List.of(new PropertySaleDealResponse());
+    List<PropertyRentDealResponse> rentDeals = List.of(new PropertyRentDealResponse());
+    given(propertyMapper.selectPropertyById(propertyId)).willReturn(detail);
+    given(propertyMapper.selectSaleDealsByPropertyId(propertyId)).willReturn(saleDeals);
+    given(propertyMapper.selectRentDealsByPropertyId(propertyId)).willReturn(rentDeals);
+
+    PropertyDetailResponse result = service.findPropertyDetail(propertyId);
+
+    assertThat(result).isSameAs(detail);
+    assertThat(result.getSaleDeals()).isSameAs(saleDeals);
+    assertThat(result.getRentDeals()).isSameAs(rentDeals);
+  }
+
+  @Test
+  void findPropertyDetail_주택이_없으면_예외가_발생한다() {
+    Long propertyId = 1L;
+    given(propertyMapper.selectPropertyById(propertyId)).willReturn(null);
+
+    assertThatThrownBy(() -> service.findPropertyDetail(propertyId))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PROPERTY_NOT_FOUND)
+        );
+  }
 
   @Test
   void searchProperties_검색조건을_정리한_뒤_조회한다() {
