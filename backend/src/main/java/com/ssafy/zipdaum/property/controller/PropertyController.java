@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/properties")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "실거래가", description = "공공데이터 실거래가 조회 및 저장 API")
 public class PropertyController {
 
@@ -70,6 +72,7 @@ public class PropertyController {
       @Parameter(description = "주택 ID", example = "1", required = true)
       @PathVariable Long propertyId
   ) {
+    log.info("GET /properties/{} 요청", propertyId);
     return ResponseEntity.ok(propertyService.findPropertyDetail(propertyId));
   }
 

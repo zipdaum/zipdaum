@@ -10,10 +10,12 @@ import com.ssafy.zipdaum.property.mapper.PropertyMapper;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PropertyServiceImpl implements PropertyService {
 
   private static final Set<String> SORT_OPTIONS = Set.of("LATEST", "PRICE", "NAME");
@@ -30,14 +32,33 @@ public class PropertyServiceImpl implements PropertyService {
 
   @Override
   public PropertyDetailResponse findPropertyDetail(Long propertyId) {
+    validatePropertyId(propertyId);
+    log.info("주택 상세 조회 요청 propertyId={}", propertyId);
+
     PropertyDetailResponse detail = propertyMapper.selectPropertyById(propertyId);
     if (detail == null) {
+      log.warn("존재하지 않는 주택 propertyId={}", propertyId);
       throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
     }
 
-    detail.setSaleDeals(propertyMapper.selectSaleDealsByPropertyId(propertyId));
-    detail.setRentDeals(propertyMapper.selectRentDealsByPropertyId(propertyId));
+    var saleDeals = propertyMapper.selectSaleDealsByPropertyId(propertyId);
+    var rentDeals = propertyMapper.selectRentDealsByPropertyId(propertyId);
+    detail.setSaleDeals(saleDeals);
+    detail.setRentDeals(rentDeals);
+
+    log.info(
+        "주택 상세 조회 완료 propertyId={}, saleDealCount={}, rentDealCount={}",
+        propertyId,
+        saleDeals.size(),
+        rentDeals.size()
+    );
     return detail;
+  }
+
+  private void validatePropertyId(Long propertyId) {
+    if (propertyId == null || propertyId < 1) {
+      throw new BusinessException(ErrorCode.INVALID_PROPERTY_ID);
+    }
   }
 
   private void validateSearchRequest(PropertySearchRequest request) {

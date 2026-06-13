@@ -52,6 +52,14 @@ class PropertyServiceImplTest {
   }
 
   @Test
+  void findPropertyDetail_주택ID가_유효하지_않으면_예외가_발생한다() {
+    assertThatThrownBy(() -> service.findPropertyDetail(0L))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_PROPERTY_ID)
+        );
+  }
+
+  @Test
   void searchProperties_검색조건을_정리한_뒤_조회한다() {
     PropertySearchRequest request = new PropertySearchRequest();
     request.setSggCd("26350");
