@@ -1,9 +1,13 @@
 package com.ssafy.zipdaum.favorite.service;
 
+import com.ssafy.zipdaum.favorite.dto.FavoritePropertyResponse;
 import com.ssafy.zipdaum.favorite.mapper.FavoritePropertyMapper;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.property.domain.RegionCode;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -17,6 +21,19 @@ public class FavoritePropertyServiceImpl implements FavoritePropertyService {
 
   private final FavoritePropertyMapper favoritePropertyMapper;
   private final PropertyMapper propertyMapper;
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<FavoritePropertyResponse> findFavoriteProperties(Long userId) {
+    List<FavoritePropertyResponse> favoriteProperties =
+        favoritePropertyMapper.selectFavoriteProperties(userId, LocalDate.now().minusYears(1));
+
+    favoriteProperties.forEach(property ->
+        property.setRegionName(RegionCode.nameOf(property.getSggCd()))
+    );
+
+    return favoriteProperties;
+  }
 
   @Override
   @Transactional
