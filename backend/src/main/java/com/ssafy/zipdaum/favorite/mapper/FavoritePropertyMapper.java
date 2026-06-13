@@ -10,4 +10,9 @@ public interface FavoritePropertyMapper {
       @Param("userId") Long userId,
       @Param("propertyId") Long propertyId
   );
+
+  int deleteFavoriteProperty(
+      @Param("userId") Long userId,
+      @Param("propertyId") Long propertyId
+  );
 }
