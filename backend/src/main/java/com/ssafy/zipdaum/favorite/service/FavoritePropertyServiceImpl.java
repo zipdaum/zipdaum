@@ -1,0 +1,38 @@
+package com.ssafy.zipdaum.favorite.service;
+
+import com.ssafy.zipdaum.favorite.mapper.FavoritePropertyMapper;
+import com.ssafy.zipdaum.global.error.ErrorCode;
+import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.property.mapper.PropertyMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class FavoritePropertyServiceImpl implements FavoritePropertyService {
+
+  private final FavoritePropertyMapper favoritePropertyMapper;
+  private final PropertyMapper propertyMapper;
+
+  @Override
+  @Transactional
+  public void saveFavoriteProperty(Long userId, Long propertyId) {
+    if (!propertyMapper.existsPropertyById(propertyId)) {
+      log.warn("존재하지 않는 주택 propertyId={}", propertyId);
+      throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
+    }
+
+    try {
+      favoritePropertyMapper.insertFavoriteProperty(userId, propertyId);
+    } catch (DuplicateKeyException e) {
+      log.warn("이미 등록된 관심 주택 userId={}, propertyId={}", userId, propertyId);
+      throw new BusinessException(ErrorCode.FAVORITE_ALREADY_EXISTS);
+    }
+
+    log.info("관심 주택 등록 완료 userId={}, propertyId={}", userId, propertyId);
+  }
+}
