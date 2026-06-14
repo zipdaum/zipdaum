@@ -1027,6 +1027,18 @@ function getDealCountByType(property, dealType) {
   return property.jeonseTotalCount || 0
 }
 
+function getTotalDealCount(property) {
+  if (!property) {
+    return 0
+  }
+
+  const totalCount = (property.saleTotalCount || 0)
+    + (property.jeonseTotalCount || 0)
+    + (property.monthlyRentTotalCount || 0)
+
+  return totalCount || getAllDealRows(property).length
+}
+
 function getRecentDealRows(property) {
   return getAllDealRows(property).slice(0, 5)
 }
@@ -1687,7 +1699,7 @@ function formatPrice(price) {
             <div class="panel-title-row">
               <h2>최근 실거래</h2>
               <div class="panel-actions">
-                <span>{{ getAllDealRows(selectedPropertyDetail).length.toLocaleString() }}건</span>
+                <span>{{ getTotalDealCount(selectedPropertyDetail).toLocaleString() }}건</span>
                 <button class="text-action-button" type="button" @click="openDealHistoryView">
                   전체 거래 보러가기
                 </button>
