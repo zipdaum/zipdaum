@@ -34,7 +34,6 @@ public class PropertyServiceImpl implements PropertyService {
   @Override
   public PropertyDetailResponse findPropertyDetail(Long propertyId) {
     validatePropertyId(propertyId);
-    log.info("주택 상세 조회 요청 propertyId={}", propertyId);
 
     PropertyDetailResponse detail = propertyMapper.selectPropertyById(propertyId);
     if (detail == null) {
@@ -42,14 +41,13 @@ public class PropertyServiceImpl implements PropertyService {
       throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
     }
 
-    log.info("주택 상세 조회 완료 propertyId={}", propertyId);
+    log.debug("주택 상세 조회 완료 propertyId={}", propertyId);
     return detail;
   }
 
   @Override
   public PropertyDealHistoryResponse findPropertyDealHistories(Long propertyId) {
     validatePropertyId(propertyId);
-    log.info("주택 거래 이력 조회 요청 propertyId={}", propertyId);
 
     if (!propertyMapper.existsPropertyById(propertyId)) {
       log.warn("존재하지 않는 주택 propertyId={}", propertyId);
@@ -59,7 +57,7 @@ public class PropertyServiceImpl implements PropertyService {
     var saleDeals = propertyMapper.selectSaleDealsByPropertyId(propertyId);
     var rentDeals = propertyMapper.selectRentDealsByPropertyId(propertyId);
 
-    log.info(
+    log.debug(
         "주택 거래 이력 조회 완료 propertyId={}, saleDealCount={}, rentDealCount={}",
         propertyId,
         saleDeals.size(),
@@ -70,6 +68,7 @@ public class PropertyServiceImpl implements PropertyService {
 
   private void validatePropertyId(Long propertyId) {
     if (propertyId == null || propertyId < 1) {
+      log.warn("주택 조회 실패 - 잘못된 주택 ID propertyId={}", propertyId);
       throw new BusinessException(ErrorCode.INVALID_PROPERTY_ID);
     }
   }
