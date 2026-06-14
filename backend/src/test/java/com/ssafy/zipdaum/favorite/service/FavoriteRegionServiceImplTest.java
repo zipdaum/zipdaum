@@ -4,11 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 
+import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import com.ssafy.zipdaum.favorite.mapper.FavoriteRegionMapper;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.property.domain.RegionCode;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class FavoriteRegionServiceImplTest {
@@ -16,6 +21,35 @@ class FavoriteRegionServiceImplTest {
   private final FavoriteRegionMapper favoriteRegionMapper = mock(FavoriteRegionMapper.class);
   private final FavoriteRegionServiceImpl service =
       new FavoriteRegionServiceImpl(favoriteRegionMapper);
+
+  @Test
+  void findFavoriteRegions_관심_지역에_지역명을_설정하여_반환한다() {
+    FavoriteRegionResponse favoriteRegion = new FavoriteRegionResponse();
+    favoriteRegion.setSggCd("26350");
+    given(favoriteRegionMapper.selectFavoriteRegions(
+        org.mockito.ArgumentMatchers.eq(1L),
+        any(LocalDate.class)
+    )).willReturn(List.of(favoriteRegion));
+
+    List<FavoriteRegionResponse> result = service.findFavoriteRegions(1L);
+
+    assertThat(result).containsExactly(favoriteRegion);
+    assertThat(result.getFirst().getRegionName()).isEqualTo(RegionCode.nameOf("26350"));
+    then(favoriteRegionMapper).should()
+        .selectFavoriteRegions(org.mockito.ArgumentMatchers.eq(1L), any(LocalDate.class));
+  }
+
+  @Test
+  void findFavoriteRegions_관심_지역이_없으면_빈_목록을_반환한다() {
+    given(favoriteRegionMapper.selectFavoriteRegions(
+        org.mockito.ArgumentMatchers.eq(1L),
+        any(LocalDate.class)
+    )).willReturn(List.of());
+
+    List<FavoriteRegionResponse> result = service.findFavoriteRegions(1L);
+
+    assertThat(result).isEmpty();
+  }
 
   @Test
   void saveFavoriteRegion_존재하는_지역이면_관심_지역으로_등록한다() {

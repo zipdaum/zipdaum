@@ -1,9 +1,12 @@
 package com.ssafy.zipdaum.favorite.service;
 
+import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import com.ssafy.zipdaum.favorite.mapper.FavoriteRegionMapper;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.domain.RegionCode;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -16,6 +19,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class FavoriteRegionServiceImpl implements FavoriteRegionService {
 
   private final FavoriteRegionMapper favoriteRegionMapper;
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<FavoriteRegionResponse> findFavoriteRegions(Long userId) {
+    List<FavoriteRegionResponse> favoriteRegions =
+        favoriteRegionMapper.selectFavoriteRegions(userId, LocalDate.now().minusYears(1));
+
+    favoriteRegions.forEach(region ->
+        region.setRegionName(RegionCode.nameOf(region.getSggCd()))
+    );
+
+    log.info("관심 지역 조회 완료 userId={}, regionCount={}", userId, favoriteRegions.size());
+
+    return favoriteRegions;
+  }
 
   @Override
   @Transactional
