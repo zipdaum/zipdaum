@@ -18,10 +18,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PropertyFetchServiceImpl implements PropertyFetchService {
 
   private final PropertyApiClient propertyApiClient;
@@ -40,6 +42,8 @@ public class PropertyFetchServiceImpl implements PropertyFetchService {
       savedDealCount += savePropertyDeal(apiType, propertyId, propertyItem);
     }
 
+    log.info("실거래가 저장 완료 type={}, lawdCd={}, dealYmd={}, fetchedCount={}, savedCount={}",
+        apiType, lawdCd, dealYmd, propertyItems.size(), savedDealCount);
     return new PropertySaveResult(propertyItems.size(), savedDealCount);
   }
 
@@ -50,12 +54,15 @@ public class PropertyFetchServiceImpl implements PropertyFetchService {
 
   private void validateFetchRequest(String lawdCd, String dealYmd) {
     if (!properties.hasServiceKey()) {
+      log.warn("실거래가 저장 실패 - 공공데이터 API 키 누락");
       throw new BusinessException(ErrorCode.REAL_ESTATE_API_KEY_NOT_FOUND);
     }
     if (lawdCd == null || !lawdCd.matches("\\d{5}")) {
+      log.warn("실거래가 저장 실패 - 잘못된 법정동 코드 lawdCd={}", lawdCd);
       throw new BusinessException(ErrorCode.INVALID_LAWD_CODE);
     }
     if (dealYmd == null || !dealYmd.matches("\\d{6}")) {
+      log.warn("실거래가 저장 실패 - 잘못된 계약년월 dealYmd={}", dealYmd);
       throw new BusinessException(ErrorCode.INVALID_DEAL_YMD);
     }
   }
