@@ -65,7 +65,7 @@ class SurroundingServiceImplTest {
     assertThatThrownBy(() -> service.findSurroundings(
         new BigDecimal("35.1"),
         new BigDecimal("129.1"),
-        50
+        0
     )).isInstanceOf(BusinessException.class);
   }
 }

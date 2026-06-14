@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.ssafy.zipdaum.auth.dto.AuthRequest;
 import com.ssafy.zipdaum.favorite.dto.FavoritePropertyCreateRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
+import com.ssafy.zipdaum.property.dto.SurroundingRequest;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
 import jakarta.validation.Validation;
@@ -37,10 +38,14 @@ class RequestValidationTest {
     propertySearchRequest.setSortBy("price");
     propertySearchRequest.setSortDirection("asc");
 
+    SurroundingRequest surroundingRequest = new SurroundingRequest();
+    surroundingRequest.setRadiusMeters(50);
+
     assertThat(validator.validate(signUpRequest)).isEmpty();
     assertThat(validator.validate(authRequest)).isEmpty();
     assertThat(validator.validate(updateRequest)).isEmpty();
     assertThat(validator.validate(propertySearchRequest)).isEmpty();
+    assertThat(validator.validate(surroundingRequest)).isEmpty();
   }
 
   @Test
@@ -99,5 +104,21 @@ class RequestValidationTest {
     assertThat(validator.validate(request))
         .extracting(violation -> violation.getPropertyPath().toString())
         .contains("sggCd", "dealType", "minPrice", "maxPrice", "sortBy", "sortDirection");
+  }
+
+  @Test
+  void validate_주변시설_반경이_허용범위를_벗어나면_검증_오류가_발생한다() {
+    SurroundingRequest tooSmall = new SurroundingRequest();
+    tooSmall.setRadiusMeters(0);
+
+    SurroundingRequest tooLarge = new SurroundingRequest();
+    tooLarge.setRadiusMeters(3001);
+
+    assertThat(validator.validate(tooSmall))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("radiusMeters");
+    assertThat(validator.validate(tooLarge))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("radiusMeters");
   }
 }

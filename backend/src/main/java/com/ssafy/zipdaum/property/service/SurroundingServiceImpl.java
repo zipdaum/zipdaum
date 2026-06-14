@@ -67,7 +67,14 @@ public class SurroundingServiceImpl implements SurroundingService {
       throw new BusinessException(ErrorCode.COORDINATE_NOT_FOUND);
     }
 
-    return findSurroundings(property.getLatitude(), property.getLongitude(), radiusMeters);
+    SurroundingResponse response = findSurroundings(
+        property.getLatitude(),
+        property.getLongitude(),
+        radiusMeters
+    );
+    log.debug("주변 시설 조회 완료 propertyId={}, radiusMeters={}, facilityCount={}",
+        propertyId, response.getRadiusMeters(), response.getFacilities().size());
+    return response;
   }
 
   @Override
@@ -100,11 +107,13 @@ public class SurroundingServiceImpl implements SurroundingService {
 
   private void validateCoordinate(BigDecimal latitude, BigDecimal longitude) {
     if (latitude == null || longitude == null) {
+      log.warn("주변 시설 조회 실패 - 좌표 파라미터 누락 latitude={}, longitude={}", latitude, longitude);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
     double lat = latitude.doubleValue();
     double lng = longitude.doubleValue();
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      log.warn("주변 시설 조회 실패 - 잘못된 좌표 latitude={}, longitude={}", latitude, longitude);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
   }
@@ -113,7 +122,8 @@ public class SurroundingServiceImpl implements SurroundingService {
     if (radiusMeters == null) {
       return DEFAULT_RADIUS_METERS;
     }
-    if (radiusMeters < 100 || radiusMeters > MAX_RADIUS_METERS) {
+    if (radiusMeters < 1 || radiusMeters > MAX_RADIUS_METERS) {
+      log.warn("주변 시설 조회 실패 - 잘못된 반경 radiusMeters={}", radiusMeters);
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
     return radiusMeters;

@@ -6,6 +6,7 @@ import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaveResult;
+import com.ssafy.zipdaum.property.dto.SurroundingRequest;
 import com.ssafy.zipdaum.property.dto.SurroundingResponse;
 import com.ssafy.zipdaum.property.service.PropertyFetchService;
 import com.ssafy.zipdaum.property.service.PropertyService;
@@ -19,10 +20,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/properties")
 @RequiredArgsConstructor
 @Slf4j
+@Validated
 @Tag(name = "실거래가", description = "공공데이터 실거래가 조회 및 저장 API")
 public class PropertyController {
 
@@ -123,12 +127,14 @@ public class PropertyController {
   })
   public ResponseEntity<SurroundingResponse> getPropertySurroundings(
       @Parameter(description = "주택 ID", example = "1", required = true)
-      @PathVariable Long propertyId,
-      @Parameter(description = "조회 반경(m)", example = "1000")
-      @RequestParam(required = false) Integer radiusMeters
+      @PathVariable @Positive Long propertyId,
+      @Valid @ModelAttribute SurroundingRequest request
   ) {
-    log.info("GET /properties/{}/surroundings 요청 radiusMeters={}", propertyId, radiusMeters);
-    return ResponseEntity.ok(surroundingService.findPropertySurroundings(propertyId, radiusMeters));
+    log.info("GET /properties/{}/surroundings 요청 radiusMeters={}",
+        propertyId, request.getRadiusMeters());
+    return ResponseEntity.ok(
+        surroundingService.findPropertySurroundings(propertyId, request.getRadiusMeters())
+    );
   }
 
   @PostMapping
