@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 
@@ -15,6 +16,7 @@ import com.ssafy.zipdaum.property.domain.RegionCode;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 
 class FavoriteRegionServiceImplTest {
 
@@ -66,6 +68,17 @@ class FavoriteRegionServiceImplTest {
         );
 
     then(favoriteRegionMapper).shouldHaveNoInteractions();
+  }
+
+  @Test
+  void saveFavoriteRegion_이미_등록된_관심_지역이면_FAVORITE_ALREADY_EXISTS_예외가_발생한다() {
+    willThrow(new DuplicateKeyException("중복 관심 지역"))
+        .given(favoriteRegionMapper).insertFavoriteRegion(1L, "26350", "우동");
+
+    assertThatThrownBy(() -> service.saveFavoriteRegion(1L, "26350", "우동"))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.FAVORITE_ALREADY_EXISTS)
+        );
   }
 
   @Test
