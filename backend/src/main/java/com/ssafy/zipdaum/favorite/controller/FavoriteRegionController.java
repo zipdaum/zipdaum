@@ -15,9 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -55,5 +57,30 @@ public class FavoriteRegionController {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body("관심 지역 등록 성공");
+  }
+
+  @DeleteMapping
+  @Operation(summary = "관심 지역 해제", description = "현재 로그인한 사용자의 관심 지역을 해제합니다.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "관심 지역 해제 성공", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "관심 목록에서 지역 정보를 찾을 수 없음", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<String> deleteFavoriteRegion(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @RequestParam String sggCd,
+      @RequestParam String umdNm
+  ) {
+    log.info(
+        "DELETE /users/info/regions 요청 userId={}, sggCd={}, umdNm={}",
+        authenticatedUser.getId(),
+        sggCd,
+        umdNm
+    );
+
+    favoriteRegionService.removeFavoriteRegion(authenticatedUser.getId(), sggCd, umdNm);
+
+    return ResponseEntity.ok("관심 지역 해제 성공");
   }
 }

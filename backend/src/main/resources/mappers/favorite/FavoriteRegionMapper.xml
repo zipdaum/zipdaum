@@ -8,4 +8,11 @@
     VALUES (#{userId}, #{sggCd}, #{umdNm})
   </insert>
 
+  <delete id="deleteFavoriteRegion">
+    DELETE FROM favorite_region
+    WHERE user_id = #{userId}
+      AND sgg_cd = #{sggCd}
+      AND umd_nm = #{umdNm}
+  </delete>
+
 </mapper>
