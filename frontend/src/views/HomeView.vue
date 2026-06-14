@@ -131,6 +131,32 @@ const emptyHistoryMeta = {
 let resultHighlightTimer = null
 let mapDragStart = null
 
+function createEmptyRentDealsByType() {
+  return {
+    JEONSE: [],
+    MONTHLY_RENT: []
+  }
+}
+
+function createEmptyRentMetaByType() {
+  return {
+    JEONSE: {
+      page: 1,
+      size: historyPageSize,
+      totalCount: 0,
+      totalPages: 1,
+      serverPaged: false
+    },
+    MONTHLY_RENT: {
+      page: 1,
+      size: historyPageSize,
+      totalCount: 0,
+      totalPages: 1,
+      serverPaged: false
+    }
+  }
+}
+
 onMounted(async () => {
   await restoreViewFromUrl()
   window.addEventListener('popstate', handleBrowserBack)
@@ -364,11 +390,12 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
       loadSurroundings(selectedPropertyDetail.value)
     ])
 
-    if (selectedPropertyDetail.value.jeonseTotalCount === 0
-        && selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
+    if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
       await loadHistories(selectedPropertyDetail.value.id, {
         rentPage: 1,
-        rentDealType: 'MONTHLY_RENT'
+        rentDealType: 'MONTHLY_RENT',
+        updateSale: false,
+        activateRent: false
       })
     }
 
@@ -390,6 +417,8 @@ function createPropertyDetailState(detail) {
     ...detail,
     saleDeals: [],
     rentDeals: [],
+    rentDealsByType: createEmptyRentDealsByType(),
+    rentMetaByType: createEmptyRentMetaByType(),
     ...emptyHistoryMeta
   }
 }
@@ -405,6 +434,7 @@ async function loadHistories(propertyId, options = {}) {
   const requestedRentPage = options.rentPage || rentHistoryPage.value
   const shouldUpdateSale = options.updateSale !== false
   const shouldUpdateRent = options.updateRent !== false
+  const shouldActivateRent = options.activateRent !== false
 
   if (shouldUpdateSale) {
     isSaleHistoryLoading.value = true
@@ -424,6 +454,25 @@ async function loadHistories(propertyId, options = {}) {
     const rentTotalCount = histories.rentTotalCount ?? getRentDealCount(histories.rentDeals || [], rentDealType)
     const saleServerPaged = histories.salePage !== undefined || histories.saleTotalCount !== undefined
     const rentServerPaged = histories.rentPage !== undefined || histories.rentTotalCount !== undefined
+    const nextRentDealsByType = {
+      ...createEmptyRentDealsByType(),
+      ...(selectedPropertyDetail.value.rentDealsByType || {}),
+      ...(shouldUpdateRent ? { [rentDealType]: histories.rentDeals || [] } : {})
+    }
+    const nextRentMetaByType = {
+      ...createEmptyRentMetaByType(),
+      ...(selectedPropertyDetail.value.rentMetaByType || {}),
+      ...(shouldUpdateRent ? {
+        [rentDealType]: {
+          page: histories.rentPage || requestedRentPage,
+          size: histories.rentSize || historyPageSize,
+          totalCount: rentTotalCount,
+          totalPages: histories.rentTotalPages || calculatePageCount(rentTotalCount),
+          serverPaged: rentServerPaged
+        }
+      } : {})
+    }
+    const activeRentMeta = nextRentMetaByType[rentDealType]
 
     selectedPropertyDetail.value = {
       ...selectedPropertyDetail.value,
@@ -436,21 +485,27 @@ async function loadHistories(propertyId, options = {}) {
         saleServerPaged
       } : {}),
       ...(shouldUpdateRent ? {
-        rentDeals: histories.rentDeals || [],
-        rentDealType: histories.rentDealType || rentDealType,
-        rentPage: histories.rentPage || requestedRentPage,
-        rentSize: histories.rentSize || historyPageSize,
-        rentTotalCount,
-        rentTotalPages: histories.rentTotalPages || calculatePageCount(rentTotalCount),
+        rentDeals: shouldActivateRent
+          ? nextRentDealsByType[rentDealType]
+          : selectedPropertyDetail.value.rentDeals,
+        rentDealsByType: nextRentDealsByType,
+        rentMetaByType: nextRentMetaByType,
+        rentDealType: shouldActivateRent
+          ? histories.rentDealType || rentDealType
+          : selectedPropertyDetail.value.rentDealType,
+        rentPage: shouldActivateRent ? activeRentMeta.page : selectedPropertyDetail.value.rentPage,
+        rentSize: shouldActivateRent ? activeRentMeta.size : selectedPropertyDetail.value.rentSize,
+        rentTotalCount: shouldActivateRent ? activeRentMeta.totalCount : selectedPropertyDetail.value.rentTotalCount,
+        rentTotalPages: shouldActivateRent ? activeRentMeta.totalPages : selectedPropertyDetail.value.rentTotalPages,
         jeonseTotalCount: histories.jeonseTotalCount ?? getJeonseDealCount(histories.rentDeals || []),
         monthlyRentTotalCount: histories.monthlyRentTotalCount ?? getMonthlyRentDealCount(histories.rentDeals || []),
-        rentServerPaged
+        rentServerPaged: shouldActivateRent ? activeRentMeta.serverPaged : selectedPropertyDetail.value.rentServerPaged
       } : {})
     }
     if (shouldUpdateSale) {
       saleHistoryPage.value = selectedPropertyDetail.value.salePage
     }
-    if (shouldUpdateRent) {
+    if (shouldUpdateRent && shouldActivateRent) {
       rentHistoryPage.value = selectedPropertyDetail.value.rentPage
       activeRentHistoryType.value = selectedPropertyDetail.value.rentDealType
     }
@@ -729,16 +784,52 @@ function getRentDealCount(rentDeals, dealType) {
     : getJeonseDealCount(rentDeals)
 }
 
+function getRentDealsByType(property, dealType) {
+  if (!property) {
+    return []
+  }
+
+  const storedDeals = property.rentDealsByType?.[dealType]
+  if (storedDeals) {
+    return storedDeals
+  }
+
+  const rentDeals = property.rentDeals || []
+  return dealType === 'MONTHLY_RENT'
+    ? rentDeals.filter((deal) => deal.monthlyRent > 0)
+    : rentDeals.filter((deal) => !deal.monthlyRent || deal.monthlyRent === 0)
+}
+
+function getRentMetaByType(property, dealType) {
+  if (!property) {
+    return {
+      page: 1,
+      size: historyPageSize,
+      totalCount: 0,
+      totalPages: 1,
+      serverPaged: false
+    }
+  }
+
+  return property.rentMetaByType?.[dealType] || {
+    page: property.rentPage || 1,
+    size: property.rentSize || historyPageSize,
+    totalCount: getDealCountByType(property, dealType),
+    totalPages: property.rentTotalPages || calculatePageCount(getDealCountByType(property, dealType)),
+    serverPaged: property.rentServerPaged
+  }
+}
+
 function getDefaultTrendType(property) {
   if ((property.saleTotalCount || 0) > 0 || (property.saleDeals || []).length > 0) {
     return 'SALE'
   }
 
-  if ((property.jeonseTotalCount || 0) > 0 || getJeonseDealCount(property.rentDeals || []) > 0) {
+  if ((property.jeonseTotalCount || 0) > 0 || getRentDealsByType(property, 'JEONSE').length > 0) {
     return 'JEONSE'
   }
 
-  if ((property.monthlyRentTotalCount || 0) > 0 || getMonthlyRentDealCount(property.rentDeals || []) > 0) {
+  if ((property.monthlyRentTotalCount || 0) > 0 || getRentDealsByType(property, 'MONTHLY_RENT').length > 0) {
     return 'MONTHLY_RENT'
   }
 
@@ -784,8 +875,7 @@ function getDealRowsByType(property, dealType) {
     area: formatArea(deal.exclusiveArea),
     floor: `${deal.floor}층`
   }))
-  const jeonseRows = (property.rentDeals || [])
-    .filter((deal) => !deal.monthlyRent || deal.monthlyRent === 0)
+  const jeonseRows = getRentDealsByType(property, 'JEONSE')
     .map((deal) => ({
       id: `jeonse-${deal.id}`,
       type: '전세',
@@ -795,8 +885,7 @@ function getDealRowsByType(property, dealType) {
       area: formatArea(deal.exclusiveArea),
       floor: `${deal.floor}층`
     }))
-  const monthlyRentRows = (property.rentDeals || [])
-    .filter((deal) => deal.monthlyRent > 0)
+  const monthlyRentRows = getRentDealsByType(property, 'MONTHLY_RENT')
     .map((deal) => ({
       id: `monthly-rent-${deal.id}`,
       type: '월세',
@@ -846,7 +935,7 @@ function getPaginatedDealRows(property, dealType, page) {
   const rows = getDealRowsByType(property, dealType)
   const isServerPaged = dealType === 'SALE'
     ? property.saleServerPaged
-    : property.rentServerPaged
+    : getRentMetaByType(property, dealType).serverPaged
 
   if (isServerPaged) {
     return rows.slice(0, historyPageSize)
@@ -865,7 +954,7 @@ function getDealPageCount(property, dealType) {
     return property.saleTotalPages || 1
   }
 
-  return property.rentTotalPages || 1
+  return getRentMetaByType(property, dealType).totalPages || 1
 }
 
 function calculatePageCount(totalCount) {
@@ -946,12 +1035,10 @@ function getTrendRows(property, dealType = activeTrendType.value) {
   const saleRows = (property.saleDeals || [])
     .map((deal) => ({ date: deal.dealDate, price: deal.dealAmount || 0 }))
     .filter((deal) => deal.price > 0)
-  const jeonseRows = (property.rentDeals || [])
-    .filter((deal) => !deal.monthlyRent || deal.monthlyRent === 0)
+  const jeonseRows = getRentDealsByType(property, 'JEONSE')
     .map((deal) => ({ date: deal.dealDate, price: deal.deposit || 0 }))
     .filter((deal) => deal.price > 0)
-  const monthlyRentRows = (property.rentDeals || [])
-    .filter((deal) => deal.monthlyRent > 0)
+  const monthlyRentRows = getRentDealsByType(property, 'MONTHLY_RENT')
     .map((deal) => ({ date: deal.dealDate, price: deal.monthlyRent || 0 }))
     .filter((deal) => deal.price > 0)
 
