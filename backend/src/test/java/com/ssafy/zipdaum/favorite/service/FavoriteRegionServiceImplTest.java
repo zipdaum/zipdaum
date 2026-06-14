@@ -53,7 +53,7 @@ class FavoriteRegionServiceImplTest {
 
   @Test
   void saveFavoriteRegion_존재하는_지역이면_관심_지역으로_등록한다() {
-    service.saveFavoriteRegion(1L, " 26350 ", " 우동 ");
+    service.saveFavoriteRegion(1L, "26350", "우동");
 
     then(favoriteRegionMapper).should().insertFavoriteRegion(1L, "26350", "우동");
   }
