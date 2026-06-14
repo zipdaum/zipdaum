@@ -1855,7 +1855,7 @@ function formatPrice(price) {
               매매 거래 이력이 없습니다.
             </p>
             <template v-else>
-              <div class="history-table">
+              <div class="history-table compact-history-table">
                 <div class="history-table-head">
                   <span>거래일</span>
                   <span>거래금액</span>
@@ -1926,10 +1926,9 @@ function formatPrice(price) {
               {{ activeRentHistoryType === 'JEONSE' ? '전세' : '월세' }} 거래 이력이 없습니다.
             </p>
             <template v-else>
-              <div class="history-table rent-history-table">
+              <div :class="['history-table', 'rent-history-table', activeRentHistoryType === 'MONTHLY_RENT' ? 'monthly-rent-history-table' : 'compact-history-table']">
                 <div class="history-table-head">
                   <span>거래일</span>
-                  <span>유형</span>
                   <span>거래금액</span>
                   <span>전용면적</span>
                   <span>층</span>
@@ -1939,8 +1938,7 @@ function formatPrice(price) {
                   :key="deal.id"
                 >
                   <span>{{ formatDealDate(deal.date) }}</span>
-                  <strong>{{ deal.type }}</strong>
-                  <span>{{ deal.price }}</span>
+                  <strong>{{ deal.price }}</strong>
                   <span>{{ deal.area }}</span>
                   <span>{{ deal.floor }}</span>
                 </article>
