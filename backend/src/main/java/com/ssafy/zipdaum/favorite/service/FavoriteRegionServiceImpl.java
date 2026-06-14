@@ -47,4 +47,34 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
         normalizedUmdNm
     );
   }
+
+  @Override
+  @Transactional
+  public void removeFavoriteRegion(Long userId, String sggCd, String umdNm) {
+    String normalizedSggCd = sggCd.trim();
+    String normalizedUmdNm = umdNm.trim();
+
+    int deletedCount = favoriteRegionMapper.deleteFavoriteRegion(
+        userId,
+        normalizedSggCd,
+        normalizedUmdNm
+    );
+
+    if (deletedCount == 0) {
+      log.warn(
+          "관심 목록에 없는 지역 userId={}, sggCd={}, umdNm={}",
+          userId,
+          normalizedSggCd,
+          normalizedUmdNm
+      );
+      throw new BusinessException(ErrorCode.FAVORITE_NOT_FOUND);
+    }
+
+    log.info(
+        "관심 지역 해제 완료 userId={}, sggCd={}, umdNm={}",
+        userId,
+        normalizedSggCd,
+        normalizedUmdNm
+    );
+  }
 }

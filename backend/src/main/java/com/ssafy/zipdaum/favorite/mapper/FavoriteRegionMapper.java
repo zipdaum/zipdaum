@@ -11,4 +11,10 @@ public interface FavoriteRegionMapper {
       @Param("sggCd") String sggCd,
       @Param("umdNm") String umdNm
   );
+
+  int deleteFavoriteRegion(
+      @Param("userId") Long userId,
+      @Param("sggCd") String sggCd,
+      @Param("umdNm") String umdNm
+  );
 }
