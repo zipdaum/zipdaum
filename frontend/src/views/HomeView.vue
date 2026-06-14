@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
   getPropertyDetail as fetchPropertyDetail,
+  getSurroundings as fetchSurroundings,
   searchProperties
 } from '../api/property'
 
@@ -59,6 +60,22 @@ const trendTypes = [
   { label: '월세', value: 'MONTHLY_RENT' }
 ]
 
+const facilityLegendItems = [
+  { label: '버스', value: 'BUS' },
+  { label: '지하철역', value: 'SUBWAY' },
+  { label: '병원', value: 'HOSPITAL' },
+  { label: '공원', value: 'PARK' },
+  { label: 'CCTV', value: 'CCTV' }
+]
+
+const facilityTypeLabels = {
+  BUS: '버스',
+  SUBWAY: '지하철역',
+  HOSPITAL: '병원',
+  CCTV: 'CCTV',
+  PARK: '공원'
+}
+
 const searchForm = ref({
   sggCd: '26350',
   umdNm: '',
@@ -81,6 +98,12 @@ const selectedPropertyDetail = ref(null)
 const activeTrendType = ref('SALE')
 const hoveredTrendDot = ref(null)
 const activeRentHistoryType = ref('JEONSE')
+const surroundings = ref(null)
+const isSurroundingsLoading = ref(false)
+const surroundingsErrorMessage = ref('')
+const mapZoom = ref(1)
+const mapPan = ref({ x: 0, y: 0 })
+const isMapDragging = ref(false)
 const saleHistoryPage = ref(1)
 const rentHistoryPage = ref(1)
 const favoritePropertyIds = ref([])
@@ -88,6 +111,7 @@ const resultPanel = ref(null)
 const appliedSearchSummary = ref([])
 const historyPageSize = 5
 let resultHighlightTimer = null
+let mapDragStart = null
 
 onMounted(async () => {
   await restoreViewFromUrl()
@@ -96,6 +120,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearResultHighlightTimer()
+  stopMapDrag()
   window.removeEventListener('popstate', handleBrowserBack)
 })
 
@@ -285,6 +310,9 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
   detailErrorMessage.value = ''
   activeTrendType.value = 'SALE'
   activeRentHistoryType.value = 'JEONSE'
+  surroundings.value = null
+  surroundingsErrorMessage.value = ''
+  resetFacilityMap()
   saleHistoryPage.value = 1
   rentHistoryPage.value = 1
   hoveredTrendDot.value = null
@@ -301,6 +329,7 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
         saleDeals: histories.saleDeals || [],
         rentDeals: histories.rentDeals || []
       }
+      await loadSurroundings(detail)
     }
     activeTrendType.value = getDefaultTrendType(selectedPropertyDetail.value)
     if (view === 'deal-history') {
@@ -312,6 +341,28 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
     detailErrorMessage.value = '거래 상세 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
   } finally {
     isDetailLoading.value = false
+  }
+}
+
+async function loadSurroundings(property) {
+  if (!property?.id) {
+    surroundings.value = null
+    surroundingsErrorMessage.value = '주택 정보가 없어 주변 시설을 표시할 수 없습니다.'
+    return
+  }
+
+  isSurroundingsLoading.value = true
+  surroundingsErrorMessage.value = ''
+
+  try {
+    surroundings.value = await fetchSurroundings(property.id, {
+      radiusMeters: 1000
+    })
+  } catch (error) {
+    surroundings.value = null
+    surroundingsErrorMessage.value = '주변 시설 정보를 불러오지 못했습니다.'
+  } finally {
+    isSurroundingsLoading.value = false
   }
 }
 
@@ -791,6 +842,159 @@ function getTrendEmptyText(dealType) {
   return `${trendType?.label || '거래'} 가격 추이 데이터가 없습니다.`
 }
 
+function getFeaturedFacilities() {
+  const facilities = surroundings.value?.facilities || []
+  return facilityLegendItems
+    .map((item) => facilities
+      .filter((facility) => facility.type === item.value)
+      .sort((left, right) => (left.distanceMeters ?? Infinity) - (right.distanceMeters ?? Infinity))[0] || {
+        type: item.value,
+        name: `${item.label} 없음`,
+        missing: true
+      })
+}
+
+function getMapFacilities() {
+  return getFeaturedFacilities().filter((facility) => !facility.missing)
+}
+
+function getFacilityCategoryLabel(facility) {
+  if (facility.missing) {
+    return `${(surroundings.value?.radiusMeters || 1000).toLocaleString()}m 반경 기준`
+  }
+
+  return getFacilityTypeLabel(facility.type)
+}
+
+function getFacilityTypeLabel(type) {
+  return facilityTypeLabels[type] || '시설'
+}
+
+function getFacilityDistanceLabel(distanceMeters) {
+  if (distanceMeters === null || distanceMeters === undefined) {
+    return '-'
+  }
+
+  if (distanceMeters >= 1000) {
+    return `${Number((distanceMeters / 1000).toFixed(1))}km`
+  }
+
+  return `${distanceMeters.toLocaleString()}m`
+}
+
+function getFacilityMarkerClass(facility) {
+  return [
+    'facility-marker',
+    `facility-marker-${String(facility.type || '').toLowerCase().replace('_', '-')}`
+  ]
+}
+
+function getFacilityMarkerText(facility) {
+  const markerTextByType = {
+    BUS: '버',
+    SUBWAY: '역',
+    HOSPITAL: '+',
+    CCTV: 'C',
+    PARK: '공'
+  }
+  return markerTextByType[facility.type] || 'F'
+}
+
+function getFacilityMoveLabel(facility) {
+  if (facility.missing) {
+    return '반경 내 없음'
+  }
+
+  const distance = Number(facility.distanceMeters)
+  if (!Number.isFinite(distance)) {
+    return '-'
+  }
+
+  if (distance > 1200 || facility.type === 'HOSPITAL') {
+    return `차량 ${Math.max(Math.round(distance / 450), 1)}분`
+  }
+
+  return `도보 ${Math.max(Math.round(distance / 70), 1)}분`
+}
+
+function getMapMarkers() {
+  const facilities = getMapFacilities()
+  const centerLat = Number(selectedPropertyDetail.value?.latitude)
+  const centerLng = Number(selectedPropertyDetail.value?.longitude)
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
+    return []
+  }
+
+  const points = [
+    { latitude: centerLat, longitude: centerLng },
+    ...facilities
+  ].filter((point) => Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude)))
+  const latitudes = points.map((point) => Number(point.latitude))
+  const longitudes = points.map((point) => Number(point.longitude))
+  const minLat = Math.min(...latitudes)
+  const maxLat = Math.max(...latitudes)
+  const minLng = Math.min(...longitudes)
+  const maxLng = Math.max(...longitudes)
+  const latRange = Math.max(maxLat - minLat, 0.002)
+  const lngRange = Math.max(maxLng - minLng, 0.002)
+
+  return facilities
+    .filter((facility) => Number.isFinite(Number(facility.latitude)) && Number.isFinite(Number(facility.longitude)))
+    .map((facility) => ({
+      ...facility,
+      top: `${Math.min(Math.max(8 + ((maxLat - Number(facility.latitude)) / latRange) * 84, 8), 92)}%`,
+      left: `${Math.min(Math.max(8 + ((Number(facility.longitude) - minLng) / lngRange) * 84, 8), 92)}%`
+    }))
+}
+
+function getFacilityMapTransform() {
+  return {
+    transform: `translate(${mapPan.value.x}px, ${mapPan.value.y}px) scale(${mapZoom.value})`
+  }
+}
+
+function changeMapZoom(delta) {
+  mapZoom.value = Math.min(Math.max(Number((mapZoom.value + delta).toFixed(1)), 0.8), 1.8)
+}
+
+function resetFacilityMap() {
+  mapZoom.value = 1
+  mapPan.value = { x: 0, y: 0 }
+  stopMapDrag()
+}
+
+function startMapDrag(event) {
+  if (event.button !== undefined && event.button !== 0) {
+    return
+  }
+
+  isMapDragging.value = true
+  mapDragStart = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    panX: mapPan.value.x,
+    panY: mapPan.value.y
+  }
+  event.currentTarget.setPointerCapture?.(event.pointerId)
+}
+
+function moveMapDrag(event) {
+  if (!isMapDragging.value || !mapDragStart) {
+    return
+  }
+
+  mapPan.value = {
+    x: Math.min(Math.max(mapDragStart.panX + event.clientX - mapDragStart.x, -180), 180),
+    y: Math.min(Math.max(mapDragStart.panY + event.clientY - mapDragStart.y, -120), 120)
+  }
+}
+
+function stopMapDrag() {
+  isMapDragging.value = false
+  mapDragStart = null
+}
+
 function getBuildYearLabel(buildYear) {
   return buildYear ? `${buildYear}년 준공` : '준공연도 미상'
 }
@@ -1221,20 +1425,68 @@ function formatPrice(price) {
             <div class="nearby-info-section">
               <div class="panel-title-row">
                 <h2>주변 생활 편의 시설</h2>
+                <span v-if="surroundings">{{ surroundings.radiusMeters.toLocaleString() }}m 반경</span>
               </div>
-              <div class="locked-feature">
-                <strong>주변 생활 편의 시설 정보 준비 중</strong>
-                <p>교통, 학교, 편의시설, 병원 등 주변 생활 편의 정보를 확인할 수 있도록 공간만 먼저 마련했습니다.</p>
-              </div>
+
+              <p v-if="isSurroundingsLoading" class="empty-message">주변 시설 정보를 불러오는 중입니다.</p>
+              <p v-else-if="surroundingsErrorMessage" class="form-message" role="alert">
+                {{ surroundingsErrorMessage }}
+              </p>
+              <ul v-else class="facility-list">
+                <li
+                  v-for="facility in getFeaturedFacilities()"
+                  :key="`${facility.type}-${facility.name}-${facility.distanceMeters || 'missing'}`"
+                  :class="{ missing: facility.missing }"
+                >
+                  <span :class="getFacilityMarkerClass(facility)">
+                    {{ getFacilityMarkerText(facility) }}
+                  </span>
+                  <div>
+                    <strong>{{ facility.name }}</strong>
+                    <p>{{ getFacilityCategoryLabel(facility) }}</p>
+                  </div>
+                  <em v-if="facility.missing">{{ getFacilityMoveLabel(facility) }}</em>
+                  <em v-else>{{ getFacilityMoveLabel(facility) }} ({{ getFacilityDistanceLabel(facility.distanceMeters) }})</em>
+                </li>
+              </ul>
             </div>
 
             <div class="map-section">
-              <div class="panel-title-row">
-                <h2>지도</h2>
+              <div class="map-legend" aria-label="지도 범례">
+                <span v-for="item in facilityLegendItems" :key="item.value">
+                  <i :class="`legend-${String(item.value).toLowerCase()}`"></i>
+                  {{ item.label }}
+                </span>
               </div>
-              <div class="map-placeholder">
-                <strong>지도 화면 준비 중</strong>
-                <p>거래 위치와 주변 정보를 지도에서 확인할 수 있도록 공간만 먼저 마련했습니다.</p>
+              <div
+                :class="['facility-map', { dragging: isMapDragging }]"
+                aria-label="주택과 주변 편의시설 지도"
+              >
+                <div
+                  class="facility-map-canvas"
+                  :style="getFacilityMapTransform()"
+                  @pointerdown="startMapDrag"
+                  @pointermove="moveMapDrag"
+                  @pointerup="stopMapDrag"
+                  @pointercancel="stopMapDrag"
+                  @pointerleave="stopMapDrag"
+                >
+                  <span class="home-map-marker" :style="{ top: '50%', left: '50%' }">집</span>
+                  <span
+                    v-for="marker in getMapMarkers()"
+                    :key="`${marker.type}-${marker.name}-${marker.latitude}-${marker.longitude}`"
+                    :class="getFacilityMarkerClass(marker)"
+                    :style="{ top: marker.top, left: marker.left }"
+                    :title="`${getFacilityTypeLabel(marker.type)} · ${marker.name}`"
+                  >
+                    {{ getFacilityMarkerText(marker) }}
+                  </span>
+                </div>
+                <div class="map-controls" aria-label="지도 조작">
+                  <button type="button" aria-label="지도 확대" @click="changeMapZoom(0.2)">+</button>
+                  <button type="button" aria-label="지도 축소" @click="changeMapZoom(-0.2)">-</button>
+                  <button type="button" aria-label="지도 위치 초기화" @click="resetFacilityMap">⟲</button>
+                </div>
               </div>
             </div>
           </div>

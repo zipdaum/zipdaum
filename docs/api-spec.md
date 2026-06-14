@@ -24,10 +24,9 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 사용자 맞춤 | 관심 주택 전체 조회 | GET | `/users/info/properties` |
 | 사용자 맞춤 | 관심 주택 등록 | POST | `/users/info/properties` |
 | 사용자 맞춤 | 관심 주택 해제 | DELETE | `/users/info/properties` |
-| 생활 정보 | 주변 편의시설 조회 | GET | `/surroundings` |
-| 생활 정보 | 지도 기반 위치 표시 | GET | `/surroundings/coordinates` |
-| 생활 정보 | 관심 지역 가격 변동 리포트 | GET | `/reports/price` |
-| 생활 정보 | 관심 지역/주택 신규 거래 알림 | GET | `/users/info/notifications` |
+| 실거래가 | 주택 주변 편의시설 조회 | GET | `/properties/{propertyId}/surroundings` |
+| 리포트 및 알림 | 관심 지역 가격 변동 리포트 | GET | `/reports/price` |
+| 리포트 및 알림 | 관심 지역/주택 신규 거래 알림 | GET | `/users/info/notifications` |
 
 ## 회원 기능
 
@@ -48,6 +47,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 실거래가 저장 | POST | `/properties` |
 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
+| 주택 주변 편의시설 조회 | GET | `/properties/{propertyId}/surroundings` |
 
 ## 사용자 맞춤
 
@@ -62,11 +62,9 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 관심 주택 등록 | POST | `/users/info/properties` |
 | 관심 주택 해제 | DELETE | `/users/info/properties` |
 
-## 생활 정보
+## 리포트 및 알림
 
 | 기능 | Method | URL |
 | --- | --- | --- |
-| 주변 편의시설 조회 | GET | `/surroundings` |
-| 지도 기반 위치 표시 | GET | `/surroundings/coordinates` |
 | 관심 지역 가격 변동 리포트 | GET | `/reports/price` |
 | 관심 지역/주택 신규 거래 알림 | GET | `/users/info/notifications` |

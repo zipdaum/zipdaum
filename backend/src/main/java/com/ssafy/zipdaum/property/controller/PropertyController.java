@@ -6,8 +6,10 @@ import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaveResult;
+import com.ssafy.zipdaum.property.dto.SurroundingResponse;
 import com.ssafy.zipdaum.property.service.PropertyFetchService;
 import com.ssafy.zipdaum.property.service.PropertyService;
+import com.ssafy.zipdaum.property.service.SurroundingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -38,6 +40,7 @@ public class PropertyController {
 
   private final PropertyFetchService fetchService;
   private final PropertyService propertyService;
+  private final SurroundingService surroundingService;
 
   @GetMapping
   @Operation(
@@ -102,6 +105,30 @@ public class PropertyController {
   ) {
     log.info("GET /properties/{}/histories 요청", propertyId);
     return ResponseEntity.ok(propertyService.findPropertyDealHistories(propertyId));
+  }
+
+  @GetMapping("/{propertyId}/surroundings")
+  @Operation(
+      summary = "주택 주변 편의시설 조회",
+      description = "주택 좌표 기준 반경 내 대중교통, 병원, CCTV, 공원을 조회합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "주택 주변 편의시설 조회 성공",
+          content = @Content(schema = @Schema(implementation = SurroundingResponse.class))
+      ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
+      @ApiResponse(responseCode = "404", description = "주택 정보 또는 좌표 정보 없음", content = @Content)
+  })
+  public ResponseEntity<SurroundingResponse> getPropertySurroundings(
+      @Parameter(description = "주택 ID", example = "1", required = true)
+      @PathVariable Long propertyId,
+      @Parameter(description = "조회 반경(m)", example = "1000")
+      @RequestParam(required = false) Integer radiusMeters
+  ) {
+    log.info("GET /properties/{}/surroundings 요청 radiusMeters={}", propertyId, radiusMeters);
+    return ResponseEntity.ok(surroundingService.findPropertySurroundings(propertyId, radiusMeters));
   }
 
   @PostMapping
