@@ -34,8 +34,7 @@ class PropertyServiceImplTest {
     PropertyDetailResponse result = service.findPropertyDetail(propertyId);
 
     assertThat(result).isSameAs(detail);
-    then(propertyMapper).should(never()).selectSaleDealsByPropertyId(propertyId);
-    then(propertyMapper).should(never()).selectRentDealsByPropertyId(propertyId);
+    then(propertyMapper).should(never()).countSaleDealsByPropertyId(propertyId);
   }
 
   @Test
@@ -44,13 +43,19 @@ class PropertyServiceImplTest {
     List<PropertySaleDealResponse> saleDeals = List.of(new PropertySaleDealResponse());
     List<PropertyRentDealResponse> rentDeals = List.of(new PropertyRentDealResponse());
     given(propertyMapper.existsPropertyById(propertyId)).willReturn(true);
-    given(propertyMapper.selectSaleDealsByPropertyId(propertyId)).willReturn(saleDeals);
-    given(propertyMapper.selectRentDealsByPropertyId(propertyId)).willReturn(rentDeals);
+    given(propertyMapper.countSaleDealsByPropertyId(propertyId)).willReturn(1L);
+    given(propertyMapper.countRentDealsByPropertyId(propertyId, "JEONSE")).willReturn(1L);
+    given(propertyMapper.countRentDealsByPropertyId(propertyId, "MONTHLY_RENT")).willReturn(0L);
+    given(propertyMapper.selectSaleDealsByPropertyId(propertyId, 5, 0)).willReturn(saleDeals);
+    given(propertyMapper.selectRentDealsByPropertyId(propertyId, "JEONSE", 5, 0)).willReturn(rentDeals);
 
-    PropertyDealHistoryResponse result = service.findPropertyDealHistories(propertyId);
+    PropertyDealHistoryResponse result = service.findPropertyDealHistories(propertyId, null, null, null, null);
 
     assertThat(result.getSaleDeals()).isSameAs(saleDeals);
     assertThat(result.getRentDeals()).isSameAs(rentDeals);
+    assertThat(result.getSaleTotalCount()).isEqualTo(1);
+    assertThat(result.getRentDealType()).isEqualTo("JEONSE");
+    assertThat(result.getRentTotalCount()).isEqualTo(1);
   }
 
   @Test
@@ -58,7 +63,7 @@ class PropertyServiceImplTest {
     Long propertyId = 1L;
     given(propertyMapper.existsPropertyById(propertyId)).willReturn(false);
 
-    assertThatThrownBy(() -> service.findPropertyDealHistories(propertyId))
+    assertThatThrownBy(() -> service.findPropertyDealHistories(propertyId, null, null, null, null))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PROPERTY_NOT_FOUND)
         );
@@ -66,9 +71,42 @@ class PropertyServiceImplTest {
 
   @Test
   void findPropertyDealHistories_주택ID가_유효하지_않으면_예외가_발생한다() {
-    assertThatThrownBy(() -> service.findPropertyDealHistories(0L))
+    assertThatThrownBy(() -> service.findPropertyDealHistories(0L, null, null, null, null))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_PROPERTY_ID)
+        );
+  }
+
+  @Test
+  void findPropertyDealHistories_페이지조건을_적용해_조회한다() {
+    Long propertyId = 1L;
+    given(propertyMapper.existsPropertyById(propertyId)).willReturn(true);
+    given(propertyMapper.countSaleDealsByPropertyId(propertyId)).willReturn(12L);
+    given(propertyMapper.countRentDealsByPropertyId(propertyId, "JEONSE")).willReturn(3L);
+    given(propertyMapper.countRentDealsByPropertyId(propertyId, "MONTHLY_RENT")).willReturn(8L);
+    given(propertyMapper.selectSaleDealsByPropertyId(propertyId, 5, 5)).willReturn(List.of());
+    given(propertyMapper.selectRentDealsByPropertyId(propertyId, "MONTHLY_RENT", 5, 10))
+        .willReturn(List.of());
+
+    PropertyDealHistoryResponse result =
+        service.findPropertyDealHistories(propertyId, "monthly_rent", 2, 3, 5);
+
+    assertThat(result.getSalePage()).isEqualTo(2);
+    assertThat(result.getSaleTotalPages()).isEqualTo(3);
+    assertThat(result.getRentDealType()).isEqualTo("MONTHLY_RENT");
+    assertThat(result.getRentPage()).isEqualTo(3);
+    assertThat(result.getRentTotalCount()).isEqualTo(8);
+    assertThat(result.getMonthlyRentTotalCount()).isEqualTo(8);
+  }
+
+  @Test
+  void findPropertyDealHistories_페이지크기가_허용범위를_벗어나면_예외가_발생한다() {
+    Long propertyId = 1L;
+    given(propertyMapper.existsPropertyById(propertyId)).willReturn(true);
+
+    assertThatThrownBy(() -> service.findPropertyDealHistories(propertyId, null, null, null, 51))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE)
         );
   }
 

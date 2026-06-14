@@ -93,7 +93,7 @@ public class PropertyController {
   @GetMapping("/{propertyId}/histories")
   @Operation(
       summary = "거래 이력 조회",
-      description = "주택의 전체 매매/전월세 거래 이력을 조회합니다."
+      description = "주택의 매매/전월세 거래 이력을 페이지 단위로 조회합니다."
   )
   @ApiResponses({
       @ApiResponse(
@@ -105,10 +105,25 @@ public class PropertyController {
   })
   public ResponseEntity<PropertyDealHistoryResponse> getPropertyDealHistories(
       @Parameter(description = "주택 ID", example = "1", required = true)
-      @PathVariable Long propertyId
+      @PathVariable Long propertyId,
+      @Parameter(description = "전월세 유형", example = "JEONSE")
+      @RequestParam(required = false) String rentDealType,
+      @Parameter(description = "매매 거래 이력 페이지", example = "1")
+      @RequestParam(required = false) Integer salePage,
+      @Parameter(description = "전월세 거래 이력 페이지", example = "1")
+      @RequestParam(required = false) Integer rentPage,
+      @Parameter(description = "페이지 크기", example = "5")
+      @RequestParam(required = false) Integer size
   ) {
-    log.info("GET /properties/{}/histories 요청", propertyId);
-    return ResponseEntity.ok(propertyService.findPropertyDealHistories(propertyId));
+    log.info("GET /properties/{}/histories 요청 rentDealType={}, salePage={}, rentPage={}, size={}",
+        propertyId, rentDealType, salePage, rentPage, size);
+    return ResponseEntity.ok(propertyService.findPropertyDealHistories(
+        propertyId,
+        rentDealType,
+        salePage,
+        rentPage,
+        size
+    ));
   }
 
   @GetMapping("/{propertyId}/surroundings")

@@ -22,9 +22,22 @@ public interface PropertyMapper {
 
   PropertyDetailResponse selectPropertyById(@Param("propertyId") Long propertyId);
 
-  List<PropertySaleDealResponse> selectSaleDealsByPropertyId(@Param("propertyId") Long propertyId);
+  List<PropertySaleDealResponse> selectSaleDealsByPropertyId(
+      @Param("propertyId") Long propertyId,
+      @Param("limit") int limit,
+      @Param("offset") int offset);
 
-  List<PropertyRentDealResponse> selectRentDealsByPropertyId(@Param("propertyId") Long propertyId);
+  List<PropertyRentDealResponse> selectRentDealsByPropertyId(
+      @Param("propertyId") Long propertyId,
+      @Param("rentDealType") String rentDealType,
+      @Param("limit") int limit,
+      @Param("offset") int offset);
+
+  long countSaleDealsByPropertyId(@Param("propertyId") Long propertyId);
+
+  long countRentDealsByPropertyId(
+      @Param("propertyId") Long propertyId,
+      @Param("rentDealType") String rentDealType);
 
   PropertySaveCommand findProperty(PropertySaveCommand command);
 

@@ -207,7 +207,6 @@
   </select>
 
   <select id="selectSaleDealsByPropertyId"
-          parameterType="long"
           resultMap="propertySaleDealResponseResultMap">
     SELECT
       id,
@@ -221,10 +220,11 @@
     FROM sale_deal
     WHERE property_id = #{propertyId}
     ORDER BY deal_date DESC, id DESC
+    LIMIT #{limit}
+    OFFSET #{offset}
   </select>
 
   <select id="selectRentDealsByPropertyId"
-          parameterType="long"
           resultMap="propertyRentDealResponseResultMap">
     SELECT
       id,
@@ -241,7 +241,40 @@
       deal_date
     FROM rent_deal
     WHERE property_id = #{propertyId}
+      <choose>
+        <when test="rentDealType == 'MONTHLY_RENT'">
+          AND monthly_rent &gt; 0
+        </when>
+        <otherwise>
+          AND monthly_rent = 0
+        </otherwise>
+      </choose>
     ORDER BY deal_date DESC, id DESC
+    LIMIT #{limit}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countSaleDealsByPropertyId"
+          parameterType="long"
+          resultType="long">
+    SELECT COUNT(*)
+    FROM sale_deal
+    WHERE property_id = #{propertyId}
+  </select>
+
+  <select id="countRentDealsByPropertyId"
+          resultType="long">
+    SELECT COUNT(*)
+    FROM rent_deal
+    WHERE property_id = #{propertyId}
+      <choose>
+        <when test="rentDealType == 'MONTHLY_RENT'">
+          AND monthly_rent &gt; 0
+        </when>
+        <otherwise>
+          AND monthly_rent = 0
+        </otherwise>
+      </choose>
   </select>
 
   <select id="findProperty"

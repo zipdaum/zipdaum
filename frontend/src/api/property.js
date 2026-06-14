@@ -14,8 +14,8 @@ export async function getPropertyDetail(propertyId) {
   return response.data
 }
 
-export async function getPropertyDealHistories(propertyId) {
-  const response = await propertyClient.get(`/properties/${propertyId}/histories`)
+export async function getPropertyDealHistories(propertyId, params) {
+  const response = await propertyClient.get(`/properties/${propertyId}/histories`, { params })
   return response.data
 }
 

@@ -94,6 +94,9 @@ const isResultHighlighted = ref(false)
 const errorMessage = ref('')
 const isDetailLoading = ref(false)
 const detailErrorMessage = ref('')
+const isSaleHistoryLoading = ref(false)
+const isRentHistoryLoading = ref(false)
+const historiesErrorMessage = ref('')
 const selectedPropertyDetail = ref(null)
 const activeTrendType = ref('SALE')
 const hoveredTrendDot = ref(null)
@@ -110,6 +113,21 @@ const favoritePropertyIds = ref([])
 const resultPanel = ref(null)
 const appliedSearchSummary = ref([])
 const historyPageSize = 5
+const emptyHistoryMeta = {
+  salePage: 1,
+  saleSize: historyPageSize,
+  saleTotalCount: 0,
+  saleTotalPages: 1,
+  rentDealType: 'JEONSE',
+  rentPage: 1,
+  rentSize: historyPageSize,
+  rentTotalCount: 0,
+  rentTotalPages: 1,
+  jeonseTotalCount: 0,
+  monthlyRentTotalCount: 0,
+  saleServerPaged: false,
+  rentServerPaged: false
+}
 let resultHighlightTimer = null
 let mapDragStart = null
 
@@ -293,21 +311,33 @@ function openHomeView({ updateHistory = true } = {}) {
 }
 
 async function openPropertyDetail(propertyId) {
-  if (!propertyId) {
+  const normalizedPropertyId = normalizePropertyId(propertyId)
+  if (!normalizedPropertyId) {
     return
   }
 
-  window.history.pushState({ view: 'detail', propertyId }, '', getViewUrl('detail', propertyId))
-  await loadPropertyDetailView(propertyId, 'detail')
+  window.history.pushState(
+    { view: 'detail', propertyId: normalizedPropertyId },
+    '',
+    getViewUrl('detail', normalizedPropertyId)
+  )
+  await loadPropertyDetailView(normalizedPropertyId, 'detail')
 }
 
 async function loadPropertyDetailView(propertyId, view = 'detail') {
+  const normalizedPropertyId = normalizePropertyId(propertyId)
+  if (!normalizedPropertyId) {
+    detailErrorMessage.value = '거래 상세 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+    return
+  }
+
   currentView.value = view
-  if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== propertyId) {
+  if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== normalizedPropertyId) {
     selectedPropertyDetail.value = null
     isDetailLoading.value = true
   }
   detailErrorMessage.value = ''
+  historiesErrorMessage.value = ''
   activeTrendType.value = 'SALE'
   activeRentHistoryType.value = 'JEONSE'
   surroundings.value = null
@@ -319,21 +349,32 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 
   try {
-    if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== propertyId) {
-      const [detail, histories] = await Promise.all([
-        fetchPropertyDetail(propertyId),
-        fetchPropertyDealHistories(propertyId)
-      ])
-      selectedPropertyDetail.value = {
-        ...detail,
-        saleDeals: histories.saleDeals || [],
-        rentDeals: histories.rentDeals || []
-      }
-      await loadSurroundings(detail)
+    if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== normalizedPropertyId) {
+      const detail = await fetchPropertyDetail(normalizedPropertyId)
+      selectedPropertyDetail.value = createPropertyDetailState(detail)
     }
+
+    isDetailLoading.value = false
+    await Promise.all([
+      loadHistories(selectedPropertyDetail.value.id, {
+        salePage: 1,
+        rentPage: 1,
+        rentDealType: 'JEONSE'
+      }),
+      loadSurroundings(selectedPropertyDetail.value)
+    ])
+
+    if (selectedPropertyDetail.value.jeonseTotalCount === 0
+        && selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
+      await loadHistories(selectedPropertyDetail.value.id, {
+        rentPage: 1,
+        rentDealType: 'MONTHLY_RENT'
+      })
+    }
+
     activeTrendType.value = getDefaultTrendType(selectedPropertyDetail.value)
     if (view === 'deal-history') {
-      activeRentHistoryType.value = getJeonseDealCount(selectedPropertyDetail.value.rentDeals || []) > 0
+      activeRentHistoryType.value = selectedPropertyDetail.value.jeonseTotalCount > 0
         ? 'JEONSE'
         : 'MONTHLY_RENT'
     }
@@ -341,6 +382,87 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
     detailErrorMessage.value = '거래 상세 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
   } finally {
     isDetailLoading.value = false
+  }
+}
+
+function createPropertyDetailState(detail) {
+  return {
+    ...detail,
+    saleDeals: [],
+    rentDeals: [],
+    ...emptyHistoryMeta
+  }
+}
+
+async function loadHistories(propertyId, options = {}) {
+  if (!propertyId || !selectedPropertyDetail.value) {
+    return
+  }
+
+  historiesErrorMessage.value = ''
+  const rentDealType = options.rentDealType || activeRentHistoryType.value || 'JEONSE'
+  const requestedSalePage = options.salePage || saleHistoryPage.value
+  const requestedRentPage = options.rentPage || rentHistoryPage.value
+  const shouldUpdateSale = options.updateSale !== false
+  const shouldUpdateRent = options.updateRent !== false
+
+  if (shouldUpdateSale) {
+    isSaleHistoryLoading.value = true
+  }
+  if (shouldUpdateRent) {
+    isRentHistoryLoading.value = true
+  }
+
+  try {
+    const histories = await fetchPropertyDealHistories(propertyId, {
+      salePage: requestedSalePage,
+      rentPage: requestedRentPage,
+      rentDealType,
+      size: historyPageSize
+    })
+    const saleTotalCount = histories.saleTotalCount ?? (histories.saleDeals || []).length
+    const rentTotalCount = histories.rentTotalCount ?? getRentDealCount(histories.rentDeals || [], rentDealType)
+    const saleServerPaged = histories.salePage !== undefined || histories.saleTotalCount !== undefined
+    const rentServerPaged = histories.rentPage !== undefined || histories.rentTotalCount !== undefined
+
+    selectedPropertyDetail.value = {
+      ...selectedPropertyDetail.value,
+      ...(shouldUpdateSale ? {
+        saleDeals: histories.saleDeals || [],
+        salePage: histories.salePage || requestedSalePage,
+        saleSize: histories.saleSize || historyPageSize,
+        saleTotalCount,
+        saleTotalPages: histories.saleTotalPages || calculatePageCount(saleTotalCount),
+        saleServerPaged
+      } : {}),
+      ...(shouldUpdateRent ? {
+        rentDeals: histories.rentDeals || [],
+        rentDealType: histories.rentDealType || rentDealType,
+        rentPage: histories.rentPage || requestedRentPage,
+        rentSize: histories.rentSize || historyPageSize,
+        rentTotalCount,
+        rentTotalPages: histories.rentTotalPages || calculatePageCount(rentTotalCount),
+        jeonseTotalCount: histories.jeonseTotalCount ?? getJeonseDealCount(histories.rentDeals || []),
+        monthlyRentTotalCount: histories.monthlyRentTotalCount ?? getMonthlyRentDealCount(histories.rentDeals || []),
+        rentServerPaged
+      } : {})
+    }
+    if (shouldUpdateSale) {
+      saleHistoryPage.value = selectedPropertyDetail.value.salePage
+    }
+    if (shouldUpdateRent) {
+      rentHistoryPage.value = selectedPropertyDetail.value.rentPage
+      activeRentHistoryType.value = selectedPropertyDetail.value.rentDealType
+    }
+  } catch (error) {
+    historiesErrorMessage.value = '거래 이력을 불러오지 못했습니다.'
+  } finally {
+    if (shouldUpdateSale) {
+      isSaleHistoryLoading.value = false
+    }
+    if (shouldUpdateRent) {
+      isRentHistoryLoading.value = false
+    }
   }
 }
 
@@ -366,14 +488,14 @@ async function loadSurroundings(property) {
   }
 }
 
-function openDealHistoryView() {
+async function openDealHistoryView() {
   if (!selectedPropertyDetail.value) {
     return
   }
 
   saleHistoryPage.value = 1
   rentHistoryPage.value = 1
-  activeRentHistoryType.value = getJeonseDealCount(selectedPropertyDetail.value.rentDeals || []) > 0
+  activeRentHistoryType.value = selectedPropertyDetail.value.jeonseTotalCount > 0
     ? 'JEONSE'
     : 'MONTHLY_RENT'
   window.history.pushState(
@@ -383,6 +505,11 @@ function openDealHistoryView() {
   )
   currentView.value = 'deal-history'
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  await loadHistories(selectedPropertyDetail.value.id, {
+    salePage: 1,
+    rentPage: 1,
+    rentDealType: activeRentHistoryType.value
+  })
 }
 
 async function handleBrowserBack(event) {
@@ -422,7 +549,7 @@ async function restoreViewFromUrl() {
 function getCurrentRoute() {
   const params = new URLSearchParams(window.location.search)
   const view = params.get('view')
-  const propertyId = params.get('propertyId')
+  const propertyId = normalizePropertyId(params.get('propertyId'))
 
   if ((view === 'detail' || view === 'deal-history') && propertyId) {
     return { view, propertyId }
@@ -438,6 +565,11 @@ function getViewUrl(view, propertyId) {
   }
 
   return window.location.pathname
+}
+
+function normalizePropertyId(propertyId) {
+  const normalized = Number(propertyId)
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : null
 }
 
 function sortProperties(properties, selectedSort) {
@@ -591,16 +723,22 @@ function getMonthlyRentDealCount(rentDeals) {
   return rentDeals.filter((deal) => deal.monthlyRent > 0).length
 }
 
+function getRentDealCount(rentDeals, dealType) {
+  return dealType === 'MONTHLY_RENT'
+    ? getMonthlyRentDealCount(rentDeals)
+    : getJeonseDealCount(rentDeals)
+}
+
 function getDefaultTrendType(property) {
-  if ((property.saleDeals || []).length > 0) {
+  if ((property.saleTotalCount || 0) > 0 || (property.saleDeals || []).length > 0) {
     return 'SALE'
   }
 
-  if (getJeonseDealCount(property.rentDeals || []) > 0) {
+  if ((property.jeonseTotalCount || 0) > 0 || getJeonseDealCount(property.rentDeals || []) > 0) {
     return 'JEONSE'
   }
 
-  if (getMonthlyRentDealCount(property.rentDeals || []) > 0) {
+  if ((property.monthlyRentTotalCount || 0) > 0 || getMonthlyRentDealCount(property.rentDeals || []) > 0) {
     return 'MONTHLY_RENT'
   }
 
@@ -705,8 +843,17 @@ function getLimitedDealRows(property, dealType) {
 }
 
 function getPaginatedDealRows(property, dealType, page) {
+  const rows = getDealRowsByType(property, dealType)
+  const isServerPaged = dealType === 'SALE'
+    ? property.saleServerPaged
+    : property.rentServerPaged
+
+  if (isServerPaged) {
+    return rows.slice(0, historyPageSize)
+  }
+
   const startIndex = (page - 1) * historyPageSize
-  return getDealRowsByType(property, dealType).slice(startIndex, startIndex + historyPageSize)
+  return rows.slice(startIndex, startIndex + historyPageSize)
 }
 
 function getDealPageCount(property, dealType) {
@@ -714,8 +861,15 @@ function getDealPageCount(property, dealType) {
     return 1
   }
 
-  const rowCount = getDealRowsByType(property, dealType).length
-  return Math.max(Math.ceil(rowCount / historyPageSize), 1)
+  if (dealType === 'SALE') {
+    return property.saleTotalPages || 1
+  }
+
+  return property.rentTotalPages || 1
+}
+
+function calculatePageCount(totalCount) {
+  return Math.max(Math.ceil(totalCount / historyPageSize), 1)
 }
 
 function getVisibleHistoryPages(property, dealType, currentPage) {
@@ -725,21 +879,63 @@ function getVisibleHistoryPages(property, dealType, currentPage) {
   return Array.from({ length: groupEnd - groupStart + 1 }, (_, index) => groupStart + index)
 }
 
-function setSaleHistoryPage(page) {
+async function setSaleHistoryPage(page) {
+  if (isSaleHistoryLoading.value || page === saleHistoryPage.value) {
+    return
+  }
+
   saleHistoryPage.value = Math.min(Math.max(page, 1), getDealPageCount(selectedPropertyDetail.value, 'SALE'))
+  await loadHistories(selectedPropertyDetail.value.id, {
+    salePage: saleHistoryPage.value,
+    rentPage: rentHistoryPage.value,
+    rentDealType: activeRentHistoryType.value,
+    updateRent: false
+  })
 }
 
-function setRentHistoryPage(page) {
+async function setRentHistoryPage(page) {
+  if (isRentHistoryLoading.value || page === rentHistoryPage.value) {
+    return
+  }
+
   rentHistoryPage.value = Math.min(Math.max(page, 1), getDealPageCount(selectedPropertyDetail.value, activeRentHistoryType.value))
+  await loadHistories(selectedPropertyDetail.value.id, {
+    salePage: saleHistoryPage.value,
+    rentPage: rentHistoryPage.value,
+    rentDealType: activeRentHistoryType.value,
+    updateSale: false
+  })
 }
 
-function selectRentHistoryType(dealType) {
+async function selectRentHistoryType(dealType) {
+  if (isRentHistoryLoading.value || dealType === activeRentHistoryType.value) {
+    return
+  }
+
   activeRentHistoryType.value = dealType
   rentHistoryPage.value = 1
+  await loadHistories(selectedPropertyDetail.value.id, {
+    salePage: saleHistoryPage.value,
+    rentPage: 1,
+    rentDealType: dealType,
+    updateSale: false
+  })
 }
 
 function getDealCountByType(property, dealType) {
-  return getDealRowsByType(property, dealType).length
+  if (!property) {
+    return 0
+  }
+
+  if (dealType === 'SALE') {
+    return property.saleTotalCount || 0
+  }
+
+  if (dealType === 'MONTHLY_RENT') {
+    return property.monthlyRentTotalCount || 0
+  }
+
+  return property.jeonseTotalCount || 0
 }
 
 function getRecentDealRows(property) {
@@ -1504,27 +1700,31 @@ function formatPrice(price) {
           <div class="history-counts header-history-counts" aria-label="거래 이력 요약">
             <article>
               <span>매매</span>
-              <strong>{{ selectedPropertyDetail.saleDeals.length.toLocaleString() }}건</strong>
+              <strong>{{ getDealCountByType(selectedPropertyDetail, 'SALE').toLocaleString() }}건</strong>
             </article>
             <article>
               <span>전세</span>
-              <strong>{{ getJeonseDealCount(selectedPropertyDetail.rentDeals).toLocaleString() }}건</strong>
+              <strong>{{ getDealCountByType(selectedPropertyDetail, 'JEONSE').toLocaleString() }}건</strong>
             </article>
             <article>
               <span>월세</span>
-              <strong>{{ getMonthlyRentDealCount(selectedPropertyDetail.rentDeals).toLocaleString() }}건</strong>
+              <strong>{{ getDealCountByType(selectedPropertyDetail, 'MONTHLY_RENT').toLocaleString() }}건</strong>
             </article>
           </div>
         </section>
+
+        <p v-if="historiesErrorMessage" class="form-message" role="alert">
+          {{ historiesErrorMessage }}
+        </p>
 
         <section class="history-panel-grid" aria-label="전체 거래 이력 목록">
           <article class="history-section" aria-labelledby="sale-history-title">
             <div class="panel-title-row">
               <h2 id="sale-history-title">매매 거래 이력</h2>
-              <span>{{ selectedPropertyDetail.saleDeals.length.toLocaleString() }}건</span>
+              <span>{{ getDealCountByType(selectedPropertyDetail, 'SALE').toLocaleString() }}건</span>
             </div>
 
-            <p v-if="selectedPropertyDetail.saleDeals.length === 0" class="empty-message">
+            <p v-if="getDealCountByType(selectedPropertyDetail, 'SALE') === 0" class="empty-message">
               매매 거래 이력이 없습니다.
             </p>
             <template v-else>
@@ -1542,8 +1742,12 @@ function formatPrice(price) {
                   <span>{{ deal.floor }}</span>
                 </article>
               </div>
-              <div class="history-pagination" aria-label="매매 거래 이력 페이지">
-                <button type="button" :disabled="saleHistoryPage === 1" @click="setSaleHistoryPage(saleHistoryPage - 1)">
+              <div class="history-pagination" aria-label="매매 거래 이력 페이지" :aria-busy="isSaleHistoryLoading">
+                <button
+                  type="button"
+                  :disabled="saleHistoryPage === 1"
+                  @click="setSaleHistoryPage(saleHistoryPage - 1)"
+                >
                   이전
                 </button>
                 <button
@@ -1614,8 +1818,12 @@ function formatPrice(price) {
                   <span>{{ deal.floor }}</span>
                 </article>
               </div>
-              <div class="history-pagination" aria-label="전월세 거래 이력 페이지">
-                <button type="button" :disabled="rentHistoryPage === 1" @click="setRentHistoryPage(rentHistoryPage - 1)">
+              <div class="history-pagination" aria-label="전월세 거래 이력 페이지" :aria-busy="isRentHistoryLoading">
+                <button
+                  type="button"
+                  :disabled="rentHistoryPage === 1"
+                  @click="setRentHistoryPage(rentHistoryPage - 1)"
+                >
                   이전
                 </button>
                 <button

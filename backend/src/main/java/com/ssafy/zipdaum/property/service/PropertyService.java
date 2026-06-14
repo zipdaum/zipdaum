@@ -12,5 +12,10 @@ public interface PropertyService {
 
   PropertyDetailResponse findPropertyDetail(Long propertyId);
 
-  PropertyDealHistoryResponse findPropertyDealHistories(Long propertyId);
+  PropertyDealHistoryResponse findPropertyDealHistories(
+      Long propertyId,
+      String rentDealType,
+      Integer salePage,
+      Integer rentPage,
+      Integer size);
 }

@@ -15,7 +15,9 @@ import org.junit.jupiter.api.Test;
 class SurroundingServiceImplTest {
 
   private final PropertyMapper propertyMapper = mock(PropertyMapper.class);
-  private final SurroundingServiceImpl service = new SurroundingServiceImpl(propertyMapper);
+  private final FacilitySourceLoader facilitySourceLoader = new FacilitySourceLoader();
+  private final SurroundingServiceImpl service =
+      new SurroundingServiceImpl(propertyMapper, facilitySourceLoader);
 
   @Test
   void findPropertySurroundings_주택ID로_주택좌표를_조회해_주변시설을_조회한다() {
