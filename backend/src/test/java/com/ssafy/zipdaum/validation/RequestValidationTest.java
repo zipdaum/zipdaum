@@ -3,6 +3,8 @@ package com.ssafy.zipdaum.validation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ssafy.zipdaum.auth.dto.AuthRequest;
+import com.ssafy.zipdaum.favorite.dto.FavoritePropertyCreateRequest;
+import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
 import jakarta.validation.Validation;
@@ -27,9 +29,18 @@ class RequestValidationTest {
     UserUpdateRequest updateRequest = new UserUpdateRequest();
     updateRequest.setName("김집다움");
 
+    PropertySearchRequest propertySearchRequest = new PropertySearchRequest();
+    propertySearchRequest.setSggCd("26350");
+    propertySearchRequest.setDealType("sale");
+    propertySearchRequest.setMinPrice(0L);
+    propertySearchRequest.setMaxPrice(100000L);
+    propertySearchRequest.setSortBy("price");
+    propertySearchRequest.setSortDirection("asc");
+
     assertThat(validator.validate(signUpRequest)).isEmpty();
     assertThat(validator.validate(authRequest)).isEmpty();
     assertThat(validator.validate(updateRequest)).isEmpty();
+    assertThat(validator.validate(propertySearchRequest)).isEmpty();
   }
 
   @Test
@@ -63,5 +74,30 @@ class RequestValidationTest {
     assertThat(validator.validate(request))
         .extracting(violation -> violation.getPropertyPath().toString())
         .contains("name");
+  }
+
+  @Test
+  void validate_관심_주택_ID가_양수가_아니면_검증_오류가_발생한다() {
+    FavoritePropertyCreateRequest request = new FavoritePropertyCreateRequest();
+    request.setPropertyId(0L);
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("propertyId");
+  }
+
+  @Test
+  void validate_주택_검색_요청값이_유효하지_않으면_각_필드의_검증_오류가_발생한다() {
+    PropertySearchRequest request = new PropertySearchRequest();
+    request.setSggCd("2635");
+    request.setDealType("INVALID");
+    request.setMinPrice(-1L);
+    request.setMaxPrice(-1L);
+    request.setSortBy("INVALID");
+    request.setSortDirection("INVALID");
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("sggCd", "dealType", "minPrice", "maxPrice", "sortBy", "sortDirection");
   }
 }

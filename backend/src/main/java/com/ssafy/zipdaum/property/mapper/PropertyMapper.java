@@ -16,6 +16,8 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface PropertyMapper {
 
+  boolean existsPropertyById(Long propertyId);
+
   List<PropertySearchResponse> selectProperties(PropertySearchRequest request);
 
   PropertyDetailResponse selectPropertyById(@Param("propertyId") Long propertyId);

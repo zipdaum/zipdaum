@@ -64,31 +64,39 @@ public class PropertyServiceImpl implements PropertyService {
   private void validateSearchRequest(PropertySearchRequest request) {
     if (request.getSggCd() != null && !request.getSggCd().isBlank()
         && !request.getSggCd().matches("\\d{5}")) {
+      log.warn("주택 실거래가 검색 실패 - 잘못된 법정동 코드 sggCd={}", request.getSggCd());
       throw new BusinessException(ErrorCode.INVALID_LAWD_CODE);
     }
     if (request.getMinPrice() != null && request.getMinPrice() < 0) {
+      log.warn("주택 실거래가 검색 실패 - 잘못된 최소 가격 minPrice={}", request.getMinPrice());
       throw new BusinessException(ErrorCode.INVALID_MIN_PRICE);
     }
     if (request.getMaxPrice() != null && request.getMaxPrice() < 0) {
+      log.warn("주택 실거래가 검색 실패 - 잘못된 최대 가격 maxPrice={}", request.getMaxPrice());
       throw new BusinessException(ErrorCode.INVALID_MAX_PRICE);
     }
     if (request.getMinPrice() != null && request.getMaxPrice() != null
         && request.getMinPrice() > request.getMaxPrice()) {
+      log.warn("주택 실거래가 검색 실패 - 잘못된 가격 범위 minPrice={}, maxPrice={}",
+          request.getMinPrice(), request.getMaxPrice());
       throw new BusinessException(ErrorCode.INVALID_PRICE_RANGE);
     }
     if (request.getDealType() != null && !request.getDealType().isBlank()) {
       try {
         DealType.valueOf(request.getDealType().trim().toUpperCase());
       } catch (IllegalArgumentException e) {
+        log.warn("주택 실거래가 검색 실패 - 잘못된 거래 유형 dealType={}", request.getDealType());
         throw new BusinessException(ErrorCode.INVALID_DEAL_TYPE);
       }
     }
     if (request.getSortBy() != null && !request.getSortBy().isBlank()
         && !SORT_OPTIONS.contains(request.getSortBy().trim().toUpperCase())) {
+      log.warn("주택 실거래가 검색 실패 - 잘못된 정렬 기준 sortBy={}", request.getSortBy());
       throw new BusinessException(ErrorCode.INVALID_SORT_OPTION);
     }
     if (request.getSortDirection() != null && !request.getSortDirection().isBlank()
         && !SORT_DIRECTIONS.contains(request.getSortDirection().trim().toUpperCase())) {
+      log.warn("주택 실거래가 검색 실패 - 잘못된 정렬 방향 sortDirection={}", request.getSortDirection());
       throw new BusinessException(ErrorCode.INVALID_SORT_DIRECTION);
     }
   }
