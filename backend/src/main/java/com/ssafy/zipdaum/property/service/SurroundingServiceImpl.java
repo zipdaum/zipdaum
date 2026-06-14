@@ -69,16 +69,23 @@ public class SurroundingServiceImpl implements SurroundingService {
     double centerLat = latitude.doubleValue();
     double centerLng = longitude.doubleValue();
 
-    List<SurroundingFacilityResponse> facilities = new ArrayList<>(
+    List<SurroundingFacilityResponse> allFacilities = new ArrayList<>(
         findLocalFacilities(centerLat, centerLng, radius)
     );
-    facilities.sort(Comparator.comparing(SurroundingFacilityResponse::getDistanceMeters)
+    allFacilities.sort(Comparator.comparing(SurroundingFacilityResponse::getDistanceMeters)
         .thenComparing(SurroundingFacilityResponse::getName, Comparator.nullsLast(String::compareTo)));
-    if (facilities.size() > MAX_FACILITY_COUNT) {
-      facilities = facilities.subList(0, MAX_FACILITY_COUNT);
+    List<SurroundingFacilityResponse> displayFacilities = allFacilities;
+    if (displayFacilities.size() > MAX_FACILITY_COUNT) {
+      displayFacilities = displayFacilities.subList(0, MAX_FACILITY_COUNT);
     }
 
-    return new SurroundingResponse(latitude, longitude, radius, summarize(facilities), facilities);
+    return new SurroundingResponse(
+        latitude,
+        longitude,
+        radius,
+        summarize(allFacilities),
+        displayFacilities
+    );
   }
 
   private void validatePropertyId(Long propertyId) {

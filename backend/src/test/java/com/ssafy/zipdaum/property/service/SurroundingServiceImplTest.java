@@ -57,6 +57,26 @@ class SurroundingServiceImplTest {
   }
 
   @Test
+  void findSurroundings_응답목록은_최대개수로_제한하고_요약은_반경내_전체개수를_사용한다() {
+    service.loadFacilities();
+
+    var result = service.findSurroundings(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        3000
+    );
+
+    int summaryTotalCount = result.getSummary().getBusCount()
+        + result.getSummary().getSubwayCount()
+        + result.getSummary().getHospitalCount()
+        + result.getSummary().getCctvCount()
+        + result.getSummary().getParkCount();
+
+    assertThat(result.getFacilities()).hasSizeLessThanOrEqualTo(80);
+    assertThat(summaryTotalCount).isGreaterThan(result.getFacilities().size());
+  }
+
+  @Test
   void findSurroundings_좌표가_없으면_예외가_발생한다() {
     assertThatThrownBy(() -> service.findSurroundings(null, new BigDecimal("129.1"), 1000))
         .isInstanceOf(BusinessException.class);
