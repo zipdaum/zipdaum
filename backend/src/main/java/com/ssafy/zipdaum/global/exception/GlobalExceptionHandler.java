@@ -7,6 +7,8 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 @Slf4j
@@ -24,6 +26,12 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(response, errorCode.getStatus());
   }
 
+  @ExceptionHandler({
+      MissingServletRequestParameterException.class,
+      MethodArgumentTypeMismatchException.class
+  })
+  protected ResponseEntity<ErrorResponse> handleRequestParameterException(Exception e) {
+    log.warn("요청 파라미터 오류 | 예외: {}", e.getClass().getSimpleName());
   @ExceptionHandler(BindException.class)
   protected ResponseEntity<ErrorResponse> handleBindException(BindException e) {
     log.warn("요청 파라미터 검증 실패 | 오류 개수: {}", e.getBindingResult().getErrorCount());
