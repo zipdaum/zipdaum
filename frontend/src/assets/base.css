@@ -963,6 +963,10 @@ a {
   fill: #17233f;
 }
 
+.trend-tooltip {
+  pointer-events: none;
+}
+
 .trend-tooltip text {
   fill: #ffffff;
   font-size: 11px;

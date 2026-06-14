@@ -1149,9 +1149,9 @@ function formatPrice(price) {
                     :cy="dot.y"
                     r="14"
                     tabindex="0"
-                    @mouseover="hoveredTrendDot = dot"
+                    @pointerenter="hoveredTrendDot = dot"
                     @focus="hoveredTrendDot = dot"
-                    @mouseleave="hoveredTrendDot = null"
+                    @pointerleave="hoveredTrendDot = null"
                     @blur="hoveredTrendDot = null"
                   >
                     <title>{{ dot.date }} {{ dot.label }}</title>
