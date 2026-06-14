@@ -1,6 +1,10 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { getPropertyDetail as fetchPropertyDetail, searchProperties } from '../api/property'
+import {
+  getPropertyDealHistories as fetchPropertyDealHistories,
+  getPropertyDetail as fetchPropertyDetail,
+  searchProperties
+} from '../api/property'
 
 const dealTypes = [
   { label: '전체', value: '' },
@@ -288,7 +292,15 @@ async function loadPropertyDetailView(propertyId, view = 'detail') {
 
   try {
     if (!selectedPropertyDetail.value || selectedPropertyDetail.value.id !== propertyId) {
-      selectedPropertyDetail.value = await fetchPropertyDetail(propertyId)
+      const [detail, histories] = await Promise.all([
+        fetchPropertyDetail(propertyId),
+        fetchPropertyDealHistories(propertyId)
+      ])
+      selectedPropertyDetail.value = {
+        ...detail,
+        saleDeals: histories.saleDeals || [],
+        rentDeals: histories.rentDeals || []
+      }
     }
     activeTrendType.value = getDefaultTrendType(selectedPropertyDetail.value)
     if (view === 'deal-history') {

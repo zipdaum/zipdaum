@@ -13,3 +13,8 @@ export async function getPropertyDetail(propertyId) {
   const response = await propertyClient.get(`/properties/${propertyId}`)
   return response.data
 }
+
+export async function getPropertyDealHistories(propertyId) {
+  const response = await propertyClient.get(`/properties/${propertyId}/histories`)
+  return response.data
+}

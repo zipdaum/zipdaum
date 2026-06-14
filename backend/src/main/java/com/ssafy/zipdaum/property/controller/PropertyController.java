@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.property.controller;
 
 import com.ssafy.zipdaum.property.domain.DealApiType;
+import com.ssafy.zipdaum.property.dto.PropertyDealHistoryResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
@@ -64,7 +65,7 @@ public class PropertyController {
   @GetMapping("/{propertyId}")
   @Operation(
       summary = "주택 상세 조회",
-      description = "주택 기본 정보와 매매/전월세 거래 이력을 조회합니다."
+      description = "주택 기본 정보와 최신 거래 요약 정보를 조회합니다."
   )
   @ApiResponses({
       @ApiResponse(
@@ -80,6 +81,27 @@ public class PropertyController {
   ) {
     log.info("GET /properties/{} 요청", propertyId);
     return ResponseEntity.ok(propertyService.findPropertyDetail(propertyId));
+  }
+
+  @GetMapping("/{propertyId}/histories")
+  @Operation(
+      summary = "거래 이력 조회",
+      description = "주택의 전체 매매/전월세 거래 이력을 조회합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "거래 이력 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyDealHistoryResponse.class))
+      ),
+      @ApiResponse(responseCode = "404", description = "주택 정보 없음", content = @Content)
+  })
+  public ResponseEntity<PropertyDealHistoryResponse> getPropertyDealHistories(
+      @Parameter(description = "주택 ID", example = "1", required = true)
+      @PathVariable Long propertyId
+  ) {
+    log.info("GET /properties/{}/histories 요청", propertyId);
+    return ResponseEntity.ok(propertyService.findPropertyDealHistories(propertyId));
   }
 
   @PostMapping

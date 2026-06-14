@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.property.dto.PropertyDealHistoryResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertyRentDealResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaleDealResponse;
@@ -23,21 +25,51 @@ class PropertyServiceImplTest {
   private final PropertyServiceImpl service = new PropertyServiceImpl(propertyMapper);
 
   @Test
-  void findPropertyDetail_주택정보와_거래이력을_조회한다() {
+  void findPropertyDetail_주택_기본정보를_조회한다() {
     Long propertyId = 1L;
     PropertyDetailResponse detail = new PropertyDetailResponse();
     detail.setId(propertyId);
-    List<PropertySaleDealResponse> saleDeals = List.of(new PropertySaleDealResponse());
-    List<PropertyRentDealResponse> rentDeals = List.of(new PropertyRentDealResponse());
     given(propertyMapper.selectPropertyById(propertyId)).willReturn(detail);
-    given(propertyMapper.selectSaleDealsByPropertyId(propertyId)).willReturn(saleDeals);
-    given(propertyMapper.selectRentDealsByPropertyId(propertyId)).willReturn(rentDeals);
 
     PropertyDetailResponse result = service.findPropertyDetail(propertyId);
 
     assertThat(result).isSameAs(detail);
+    then(propertyMapper).should(never()).selectSaleDealsByPropertyId(propertyId);
+    then(propertyMapper).should(never()).selectRentDealsByPropertyId(propertyId);
+  }
+
+  @Test
+  void findPropertyDealHistories_전체_거래이력을_조회한다() {
+    Long propertyId = 1L;
+    List<PropertySaleDealResponse> saleDeals = List.of(new PropertySaleDealResponse());
+    List<PropertyRentDealResponse> rentDeals = List.of(new PropertyRentDealResponse());
+    given(propertyMapper.existsPropertyById(propertyId)).willReturn(true);
+    given(propertyMapper.selectSaleDealsByPropertyId(propertyId)).willReturn(saleDeals);
+    given(propertyMapper.selectRentDealsByPropertyId(propertyId)).willReturn(rentDeals);
+
+    PropertyDealHistoryResponse result = service.findPropertyDealHistories(propertyId);
+
     assertThat(result.getSaleDeals()).isSameAs(saleDeals);
     assertThat(result.getRentDeals()).isSameAs(rentDeals);
+  }
+
+  @Test
+  void findPropertyDealHistories_주택이_없으면_예외가_발생한다() {
+    Long propertyId = 1L;
+    given(propertyMapper.existsPropertyById(propertyId)).willReturn(false);
+
+    assertThatThrownBy(() -> service.findPropertyDealHistories(propertyId))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PROPERTY_NOT_FOUND)
+        );
+  }
+
+  @Test
+  void findPropertyDealHistories_주택ID가_유효하지_않으면_예외가_발생한다() {
+    assertThatThrownBy(() -> service.findPropertyDealHistories(0L))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_PROPERTY_ID)
+        );
   }
 
   @Test

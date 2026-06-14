@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.property.service;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.domain.DealType;
+import com.ssafy.zipdaum.property.dto.PropertyDealHistoryResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
@@ -41,18 +42,30 @@ public class PropertyServiceImpl implements PropertyService {
       throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
     }
 
+    log.info("주택 상세 조회 완료 propertyId={}", propertyId);
+    return detail;
+  }
+
+  @Override
+  public PropertyDealHistoryResponse findPropertyDealHistories(Long propertyId) {
+    validatePropertyId(propertyId);
+    log.info("주택 거래 이력 조회 요청 propertyId={}", propertyId);
+
+    if (!propertyMapper.existsPropertyById(propertyId)) {
+      log.warn("존재하지 않는 주택 propertyId={}", propertyId);
+      throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
+    }
+
     var saleDeals = propertyMapper.selectSaleDealsByPropertyId(propertyId);
     var rentDeals = propertyMapper.selectRentDealsByPropertyId(propertyId);
-    detail.setSaleDeals(saleDeals);
-    detail.setRentDeals(rentDeals);
 
     log.info(
-        "주택 상세 조회 완료 propertyId={}, saleDealCount={}, rentDealCount={}",
+        "주택 거래 이력 조회 완료 propertyId={}, saleDealCount={}, rentDealCount={}",
         propertyId,
         saleDeals.size(),
         rentDeals.size()
     );
-    return detail;
+    return new PropertyDealHistoryResponse(saleDeals, rentDeals);
   }
 
   private void validatePropertyId(Long propertyId) {

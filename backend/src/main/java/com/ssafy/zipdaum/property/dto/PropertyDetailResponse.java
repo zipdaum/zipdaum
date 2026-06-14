@@ -1,7 +1,6 @@
 package com.ssafy.zipdaum.property.dto;
 
 import java.math.BigDecimal;
-import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,6 +20,4 @@ public class PropertyDetailResponse {
   private Long latestSalePrice;
   private Long latestDeposit;
   private Long latestMonthlyRent;
-  private List<PropertySaleDealResponse> saleDeals;
-  private List<PropertyRentDealResponse> rentDeals;
 }
