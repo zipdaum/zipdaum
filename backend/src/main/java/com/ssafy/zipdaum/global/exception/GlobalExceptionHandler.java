@@ -32,6 +32,12 @@ public class GlobalExceptionHandler {
   })
   protected ResponseEntity<ErrorResponse> handleRequestParameterException(Exception e) {
     log.warn("요청 파라미터 오류 | 예외: {}", e.getClass().getSimpleName());
+
+    ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+    ErrorResponse response = new ErrorResponse(errorCode);
+    return new ResponseEntity<>(response, errorCode.getStatus());
+  }
+
   @ExceptionHandler(BindException.class)
   protected ResponseEntity<ErrorResponse> handleBindException(BindException e) {
     log.warn("요청 파라미터 검증 실패 | 오류 개수: {}", e.getBindingResult().getErrorCount());
