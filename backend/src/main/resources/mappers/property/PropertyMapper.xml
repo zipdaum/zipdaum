@@ -5,6 +5,14 @@
 
 <mapper namespace="com.ssafy.zipdaum.property.mapper.PropertyMapper">
 
+  <select id="existsPropertyById" parameterType="long" resultType="boolean">
+    SELECT EXISTS(
+      SELECT 1
+      FROM property
+      WHERE id = #{propertyId}
+    )
+  </select>
+
   <resultMap id="propertySearchResponseResultMap"
              type="com.ssafy.zipdaum.property.dto.PropertySearchResponse">
     <id property="id" column="id"/>
