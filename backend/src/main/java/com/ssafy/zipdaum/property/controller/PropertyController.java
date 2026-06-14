@@ -56,9 +56,7 @@ public class PropertyController {
         request.getSggCd(), request.getDealType(), request.getMinPrice(), request.getMaxPrice(),
         request.getSortBy(), request.getSortDirection());
 
-    List<PropertySearchResponse> response = propertyService.searchProperties(request);
-    log.info("GET /properties 완료 count={}", response.size());
-    return ResponseEntity.ok(response);
+    return ResponseEntity.ok(propertyService.searchProperties(request));
   }
 
   @PostMapping
@@ -86,9 +84,6 @@ public class PropertyController {
   ) {
     log.info("POST /properties 요청 type={}, lawdCd={}, dealYmd={}", type, lawdCd, dealYmd);
 
-    PropertySaveResult response = fetchService.fetchAndSaveProperties(type, lawdCd, dealYmd);
-    log.info("POST /properties 완료 fetchedCount={}, savedCount={}",
-        response.fetchedCount(), response.savedCount());
-    return ResponseEntity.ok(response);
+    return ResponseEntity.ok(fetchService.fetchAndSaveProperties(type, lawdCd, dealYmd));
   }
 }

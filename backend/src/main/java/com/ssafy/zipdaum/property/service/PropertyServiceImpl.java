@@ -26,13 +26,7 @@ public class PropertyServiceImpl implements PropertyService {
   public List<PropertySearchResponse> searchProperties(PropertySearchRequest request) {
     validateSearchRequest(request);
     normalizeRequest(request);
-    log.info("주택 실거래가 검색 시작 sggCd={}, umdNm={}, name={}, dealType={}, minPrice={}, maxPrice={}, sortBy={}, sortDirection={}",
-        request.getSggCd(), request.getUmdNm(), request.getName(), request.getDealType(),
-        request.getMinPrice(), request.getMaxPrice(), request.getSortBy(), request.getSortDirection());
-
-    List<PropertySearchResponse> properties = propertyMapper.selectProperties(request);
-    log.info("주택 실거래가 검색 완료 count={}", properties.size());
-    return properties;
+    return propertyMapper.selectProperties(request);
   }
 
   private void validateSearchRequest(PropertySearchRequest request) {
