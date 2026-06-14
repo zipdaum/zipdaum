@@ -37,4 +37,9 @@ public enum RegionCode { // TODO 부산 외 지역코드 추가 시 DB 테이블
         .findFirst()
         .orElse("부산");
   }
+
+  public static boolean isValid(String lawdCd) {
+    return Arrays.stream(values())
+        .anyMatch(regionCode -> regionCode.lawdCd.equals(lawdCd));
+  }
 }
