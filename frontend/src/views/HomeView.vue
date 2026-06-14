@@ -450,58 +450,14 @@ async function loadHistories(propertyId, options = {}) {
       rentDealType,
       size: historyPageSize
     })
-    const saleTotalCount = histories.saleTotalCount ?? (histories.saleDeals || []).length
-    const rentTotalCount = histories.rentTotalCount ?? getRentDealCount(histories.rentDeals || [], rentDealType)
-    const saleServerPaged = histories.salePage !== undefined || histories.saleTotalCount !== undefined
-    const rentServerPaged = histories.rentPage !== undefined || histories.rentTotalCount !== undefined
-    const nextRentDealsByType = {
-      ...createEmptyRentDealsByType(),
-      ...(selectedPropertyDetail.value.rentDealsByType || {}),
-      ...(shouldUpdateRent ? { [rentDealType]: histories.rentDeals || [] } : {})
-    }
-    const nextRentMetaByType = {
-      ...createEmptyRentMetaByType(),
-      ...(selectedPropertyDetail.value.rentMetaByType || {}),
-      ...(shouldUpdateRent ? {
-        [rentDealType]: {
-          page: histories.rentPage || requestedRentPage,
-          size: histories.rentSize || historyPageSize,
-          totalCount: rentTotalCount,
-          totalPages: histories.rentTotalPages || calculatePageCount(rentTotalCount),
-          serverPaged: rentServerPaged
-        }
-      } : {})
-    }
-    const activeRentMeta = nextRentMetaByType[rentDealType]
-
-    selectedPropertyDetail.value = {
-      ...selectedPropertyDetail.value,
-      ...(shouldUpdateSale ? {
-        saleDeals: histories.saleDeals || [],
-        salePage: histories.salePage || requestedSalePage,
-        saleSize: histories.saleSize || historyPageSize,
-        saleTotalCount,
-        saleTotalPages: histories.saleTotalPages || calculatePageCount(saleTotalCount),
-        saleServerPaged
-      } : {}),
-      ...(shouldUpdateRent ? {
-        rentDeals: shouldActivateRent
-          ? nextRentDealsByType[rentDealType]
-          : selectedPropertyDetail.value.rentDeals,
-        rentDealsByType: nextRentDealsByType,
-        rentMetaByType: nextRentMetaByType,
-        rentDealType: shouldActivateRent
-          ? histories.rentDealType || rentDealType
-          : selectedPropertyDetail.value.rentDealType,
-        rentPage: shouldActivateRent ? activeRentMeta.page : selectedPropertyDetail.value.rentPage,
-        rentSize: shouldActivateRent ? activeRentMeta.size : selectedPropertyDetail.value.rentSize,
-        rentTotalCount: shouldActivateRent ? activeRentMeta.totalCount : selectedPropertyDetail.value.rentTotalCount,
-        rentTotalPages: shouldActivateRent ? activeRentMeta.totalPages : selectedPropertyDetail.value.rentTotalPages,
-        jeonseTotalCount: histories.jeonseTotalCount ?? getJeonseDealCount(histories.rentDeals || []),
-        monthlyRentTotalCount: histories.monthlyRentTotalCount ?? getMonthlyRentDealCount(histories.rentDeals || []),
-        rentServerPaged: shouldActivateRent ? activeRentMeta.serverPaged : selectedPropertyDetail.value.rentServerPaged
-      } : {})
-    }
+    selectedPropertyDetail.value = buildHistoryState(selectedPropertyDetail.value, histories, {
+      rentDealType,
+      requestedSalePage,
+      requestedRentPage,
+      shouldUpdateSale,
+      shouldUpdateRent,
+      shouldActivateRent
+    })
     if (shouldUpdateSale) {
       saleHistoryPage.value = selectedPropertyDetail.value.salePage
     }
@@ -518,6 +474,78 @@ async function loadHistories(propertyId, options = {}) {
     if (shouldUpdateRent) {
       isRentHistoryLoading.value = false
     }
+  }
+}
+
+function buildHistoryState(currentProperty, histories, options) {
+  const {
+    rentDealType,
+    requestedSalePage,
+    requestedRentPage,
+    shouldUpdateSale,
+    shouldUpdateRent,
+    shouldActivateRent
+  } = options
+  const nextProperty = { ...currentProperty }
+
+  if (shouldUpdateSale) {
+    const saleTotalCount = histories.saleTotalCount ?? (histories.saleDeals || []).length
+    Object.assign(nextProperty, {
+      saleDeals: histories.saleDeals || [],
+      salePage: histories.salePage || requestedSalePage,
+      saleSize: histories.saleSize || historyPageSize,
+      saleTotalCount,
+      saleTotalPages: histories.saleTotalPages || calculatePageCount(saleTotalCount),
+      saleServerPaged: histories.salePage !== undefined || histories.saleTotalCount !== undefined
+    })
+  }
+
+  if (shouldUpdateRent) {
+    Object.assign(nextProperty, buildRentHistoryState(currentProperty, histories, {
+      rentDealType,
+      requestedRentPage,
+      shouldActivateRent
+    }))
+  }
+
+  return nextProperty
+}
+
+function buildRentHistoryState(currentProperty, histories, options) {
+  const { rentDealType, requestedRentPage, shouldActivateRent } = options
+  const rentDeals = histories.rentDeals || []
+  const rentTotalCount = histories.rentTotalCount ?? getRentDealCount(rentDeals, rentDealType)
+  const rentServerPaged = histories.rentPage !== undefined || histories.rentTotalCount !== undefined
+  const nextRentDealsByType = {
+    ...createEmptyRentDealsByType(),
+    ...(currentProperty.rentDealsByType || {}),
+    [rentDealType]: rentDeals
+  }
+  const nextRentMetaByType = {
+    ...createEmptyRentMetaByType(),
+    ...(currentProperty.rentMetaByType || {}),
+    [rentDealType]: {
+      page: histories.rentPage || requestedRentPage,
+      size: histories.rentSize || historyPageSize,
+      totalCount: rentTotalCount,
+      totalPages: histories.rentTotalPages || calculatePageCount(rentTotalCount),
+      serverPaged: rentServerPaged
+    }
+  }
+  const activeRentMeta = nextRentMetaByType[rentDealType]
+
+  return {
+    rentDeals: shouldActivateRent ? nextRentDealsByType[rentDealType] : currentProperty.rentDeals,
+    rentDealsByType: nextRentDealsByType,
+    rentMetaByType: nextRentMetaByType,
+    rentDealType: shouldActivateRent ? histories.rentDealType || rentDealType : currentProperty.rentDealType,
+    rentPage: shouldActivateRent ? activeRentMeta.page : currentProperty.rentPage,
+    rentSize: shouldActivateRent ? activeRentMeta.size : currentProperty.rentSize,
+    rentTotalCount: shouldActivateRent ? activeRentMeta.totalCount : currentProperty.rentTotalCount,
+    rentTotalPages: shouldActivateRent ? activeRentMeta.totalPages : currentProperty.rentTotalPages,
+    jeonseTotalCount: histories.jeonseTotalCount ?? getJeonseDealCount(rentDeals),
+    monthlyRentTotalCount: histories.monthlyRentTotalCount ?? getMonthlyRentDealCount(rentDeals),
+    rentServerPaged: shouldActivateRent ? activeRentMeta.serverPaged : currentProperty.rentServerPaged
   }
 }
 
