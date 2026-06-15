@@ -34,7 +34,8 @@ public enum ErrorCode {
   INVALID_DEAL_TYPE(HttpStatus.BAD_REQUEST, "P011", "거래 유형은 SALE, JEONSE, MONTHLY_RENT 중 하나여야 합니다."),
   INVALID_SORT_OPTION(HttpStatus.BAD_REQUEST, "P012", "정렬 기준은 LATEST, PRICE, NAME 중 하나여야 합니다."),
   INVALID_SORT_DIRECTION(HttpStatus.BAD_REQUEST, "P013", "정렬 방향은 ASC, DESC 중 하나여야 합니다."),
-  INVALID_REGION_CODE(HttpStatus.BAD_REQUEST, "P014", "지원하지 않는 지역 코드입니다."),
+  INVALID_PROPERTY_ID(HttpStatus.BAD_REQUEST, "P014", "주택 ID는 1 이상의 숫자여야 합니다."),
+  INVALID_REGION_CODE(HttpStatus.BAD_REQUEST, "P015", "지원하지 않는 지역 코드입니다."),
 
   // 4. Favorite
   FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "관심 목록에서 해당 정보를 찾을 수 없습니다."),
