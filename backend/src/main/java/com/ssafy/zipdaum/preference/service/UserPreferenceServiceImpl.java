@@ -131,10 +131,11 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
         case AREA -> validateArea(normalizedValue).stripTrailingZeros().toPlainString();
         case BUILD_YEAR -> String.valueOf(validateBuildYear(normalizedValue));
         case REGION -> normalizedValue;
-        case BUS, SUBWAY, HOSPITAL, CCTV, PARK -> String.valueOf(validateBoolean(normalizedValue));
+        case BUS, SUBWAY, HOSPITAL, CCTV, PARK ->
+            String.valueOf(validateBoolean(type, normalizedValue));
       };
     } catch (NumberFormatException e) {
-      log.warn("맞춤 조건 값 형식 오류 type={}, value={}", type.name(), value);
+      log.warn("맞춤 조건 값 형식 오류 type={}", type.name());
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
   }
@@ -142,6 +143,7 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
   private long validateBudget(String value) {
     long budget = Long.parseLong(value);
     if (budget < 0) {
+      log.warn("맞춤 조건 값 범위 오류 type=BUDGET");
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
     return budget;
@@ -150,6 +152,7 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
   private BigDecimal validateArea(String value) {
     BigDecimal area = new BigDecimal(value);
     if (area.compareTo(BigDecimal.ZERO) <= 0) {
+      log.warn("맞춤 조건 값 범위 오류 type=AREA");
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
     return area;
@@ -158,13 +161,15 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
   private int validateBuildYear(String value) {
     int buildYear = Integer.parseInt(value);
     if (buildYear < 1900 || buildYear > 2100) {
+      log.warn("맞춤 조건 값 범위 오류 type=BUILD_YEAR, min=1900, max=2100");
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
     return buildYear;
   }
 
-  private boolean validateBoolean(String value) {
+  private boolean validateBoolean(UserPreferenceType type, String value) {
     if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+      log.warn("맞춤 조건 값 형식 오류 type={}", type.name());
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
     return Boolean.parseBoolean(value);
