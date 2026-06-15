@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
+import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.domain.SurroundingType;
 import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
@@ -33,6 +34,18 @@ class SurroundingServiceImplTest {
     assertThat(result.getLatitude()).isEqualByComparingTo("35.1709598");
     assertThat(result.getLongitude()).isEqualByComparingTo("129.125307");
     assertThat(result.getFacilities()).isNotEmpty();
+  }
+
+  @Test
+  void findPropertySurroundings_주택좌표가_없으면_예외가_발생한다() {
+    PropertyDetailResponse property = new PropertyDetailResponse();
+    property.setId(1L);
+    given(propertyMapper.selectPropertyById(1L)).willReturn(property);
+
+    assertThatThrownBy(() -> service.findPropertySurroundings(1L, 1000))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COORDINATE_NOT_FOUND)
+        );
   }
 
   @Test
