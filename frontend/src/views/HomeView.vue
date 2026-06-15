@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { searchProperties } from '../api/property'
+import AppHeader from '../components/AppHeader.vue'
 
 const dealTypes = [
   { label: '전체', value: '' },
@@ -347,24 +348,7 @@ function formatPrice(price) {
 
 <template>
   <main class="app-shell">
-    <header class="top-bar">
-      <a class="brand" href="#" aria-label="집다움 홈" @click.prevent="openHomeView">
-        <span class="brand-mark">Z</span>
-        <span>집다움</span>
-      </a>
-
-      <nav class="main-nav" aria-label="주요 메뉴">
-        <a class="active" href="#" @click.prevent="openHomeView">실거래가 검색</a>
-        <a href="#">관심지역</a>
-        <a href="#">알림</a>
-        <a href="#">마이페이지</a>
-      </nav>
-
-      <div class="account-actions">
-        <button class="ghost-button" type="button">로그인</button>
-        <button class="primary-button" type="button">회원가입</button>
-      </div>
-    </header>
+    <AppHeader @home="openHomeView" />
 
     <template v-if="currentView === 'home'">
       <section class="hero-section" aria-labelledby="home-title">

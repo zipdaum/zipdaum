@@ -106,10 +106,19 @@ a {
   gap: 8px;
 }
 
+.user-name {
+  color: #53617c;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .ghost-button,
 .primary-button,
 .search-button,
 .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 36px;
   border-radius: 6px;
   padding: 0 18px;
