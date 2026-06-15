@@ -19,8 +19,6 @@ public class GlobalExceptionHandler {
   protected ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
       MethodArgumentNotValidException e
   ) {
-    log.warn("요청값 검증 실패 | 오류 개수: {}", e.getBindingResult().getErrorCount());
-
     ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
     ErrorResponse response = new ErrorResponse(errorCode);
     return new ResponseEntity<>(response, errorCode.getStatus());
@@ -31,8 +29,6 @@ public class GlobalExceptionHandler {
       MethodArgumentTypeMismatchException.class
   })
   protected ResponseEntity<ErrorResponse> handleRequestParameterException(Exception e) {
-    log.warn("요청 파라미터 오류 | 예외: {}", e.getClass().getSimpleName());
-
     ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
     ErrorResponse response = new ErrorResponse(errorCode);
     return new ResponseEntity<>(response, errorCode.getStatus());
@@ -40,8 +36,6 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(BindException.class)
   protected ResponseEntity<ErrorResponse> handleBindException(BindException e) {
-    log.warn("요청 파라미터 검증 실패 | 오류 개수: {}", e.getBindingResult().getErrorCount());
-
     ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
     ErrorResponse response = new ErrorResponse(errorCode);
     return new ResponseEntity<>(response, errorCode.getStatus());
@@ -51,10 +45,6 @@ public class GlobalExceptionHandler {
   protected ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(
       HandlerMethodValidationException e
   ) {
-    int errorCount = e.getParameterValidationResults().size()
-        + e.getCrossParameterValidationResults().size();
-    log.warn("요청 파라미터 검증 실패 | 오류 개수: {}", errorCount);
-
     ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
     ErrorResponse response = new ErrorResponse(errorCode);
     return new ResponseEntity<>(response, errorCode.getStatus());
@@ -63,8 +53,6 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(BusinessException.class)
   protected ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e){
     ErrorCode errorCode = e.getErrorCode();
-
-    log.debug("BusinessException 처리 | 코드: {}, 메시지: {}", errorCode.name(), errorCode.getMessage());
 
     ErrorResponse response = new ErrorResponse(errorCode);
     return new ResponseEntity<>(response, errorCode.getStatus());
