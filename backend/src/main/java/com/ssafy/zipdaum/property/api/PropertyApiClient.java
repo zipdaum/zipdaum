@@ -45,12 +45,12 @@ public class PropertyApiClient {
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {
-      log.warn("공공데이터 API 응답 지연 또는 연결 실패 type={}, lawdCd={}, dealYmd={}, reason={}",
-          apiType, lawdCd, dealYmd, e.getMessage());
+      log.warn("공공데이터 API 응답 지연 또는 연결 실패 type={}, lawdCd={}, dealYmd={}",
+          apiType, lawdCd, dealYmd);
       throw new BusinessException(ErrorCode.REAL_ESTATE_API_TIMEOUT);
     } catch (RestClientException e) {
-      log.warn("공공데이터 API 호출 실패 type={}, lawdCd={}, dealYmd={}, reason={}",
-          apiType, lawdCd, dealYmd, e.getMessage());
+      log.warn("공공데이터 API 호출 실패 type={}, lawdCd={}, dealYmd={}",
+          apiType, lawdCd, dealYmd);
       throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
     }
 
