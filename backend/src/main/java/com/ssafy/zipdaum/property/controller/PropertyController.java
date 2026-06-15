@@ -80,11 +80,12 @@ public class PropertyController {
           description = "주택 상세 조회 성공",
           content = @Content(schema = @Schema(implementation = PropertyDetailResponse.class))
       ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
       @ApiResponse(responseCode = "404", description = "주택 정보 없음", content = @Content)
   })
   public ResponseEntity<PropertyDetailResponse> getPropertyDetail(
       @Parameter(description = "주택 ID", example = "1", required = true)
-      @PathVariable Long propertyId
+      @PathVariable @Positive Long propertyId
   ) {
     log.info("GET /properties/{} 요청", propertyId);
     return ResponseEntity.ok(propertyService.findPropertyDetail(propertyId));
@@ -101,11 +102,12 @@ public class PropertyController {
           description = "거래 이력 조회 성공",
           content = @Content(schema = @Schema(implementation = PropertyDealHistoryResponse.class))
       ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
       @ApiResponse(responseCode = "404", description = "주택 정보 없음", content = @Content)
   })
   public ResponseEntity<PropertyDealHistoryResponse> getPropertyDealHistories(
       @Parameter(description = "주택 ID", example = "1", required = true)
-      @PathVariable Long propertyId,
+      @PathVariable @Positive Long propertyId,
       @Parameter(description = "전월세 유형", example = "JEONSE")
       @RequestParam(required = false) String rentDealType,
       @Parameter(description = "매매 거래 이력 페이지", example = "1")
