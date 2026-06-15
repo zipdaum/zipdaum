@@ -25,23 +25,21 @@ public class AuthServiceImpl implements AuthService {
   @Override
   @Transactional(readOnly = true)
   public AuthResponse login(AuthRequest authRequest) {
-    log.info("로그인 요청 email={}", authRequest.getEmail());
-
     UserDto user = userMapper.findByEmail(authRequest.getEmail());
 
     if (user == null) {
-      log.warn("존재하지 않는 사용자 email={}", authRequest.getEmail());
+      log.warn("로그인 실패 - 존재하지 않는 사용자");
       throw new BusinessException(ErrorCode.USER_NOT_FOUND);
     }
 
     if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
-      log.warn("비밀번호 불일치 email={}", authRequest.getEmail());
+      log.warn("로그인 실패 - 비밀번호 불일치 userId={}", user.getId());
       throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
     }
 
     String accessToken = jwtTokenProvider.createAccessToken(user);
 
-    log.info("로그인 완료 email={}", authRequest.getEmail());
+    log.info("로그인 완료 userId={}", user.getId());
     return new AuthResponse(accessToken, user.getId(), user.getEmail(), user.getName());
   }
 }

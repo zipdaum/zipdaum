@@ -23,10 +23,8 @@ public class UserServiceImpl implements UserService{
   @Transactional
   public void signUp(UserSignUpRequest request) {
 
-    log.info("회원가입 요청 도착 email={}", request.getEmail());
-
     if (userMapper.findByEmail(request.getEmail()) != null) {
-      log.warn("중복 이메일 email={}", request.getEmail());
+      log.warn("회원가입 실패 - 중복 이메일");
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
     }
 
@@ -38,18 +36,16 @@ public class UserServiceImpl implements UserService{
     try {
       userMapper.insertUser(userDto);
     } catch (DuplicateKeyException e) {
-      log.warn("회원가입 중 중복 이메일 발생 email={}", request.getEmail());
+      log.warn("회원가입 실패 - 중복 이메일");
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
     }
 
-    log.info("회원가입 완료 email={}", request.getEmail());
+    log.info("회원가입 완료");
   }
 
   @Override
   @Transactional(readOnly = true)
   public UserDto findById(Long id) {
-    log.info("회원 정보 조회 요청 userId={}", id);
-
     UserDto user = userMapper.findById(id);
     if (user == null) {
       log.warn("존재하지 않는 사용자 userId={}", id);
@@ -62,8 +58,6 @@ public class UserServiceImpl implements UserService{
   @Override
   @Transactional
   public void updateName(Long id, String name) {
-    log.info("회원 정보 수정 요청 userId={}", id);
-
     int updatedRows = userMapper.updateNameById(id, name);
     if (updatedRows == 0) {
       log.warn("수정 처리할 대상이 없음 userId={}", id);
@@ -76,8 +70,6 @@ public class UserServiceImpl implements UserService{
   @Override
   @Transactional
   public void deleteById(Long id) {
-    log.info("회원 탈퇴 요청 userId={}", id);
-
     int updatedRows = userMapper.softDeleteById(id);
     if (updatedRows == 0) {
       log.warn("탈퇴 처리할 대상이 없음 userId={}", id);
