@@ -100,6 +100,18 @@ class PropertyServiceImplTest {
   }
 
   @Test
+  void findPropertyDealHistories_전월세유형이_올바르지_않으면_예외가_발생한다() {
+    Long propertyId = 1L;
+    given(propertyMapper.existsPropertyById(propertyId)).willReturn(true);
+
+    assertThatThrownBy(() -> service.findPropertyDealHistories(propertyId, "INVALID", null, null, null))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_DEAL_TYPE)
+        );
+    then(propertyMapper).should(never()).countSaleDealsByPropertyId(propertyId);
+  }
+
+  @Test
   void findPropertyDealHistories_페이지크기가_허용범위를_벗어나면_예외가_발생한다() {
     Long propertyId = 1L;
     given(propertyMapper.existsPropertyById(propertyId)).willReturn(true);
