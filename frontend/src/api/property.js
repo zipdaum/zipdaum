@@ -1,10 +1,6 @@
-import axios from 'axios'
-
-const propertyClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || ''
-})
+import client from './client'
 
 export async function searchProperties(params) {
-  const response = await propertyClient.get('/properties', { params })
+  const response = await client.get('/properties', { params })
   return response.data
 }
