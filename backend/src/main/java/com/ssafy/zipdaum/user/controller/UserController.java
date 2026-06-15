@@ -42,7 +42,7 @@ public class UserController {
       @ApiResponse(responseCode = "400", description = "중복 이메일 또는 입력값 오류", content = @Content)
   })
   public ResponseEntity<String> signUp(@Valid @RequestBody UserSignUpRequest request) {
-    log.info("POST /users 요청 email={}", request.getEmail());
+    log.info("POST /users 요청");
     userService.signUp(request);
     return ResponseEntity.status(HttpStatus.CREATED).body("회원가입 성공");
   }
@@ -62,7 +62,7 @@ public class UserController {
   public ResponseEntity<UserInfoResponse> getUserInfo(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
-    log.info("GET /users/info 요청 userId={}", authenticatedUser.getId());
+    log.info("GET /users/info 요청");
 
     UserDto user = userService.findById(authenticatedUser.getId());
     UserInfoResponse response = new UserInfoResponse(
@@ -88,7 +88,7 @@ public class UserController {
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
       @Valid @RequestBody UserUpdateRequest userUpdateRequest
   ) {
-    log.info("PATCH /users/info 요청 userId={}", authenticatedUser.getId());
+    log.info("PATCH /users/info 요청");
     userService.updateName(authenticatedUser.getId(), userUpdateRequest.getName());
     return ResponseEntity.ok("회원 정보 수정 성공");
   }
@@ -104,7 +104,7 @@ public class UserController {
   public ResponseEntity<String> deleteUser(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
-    log.info("DELETE /users/info 요청 userId={}", authenticatedUser.getId());
+    log.info("DELETE /users/info 요청");
     userService.deleteById(authenticatedUser.getId());
     return ResponseEntity.ok("회원 탈퇴 성공");
   }

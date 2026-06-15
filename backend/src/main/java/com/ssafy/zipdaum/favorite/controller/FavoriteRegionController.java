@@ -44,7 +44,7 @@ public class FavoriteRegionController {
   public ResponseEntity<List<FavoriteRegionResponse>> getFavoriteRegions(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
-    log.info("GET /users/info/regions 요청 userId={}", authenticatedUser.getId());
+    log.info("GET /users/info/regions 요청");
 
     return ResponseEntity.ok(
         favoriteRegionService.findFavoriteRegions(authenticatedUser.getId())
@@ -63,12 +63,7 @@ public class FavoriteRegionController {
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
       @Valid @RequestBody FavoriteRegionCreateRequest request
   ) {
-    log.info(
-        "POST /users/info/regions 요청 userId={}, sggCd={}, umdNm={}",
-        authenticatedUser.getId(),
-        request.getSggCd(),
-        request.getUmdNm()
-    );
+    log.info("POST /users/info/regions 요청");
 
     favoriteRegionService.saveFavoriteRegion(
         authenticatedUser.getId(),
@@ -92,12 +87,7 @@ public class FavoriteRegionController {
       @RequestParam String sggCd,
       @RequestParam String umdNm
   ) {
-    log.info(
-        "DELETE /users/info/regions 요청 userId={}, sggCd={}, umdNm={}",
-        authenticatedUser.getId(),
-        sggCd,
-        umdNm
-    );
+    log.info("DELETE /users/info/regions 요청");
 
     favoriteRegionService.removeFavoriteRegion(authenticatedUser.getId(), sggCd, umdNm);
 
