@@ -129,6 +129,24 @@ class PropertyFetchServiceImplTest {
         );
   }
 
+  @Test
+  void fetchAndSaveProperties_공공데이터_API_응답이_없으면_타임아웃_예외가_발생하고_저장하지_않는다() {
+    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501"))
+        .willThrow(new BusinessException(ErrorCode.REAL_ESTATE_API_TIMEOUT));
+
+    assertThatThrownBy(() -> service.fetchAndSaveProperties(
+        DealApiType.APARTMENT_SALE,
+        "26350",
+        "202501"
+    ))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REAL_ESTATE_API_TIMEOUT)
+        );
+
+    then(propertyMapper).should(never()).findProperty(any(PropertySaveCommand.class));
+    then(geocodeService).should(never()).getCoordinate(anyString());
+  }
+
   private PropertyItem saleDeal(String umdNm, String jibun, String propertyName,
       LocalDate dealDate) {
     return new PropertyItem(

@@ -16,6 +16,8 @@ mybatis:
 property:
   real-estate:
     service-key: ${PUBLIC_DATA_SERVICE_KEY:}
+    connect-timeout: ${PUBLIC_DATA_CONNECT_TIMEOUT:5s}
+    read-timeout: ${PUBLIC_DATA_READ_TIMEOUT:30s}
   kakao:
     rest-api-key: ${KAKAO_REST_API_KEY:}
 
