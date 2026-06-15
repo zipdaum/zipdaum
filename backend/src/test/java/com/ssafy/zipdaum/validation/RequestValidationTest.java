@@ -3,6 +3,8 @@ package com.ssafy.zipdaum.validation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ssafy.zipdaum.auth.dto.AuthRequest;
+import com.ssafy.zipdaum.preference.dto.UserPreferenceItemRequest;
+import com.ssafy.zipdaum.preference.dto.UserPreferenceRequest;
 import com.ssafy.zipdaum.favorite.dto.FavoritePropertyCreateRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.SurroundingRequest;
@@ -10,6 +12,7 @@ import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RequestValidationTest {
@@ -41,11 +44,15 @@ class RequestValidationTest {
     SurroundingRequest surroundingRequest = new SurroundingRequest();
     surroundingRequest.setRadiusMeters(50);
 
+    UserPreferenceRequest userPreferenceRequest = new UserPreferenceRequest();
+    userPreferenceRequest.setPreferences(List.of(preference("BUDGET", "500000000", 1)));
+
     assertThat(validator.validate(signUpRequest)).isEmpty();
     assertThat(validator.validate(authRequest)).isEmpty();
     assertThat(validator.validate(updateRequest)).isEmpty();
     assertThat(validator.validate(propertySearchRequest)).isEmpty();
     assertThat(validator.validate(surroundingRequest)).isEmpty();
+    assertThat(validator.validate(userPreferenceRequest)).isEmpty();
   }
 
   @Test
@@ -120,5 +127,23 @@ class RequestValidationTest {
     assertThat(validator.validate(tooLarge))
         .extracting(violation -> violation.getPropertyPath().toString())
         .contains("radiusMeters");
+  }
+
+  @Test
+  void validate_맞춤_조건_요청값이_유효하지_않으면_각_필드의_검증_오류가_발생한다() {
+    UserPreferenceRequest request = new UserPreferenceRequest();
+    request.setPreferences(List.of(preference(" ", " ", 0)));
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains("preferences[0].code", "preferences[0].value", "preferences[0].priority");
+  }
+
+  private UserPreferenceItemRequest preference(String code, String value, Integer priority) {
+    UserPreferenceItemRequest preference = new UserPreferenceItemRequest();
+    preference.setCode(code);
+    preference.setValue(value);
+    preference.setPriority(priority);
+    return preference;
   }
 }

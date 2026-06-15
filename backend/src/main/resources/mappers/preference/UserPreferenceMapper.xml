@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.zipdaum.preference.mapper.UserPreferenceMapper">
+
+  <resultMap id="userPreferenceResponseResultMap"
+             type="com.ssafy.zipdaum.preference.dto.UserPreferenceResponse">
+    <result property="code" column="code"/>
+    <result property="name" column="name"/>
+    <result property="value" column="preference_value"/>
+    <result property="priority" column="priority"/>
+  </resultMap>
+
+  <select id="selectUserPreferencesByUserId" resultMap="userPreferenceResponseResultMap">
+    SELECT
+      pt.code,
+      pt.name,
+      up.preference_value,
+      up.priority
+    FROM user_preference up
+    JOIN preference_type pt ON pt.id = up.preference_type_id
+    WHERE up.user_id = #{userId}
+    ORDER BY up.priority ASC, up.id ASC
+  </select>
+
+  <select id="selectPreferenceTypesByCodes" resultType="com.ssafy.zipdaum.preference.dto.PreferenceTypeDto">
+    SELECT
+      id,
+      code,
+      name,
+      description
+    FROM preference_type
+    WHERE code IN
+    <foreach collection="codes" item="code" open="(" separator="," close=")">
+      #{code}
+    </foreach>
+  </select>
+
+  <insert id="insertUserPreferences">
+    INSERT INTO user_preference (user_id, preference_type_id, preference_value, priority)
+    VALUES
+    <foreach collection="items" item="item" separator=",">
+      (#{userId}, #{item.preferenceTypeId}, #{item.preferenceValue}, #{item.priority})
+    </foreach>
+  </insert>
+
+  <delete id="deleteUserPreferencesByUserId">
+    DELETE FROM user_preference
+    WHERE user_id = #{userId}
+  </delete>
+
+</mapper>

@@ -23,7 +23,7 @@ com.ssafy.zipdaum
 ├── user
 ├── property
 ├── favorite
-├── condition
+├── preference
 ├── notification
 ├── report
 └── global
@@ -88,7 +88,7 @@ MyBatis Mapper는 다음 형식으로 작성한다.
 UserMapper
 PropertyMapper
 FavoritePropertyMapper
-ConditionItemMapper
+UserPreferenceMapper
 ```
 
 ### DTO
@@ -103,7 +103,7 @@ PropertySearchRequest
 PropertySearchResponse
 
 PropertyDetailResponse
-ConditionSaveRequest
+PreferenceSaveRequest
 NotificationResponse
 ```
 
@@ -118,8 +118,8 @@ SaleDeal
 RentDeal
 FavoriteProperty
 FavoriteRegion
-ConditionItem
-ConditionType
+UserPreference
+PreferenceType
 Notification
 ```
 
@@ -146,7 +146,7 @@ searchProperties()
 findPropertyDetail()
 saveFavoriteProperty()
 removeFavoriteProperty()
-saveConditionItems()
+savePreferences()
 calculateMatchScore()
 ```
 
@@ -158,7 +158,7 @@ selectPropertyById()
 selectProperties()
 insertFavoriteProperty()
 deleteFavoriteProperty()
-selectConditionItemsByUserId()
+selectUserPreferencesByUserId()
 ```
 
 ---
@@ -180,8 +180,8 @@ sale_deal
 rent_deal
 favorite_property
 favorite_region
-condition_item
-condition_type
+user_preference
+preference_type
 notification
 ```
 
@@ -190,7 +190,7 @@ notification
 ```
 user_id
 property_id
-condition_type_id
+preference_type_id
 created_at
 updated_at
 ```
