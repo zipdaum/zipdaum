@@ -113,6 +113,13 @@
   color: #c53030;
 }
 
+.info-message {
+  margin-top: 22px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
 .signup-link {
   margin: 22px 0 0;
   color: #71809d;
