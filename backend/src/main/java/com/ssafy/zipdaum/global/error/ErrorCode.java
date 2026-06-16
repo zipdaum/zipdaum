@@ -42,8 +42,8 @@ public enum ErrorCode {
   FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "관심 목록에서 해당 정보를 찾을 수 없습니다."),
   FAVORITE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "F002", "이미 관심 목록에 존재하는 정보입니다."),
 
-  // 5. Condition
-  CONDITION_NOT_FOUND(HttpStatus.NOT_FOUND, "M001", "설정된 맞춤 조건 정보를 찾을 수 없습니다."),
+  // 5. Preference
+  PREFERENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "M001", "설정된 맞춤 조건 정보를 찾을 수 없습니다."),
 
   // 6. Notification
   NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "알림 정보를 찾을 수 없습니다."),

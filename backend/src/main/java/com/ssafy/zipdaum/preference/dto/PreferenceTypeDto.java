@@ -1,11 +1,11 @@
-package com.ssafy.zipdaum.condition.dto;
+package com.ssafy.zipdaum.preference.dto;
 
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class ConditionTypeDto {
+public class PreferenceTypeDto {
   private Long id;
   private String code;
   private String name;
