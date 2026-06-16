@@ -108,32 +108,32 @@ CREATE TABLE favorite_region (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE condition_type (
+CREATE TABLE preference_type (
   id BIGINT NOT NULL AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
   name VARCHAR(50) NOT NULL,
   description VARCHAR(255) NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_condition_type_code (code)
+  UNIQUE KEY uk_preference_type_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE condition_item (
+CREATE TABLE user_preference (
   id BIGINT NOT NULL AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
-  condition_type_id BIGINT NOT NULL,
-  condition_value VARCHAR(100) NOT NULL,
+  preference_type_id BIGINT NOT NULL,
+  preference_value VARCHAR(100) NOT NULL,
   priority TINYINT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_condition_item_value (condition_value),
-  KEY idx_condition_item_user_id (user_id),
-  KEY idx_condition_item_type_id (condition_type_id),
-  CONSTRAINT fk_condition_item_user
+  UNIQUE KEY uk_user_preference_user_type (user_id, preference_type_id),
+  KEY idx_user_preference_user_id (user_id),
+  KEY idx_user_preference_type_id (preference_type_id),
+  CONSTRAINT fk_user_preference_user
     FOREIGN KEY (user_id) REFERENCES users (id)
     ON DELETE CASCADE,
-  CONSTRAINT fk_condition_item_condition_type
-    FOREIGN KEY (condition_type_id) REFERENCES condition_type (id)
+  CONSTRAINT fk_user_preference_preference_type
+    FOREIGN KEY (preference_type_id) REFERENCES preference_type (id)
     ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
