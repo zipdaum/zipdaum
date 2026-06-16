@@ -48,8 +48,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         surroundingSummary
     );
 
-    log.info("주택 맞춤 조건 적합도 계산 완료 userId={}, propertyId={}, score={}",
-        userId, propertyId, score.getScore());
+    log.info("주택 맞춤 조건 적합도 계산 완료 score={}, evaluatedCount={}, matchedCount={}",
+        score.getScore(), score.getEvaluatedCount(), score.getMatchedCount());
     return score;
   }
 
