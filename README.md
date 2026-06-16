@@ -93,3 +93,16 @@ Default Schema: zipdaum
 docker compose down -v
 docker compose up -d
 ```
+
+## 로컬 공공데이터 CSV
+
+주택 상세 화면의 주변 편의시설 조회는 외부 API를 매 요청마다 호출하지 않고,
+`backend/src/main/resources/data`의 UTF-8 CSV 파일을 로딩해 사용합니다.
+
+| 파일 | 용도 | 출처                                                                                                                                                                                          |
+| --- | --- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `busan_bus_stops.csv` | 버스 정류소 | [부산광역시_버스 정류소 정보(SHP)](https://www.data.go.kr/data/15084251/fileData.do)                                                                                                                    |
+| `busan_subway_stations.csv` | 지하철역 | [부산교통공사_도시철도역사정보](https://www.data.go.kr/data/15043686/fileData.do)                                                                                                                         |
+| `busan_hospital.csv` | 병원 | [부산광역시_종합병원 현황](https://www.data.go.kr/data/15083386/fileData.do)                                                                                                                           |
+| `busan_cctv.csv` | 방범용 CCTV | [부산광역시_방범용 CCTV 정보](https://www.data.go.kr/data/15082060/fileData.do)                                                                                                                       |
+| `busan_15min_urban_parks.csv` | 도시공원 | [부산 15분도시 생활권 도시공원 CSV](https://data.busan.go.kr/bdip/opendata/detail.do?publicdatapk=15152993&searchKeyword=%EA%B3%B5%EC%9B%90&searchOption=AND&uuid=26470484-ba91-4904-aeb0-f52d3d6fb519) |
