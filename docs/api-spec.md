@@ -13,6 +13,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 회원 | 회원 정보 수정 | PATCH | `/users/info` |
 | 회원 | 회원 탈퇴 | DELETE | `/users/info` |
 | 실거래가 | 주택 실거래가 검색 | GET | `/properties` |
+| 사용자 맞춤 | 사용자 맞춤 주택 추천 목록 조회 | GET | `/properties/recommendations` |
 | 실거래가 | 실거래가 저장 | POST | `/properties` |
 | 실거래가 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 실거래가 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
@@ -45,6 +46,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 기능 | Method | URL |
 | --- | --- | --- |
 | 주택 실거래가 검색 | GET | `/properties` |
+| 사용자 맞춤 주택 추천 목록 조회 | GET | `/properties/recommendations` |
 | 실거래가 저장 | POST | `/properties` |
 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |

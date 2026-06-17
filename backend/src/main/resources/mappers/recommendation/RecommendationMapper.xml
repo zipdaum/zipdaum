@@ -14,40 +14,85 @@
     <result property="umdNm" column="umd_nm"/>
     <result property="jibun" column="jibun"/>
     <result property="buildYear" column="build_year"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
     <result property="latestSalePrice" column="latest_sale_price"/>
     <result property="latestDeposit" column="latest_deposit"/>
     <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+    <result property="latestDealPrice" column="latest_deal_price"/>
+    <result property="latestDealDate" column="latest_deal_date"/>
     <result property="exclusiveArea" column="exclusive_area"/>
   </resultMap>
+
+  <sql id="propertyRecommendationCandidateColumns">
+    p.id,
+    p.property_type,
+    p.name,
+    p.sgg_cd,
+    p.umd_nm,
+    p.jibun,
+    p.build_year,
+    p.latitude,
+    p.longitude,
+    p.latest_sale_price,
+    p.latest_deposit,
+    p.latest_monthly_rent,
+    (
+      SELECT d.price
+      FROM (
+        SELECT sd.deal_amount AS price, sd.deal_date, sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        UNION ALL
+        SELECT rd.deposit AS price, rd.deal_date, rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+      ) d
+      ORDER BY d.deal_date DESC, d.id DESC
+      LIMIT 1
+    ) AS latest_deal_price,
+    (
+      SELECT d.deal_date
+      FROM (
+        SELECT sd.deal_date, sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        UNION ALL
+        SELECT rd.deal_date, rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+      ) d
+      ORDER BY d.deal_date DESC, d.id DESC
+      LIMIT 1
+    ) AS latest_deal_date,
+    (
+      SELECT d.exclusive_area
+      FROM (
+        SELECT sd.exclusive_area, sd.deal_date, sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        UNION ALL
+        SELECT rd.exclusive_area, rd.deal_date, rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+      ) d
+      ORDER BY d.deal_date DESC, d.id DESC
+      LIMIT 1
+    ) AS exclusive_area
+  </sql>
 
   <select id="selectPropertyRecommendationCandidate"
           resultMap="propertyRecommendationCandidateResultMap">
     SELECT
-      p.id,
-      p.property_type,
-      p.name,
-      p.sgg_cd,
-      p.umd_nm,
-      p.jibun,
-      p.build_year,
-      p.latest_sale_price,
-      p.latest_deposit,
-      p.latest_monthly_rent,
-      (
-        SELECT d.exclusive_area
-        FROM (
-          SELECT sd.exclusive_area, sd.deal_date, sd.id
-          FROM sale_deal sd
-          WHERE sd.property_id = p.id
-          UNION ALL
-          SELECT rd.exclusive_area, rd.deal_date, rd.id
-          FROM rent_deal rd
-          WHERE rd.property_id = p.id
-        ) d
-        ORDER BY d.deal_date DESC, d.id DESC
-        LIMIT 1
-      ) AS exclusive_area
+      <include refid="propertyRecommendationCandidateColumns"/>
     FROM property p
     WHERE p.id = #{propertyId}
+  </select>
+
+  <select id="selectPropertyRecommendationCandidates"
+          resultMap="propertyRecommendationCandidateResultMap">
+    SELECT
+      <include refid="propertyRecommendationCandidateColumns"/>
+    FROM property p
   </select>
 </mapper>

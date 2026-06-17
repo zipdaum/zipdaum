@@ -108,7 +108,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       PropertyRecommendationCandidate property,
       UserPreferenceResponse preference) {
     Long budget = parseLong(preference.getValue());
-    Long price = findLowestPositivePrice(property);
+    Long price = findLatestDealPrice(property);
     if (budget == null || price == null) {
       return unmatched(preference, UserPreferenceType.BUDGET);
     }
@@ -249,11 +249,12 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     }
   }
 
-  private Long findLowestPositivePrice(PropertyRecommendationCandidate property) {
-    return java.util.stream.Stream.of(property.getLatestSalePrice(), property.getLatestDeposit())
-        .filter(price -> price != null && price > 0)
-        .min(Long::compareTo)
-        .orElse(null);
+  private Long findLatestDealPrice(PropertyRecommendationCandidate property) {
+    Long price = property.getLatestDealPrice();
+    if (price == null || price <= 0) {
+      return null;
+    }
+    return price;
   }
 
   private int calculateWeight(Integer priority, int maxPriority) {

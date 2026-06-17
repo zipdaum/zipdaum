@@ -130,6 +130,9 @@ class RecommendationScoreServiceImplTest {
     property.setLatestSalePrice(latestSalePrice);
     property.setLatestDeposit(latestDeposit);
     property.setLatestMonthlyRent(latestMonthlyRent);
+    property.setLatestDealPrice(
+        latestSalePrice != null && latestSalePrice > 0 ? latestSalePrice : latestDeposit
+    );
     property.setExclusiveArea(exclusiveArea);
     return property;
   }

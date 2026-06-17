@@ -14,6 +14,7 @@ import com.ssafy.zipdaum.property.dto.SurroundingResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.property.service.SurroundingService;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
+import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.mapper.RecommendationMapper;
 import java.math.BigDecimal;
@@ -50,7 +51,11 @@ class RecommendationServiceImplTest {
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(surroundingService.findPropertySurroundings(10L, 1000)).willReturn(surroundings);
+    given(surroundingService.findSurroundings(
+        BigDecimal.valueOf(35.1),
+        BigDecimal.valueOf(129.1),
+        1000
+    )).willReturn(surroundings);
     given(recommendationScoreService.calculateMatchScore(property, preferences, summary))
         .willReturn(score);
 
@@ -89,13 +94,13 @@ class RecommendationServiceImplTest {
   @Test
   void findPropertyRecommendationScore_좌표가_없으면_시설조건은_불일치로_계산한다() {
     PropertyRecommendationCandidate property = property();
+    property.setLatitude(null);
+    property.setLongitude(null);
     List<UserPreferenceResponse> preferences = List.of(preference("PARK", "true"));
     PropertyRecommendationScore score = new PropertyRecommendationScore(0, 1, 0, List.of(), List.of());
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(surroundingService.findPropertySurroundings(10L, 1000))
-        .willThrow(new BusinessException(ErrorCode.COORDINATE_NOT_FOUND));
     given(recommendationScoreService.calculateMatchScore(property, preferences, null))
         .willReturn(score);
 
@@ -104,13 +109,44 @@ class RecommendationServiceImplTest {
     assertThat(result).isSameAs(score);
   }
 
+  @Test
+  void findPropertyRecommendations_우선순위가_높은_예산조건의_여유금액이_큰_주택을_먼저_반환한다() {
+    RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
+        recommendationMapper,
+        userPreferenceService,
+        surroundingService,
+        new RecommendationScoreServiceImpl()
+    );
+    PropertyRecommendationCandidate cheapProperty = property(1L, 50_000_000L);
+    PropertyRecommendationCandidate expensiveProperty = property(2L, 70_000_000L);
+    List<UserPreferenceResponse> preferences = List.of(preference("BUDGET", "100000000"));
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates())
+        .willReturn(List.of(expensiveProperty, cheapProperty));
+
+    List<PropertyRecommendationResponse> result =
+        serviceWithRealScore.findPropertyRecommendations(1L);
+
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getId)
+        .containsExactly(1L, 2L);
+  }
+
   private PropertyRecommendationCandidate property() {
+    return property(10L, 300_000_000L);
+  }
+
+  private PropertyRecommendationCandidate property(Long id, Long latestDealPrice) {
     PropertyRecommendationCandidate property = new PropertyRecommendationCandidate();
-    property.setId(10L);
+    property.setId(id);
     property.setSggCd("26110");
     property.setUmdNm("우동");
     property.setBuildYear(2020);
-    property.setLatestDeposit(300_000_000L);
+    property.setLatitude(BigDecimal.valueOf(35.1));
+    property.setLongitude(BigDecimal.valueOf(129.1));
+    property.setLatestDeposit(latestDealPrice);
+    property.setLatestDealPrice(latestDealPrice);
     property.setExclusiveArea(new BigDecimal("84.5"));
     return property;
   }

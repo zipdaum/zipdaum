@@ -12,6 +12,7 @@ import com.ssafy.zipdaum.property.service.PropertyFetchService;
 import com.ssafy.zipdaum.property.service.PropertyService;
 import com.ssafy.zipdaum.property.service.SurroundingService;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
+import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.service.RecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -73,6 +74,30 @@ public class PropertyController {
         request.getSortBy(), request.getSortDirection());
 
     return ResponseEntity.ok(propertyService.searchProperties(request));
+  }
+
+  @GetMapping("/recommendations")
+  @Operation(
+      summary = "사용자 맞춤 주택 추천 목록 조회",
+      description = "현재 로그인한 사용자의 맞춤 조건을 기준으로 적합한 주택 목록을 추천 점수 순서로 조회합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "사용자 맞춤 주택 추천 목록 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyRecommendationResponse.class))
+      ),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "맞춤 조건 정보 없음", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<List<PropertyRecommendationResponse>> getPropertyRecommendations(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser
+  ) {
+    log.info("GET /properties/recommendations 요청");
+    return ResponseEntity.ok(
+        recommendationService.findPropertyRecommendations(authenticatedUser.getId())
+    );
   }
 
   @GetMapping("/{propertyId}")
