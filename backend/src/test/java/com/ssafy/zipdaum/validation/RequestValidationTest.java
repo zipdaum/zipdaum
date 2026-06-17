@@ -45,7 +45,7 @@ class RequestValidationTest {
     surroundingRequest.setRadiusMeters(50);
 
     UserPreferenceRequest userPreferenceRequest = new UserPreferenceRequest();
-    userPreferenceRequest.setPreferences(List.of(preference("BUDGET", "500000000", 1)));
+    userPreferenceRequest.setPreferences(List.of(preference("SALE_PRICE", "500000000", 1)));
 
     assertThat(validator.validate(signUpRequest)).isEmpty();
     assertThat(validator.validate(authRequest)).isEmpty();

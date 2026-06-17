@@ -19,6 +19,8 @@
     <result property="latestSalePrice" column="latest_sale_price"/>
     <result property="latestDeposit" column="latest_deposit"/>
     <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+    <result property="latestMonthlyRentDeposit" column="latest_monthly_rent_deposit"/>
+    <result property="latestMonthlyRentAmount" column="latest_monthly_rent_amount"/>
     <result property="latestDealPrice" column="latest_deal_price"/>
     <result property="latestDealDate" column="latest_deal_date"/>
     <result property="exclusiveArea" column="exclusive_area"/>
@@ -37,6 +39,24 @@
     p.latest_sale_price,
     p.latest_deposit,
     p.latest_monthly_rent,
+    (
+      SELECT rd.deposit
+      FROM rent_deal rd
+      WHERE rd.property_id = p.id
+        AND rd.deposit &gt; 0
+        AND rd.monthly_rent &gt; 0
+      ORDER BY rd.deal_date DESC, rd.id DESC
+      LIMIT 1
+    ) AS latest_monthly_rent_deposit,
+    (
+      SELECT rd.monthly_rent
+      FROM rent_deal rd
+      WHERE rd.property_id = p.id
+        AND rd.deposit &gt; 0
+        AND rd.monthly_rent &gt; 0
+      ORDER BY rd.deal_date DESC, rd.id DESC
+      LIMIT 1
+    ) AS latest_monthly_rent_amount,
     (
       SELECT d.price
       FROM (

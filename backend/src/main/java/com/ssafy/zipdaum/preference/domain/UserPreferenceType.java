@@ -5,7 +5,9 @@ import lombok.Getter;
 
 @Getter
 public enum UserPreferenceType {
-  BUDGET("예산"),
+  SALE_PRICE("매매가"),
+  DEPOSIT("보증금"),
+  MONTHLY_RENT("월세"),
   AREA("면적"),
   BUILD_YEAR("건축연도"),
   REGION("지역"),

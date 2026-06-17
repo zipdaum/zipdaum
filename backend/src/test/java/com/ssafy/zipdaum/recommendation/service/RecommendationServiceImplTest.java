@@ -77,7 +77,7 @@ class RecommendationServiceImplTest {
   @Test
   void findPropertyRecommendationScore_시설_조건이_없으면_주변시설을_조회하지_않는다() {
     PropertyRecommendationCandidate property = property();
-    List<UserPreferenceResponse> preferences = List.of(preference("BUDGET", "300000000"));
+    List<UserPreferenceResponse> preferences = List.of(preference("DEPOSIT", "300000000"));
     PropertyRecommendationScore score = new PropertyRecommendationScore(100, 1, 1, List.of(), List.of());
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
@@ -110,7 +110,7 @@ class RecommendationServiceImplTest {
   }
 
   @Test
-  void findPropertyRecommendations_우선순위가_높은_예산조건의_여유금액이_큰_주택을_먼저_반환한다() {
+  void findPropertyRecommendations_우선순위가_높은_매매가조건의_여유금액이_큰_주택을_먼저_반환한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
         userPreferenceService,
@@ -119,11 +119,44 @@ class RecommendationServiceImplTest {
     );
     PropertyRecommendationCandidate cheapProperty = property(1L, 50_000_000L);
     PropertyRecommendationCandidate expensiveProperty = property(2L, 70_000_000L);
-    List<UserPreferenceResponse> preferences = List.of(preference("BUDGET", "100000000"));
+    cheapProperty.setLatestSalePrice(50_000_000L);
+    expensiveProperty.setLatestSalePrice(70_000_000L);
+    List<UserPreferenceResponse> preferences = List.of(preference("SALE_PRICE", "100000000"));
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationMapper.selectPropertyRecommendationCandidates())
         .willReturn(List.of(expensiveProperty, cheapProperty));
+
+    List<PropertyRecommendationResponse> result =
+        serviceWithRealScore.findPropertyRecommendations(1L);
+
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getId)
+        .containsExactly(1L, 2L);
+  }
+
+  @Test
+  void findPropertyRecommendations_월세조건이_있으면_월세거래_보증금_여유금액으로_정렬한다() {
+    RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
+        recommendationMapper,
+        userPreferenceService,
+        surroundingService,
+        new RecommendationScoreServiceImpl()
+    );
+    PropertyRecommendationCandidate lowerMonthlyDepositProperty = property(1L, 300_000_000L);
+    lowerMonthlyDepositProperty.setLatestMonthlyRentDeposit(20_000_000L);
+    lowerMonthlyDepositProperty.setLatestMonthlyRentAmount(700_000L);
+    PropertyRecommendationCandidate higherMonthlyDepositProperty = property(2L, 100_000_000L);
+    higherMonthlyDepositProperty.setLatestMonthlyRentDeposit(30_000_000L);
+    higherMonthlyDepositProperty.setLatestMonthlyRentAmount(700_000L);
+    List<UserPreferenceResponse> preferences = List.of(
+        preference("DEPOSIT", "40000000"),
+        preference("MONTHLY_RENT", "800000", 2)
+    );
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates())
+        .willReturn(List.of(higherMonthlyDepositProperty, lowerMonthlyDepositProperty));
 
     List<PropertyRecommendationResponse> result =
         serviceWithRealScore.findPropertyRecommendations(1L);
@@ -156,6 +189,12 @@ class RecommendationServiceImplTest {
     preference.setCode(code);
     preference.setValue(value);
     preference.setPriority(1);
+    return preference;
+  }
+
+  private UserPreferenceResponse preference(String code, String value, Integer priority) {
+    UserPreferenceResponse preference = preference(code, value);
+    preference.setPriority(priority);
     return preference;
   }
 }

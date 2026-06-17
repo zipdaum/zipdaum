@@ -34,7 +34,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
             UserPreferenceResponse::getPriority,
             Comparator.nullsLast(Comparator.naturalOrder())
         ))
-        .map(preference -> scorePreference(property, preference, surroundingSummary))
+        .map(preference -> scorePreference(property, preference, preferences, surroundingSummary))
         .toList();
 
     if (scoredPreferences.isEmpty()) {
@@ -80,6 +80,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
   private ScoredPreference scorePreference(
       PropertyRecommendationCandidate property,
       UserPreferenceResponse preference,
+      List<UserPreferenceResponse> preferences,
       SurroundingSummaryResponse surroundingSummary) {
     UserPreferenceType type = parseType(preference.getCode());
     if (type == null) {
@@ -87,7 +88,17 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     }
 
     return switch (type) {
-      case BUDGET -> scoreBudget(property, preference);
+      case SALE_PRICE -> scorePrice(
+          property.getLatestSalePrice(),
+          preference,
+          type,
+          "매매가 조건과 적합");
+      case DEPOSIT -> scorePrice(
+          selectDepositForScoring(property, preferences),
+          preference,
+          type,
+          "보증금 조건과 적합");
+      case MONTHLY_RENT -> scoreMonthlyRent(property, preference, preferences);
       case AREA -> scoreArea(property, preference);
       case BUILD_YEAR -> scoreBuildYear(property, preference);
       case REGION -> scoreRegion(property, preference);
@@ -104,22 +115,81 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     };
   }
 
-  private ScoredPreference scoreBudget(
-      PropertyRecommendationCandidate property,
-      UserPreferenceResponse preference) {
-    Long budget = parseLong(preference.getValue());
-    Long price = findLatestDealPrice(property);
-    if (budget == null || price == null) {
-      return unmatched(preference, UserPreferenceType.BUDGET);
+  private ScoredPreference scorePrice(
+      Long actualPrice,
+      UserPreferenceResponse preference,
+      UserPreferenceType type,
+      String reason) {
+    Long preferredPrice = parseLong(preference.getValue());
+    if (preferredPrice == null || actualPrice == null || actualPrice <= 0) {
+      return unmatched(preference, type);
     }
 
-    if (price <= budget) {
-      return scored(preference, UserPreferenceType.BUDGET, FULL_MATCH_SCORE, "예산 범위와 일치");
+    if (actualPrice <= preferredPrice) {
+      return scored(preference, type, FULL_MATCH_SCORE, reason);
     }
-    if (price <= budget * 1.1) {
-      return scored(preference, UserPreferenceType.BUDGET, PARTIAL_MATCH_SCORE, null);
+    if (actualPrice <= preferredPrice * 1.1) {
+      return scored(preference, type, PARTIAL_MATCH_SCORE, null);
     }
-    return scored(preference, UserPreferenceType.BUDGET, 0, null);
+    return scored(preference, type, 0, null);
+  }
+
+  private ScoredPreference scoreMonthlyRent(
+      PropertyRecommendationCandidate property,
+      UserPreferenceResponse preference,
+      List<UserPreferenceResponse> preferences) {
+    Long preferredMonthlyRent = parseLong(preference.getValue());
+    Long actualMonthlyRent = property.getLatestMonthlyRentAmount();
+    if (actualMonthlyRent == null) {
+      actualMonthlyRent = property.getLatestMonthlyRent();
+    }
+    if (preferredMonthlyRent == null || actualMonthlyRent == null || actualMonthlyRent <= 0) {
+      return unmatched(preference, UserPreferenceType.MONTHLY_RENT);
+    }
+
+    int monthlyRentScore = calculatePriceScore(actualMonthlyRent, preferredMonthlyRent);
+    UserPreferenceResponse depositPreference = findPreference(preferences, UserPreferenceType.DEPOSIT);
+    if (depositPreference == null) {
+      return scoredMonthlyRent(preference, monthlyRentScore);
+    }
+
+    Long preferredDeposit = parseLong(depositPreference.getValue());
+    Long actualDeposit = property.getLatestMonthlyRentDeposit();
+    if (preferredDeposit == null || actualDeposit == null) {
+      return unmatched(preference, UserPreferenceType.MONTHLY_RENT);
+    }
+
+    int depositScore = calculatePriceScore(actualDeposit, preferredDeposit);
+    return scoredMonthlyRent(preference, Math.min(monthlyRentScore, depositScore));
+  }
+
+  private ScoredPreference scoredMonthlyRent(UserPreferenceResponse preference, int score) {
+    String reason = score == FULL_MATCH_SCORE ? "보증금/월세 조건과 적합" : null;
+    return scored(preference, UserPreferenceType.MONTHLY_RENT, score, reason);
+  }
+
+  private int calculatePriceScore(Long actualPrice, Long preferredPrice) {
+    if (actualPrice <= preferredPrice) {
+      return FULL_MATCH_SCORE;
+    }
+    if (actualPrice <= preferredPrice * 1.1) {
+      return PARTIAL_MATCH_SCORE;
+    }
+    return 0;
+  }
+
+  private Long selectDepositForScoring(
+      PropertyRecommendationCandidate property,
+      List<UserPreferenceResponse> preferences) {
+    if (findPreference(preferences, UserPreferenceType.MONTHLY_RENT) != null) {
+      if (property.getLatestMonthlyRentDeposit() != null
+          && property.getLatestMonthlyRentAmount() != null
+          && property.getLatestMonthlyRentAmount() > 0) {
+        return property.getLatestMonthlyRentDeposit();
+      }
+      return null;
+    }
+    return property.getLatestDeposit();
   }
 
   private ScoredPreference scoreArea(
@@ -249,12 +319,14 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     }
   }
 
-  private Long findLatestDealPrice(PropertyRecommendationCandidate property) {
-    Long price = property.getLatestDealPrice();
-    if (price == null || price <= 0) {
-      return null;
-    }
-    return price;
+  private UserPreferenceResponse findPreference(
+      List<UserPreferenceResponse> preferences,
+      UserPreferenceType type) {
+    return preferences.stream()
+        .filter(preference -> preference.getCode() != null
+            && preference.getCode().equalsIgnoreCase(type.name()))
+        .findFirst()
+        .orElse(null);
   }
 
   private int calculateWeight(Integer priority, int maxPriority) {

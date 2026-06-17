@@ -15,7 +15,7 @@ class RecommendationScoreServiceImplTest {
   private final RecommendationScoreServiceImpl service = new RecommendationScoreServiceImpl();
 
   @Test
-  void calculateMatchScore_예산_지역_주변시설을_가중치로_점수화한다() {
+  void calculateMatchScore_매매가_지역_주변시설을_가중치로_점수화한다() {
     PropertyRecommendationCandidate property = property(
         "26110",
         "우동",
@@ -30,7 +30,7 @@ class RecommendationScoreServiceImplTest {
     PropertyRecommendationScore result = service.calculateMatchScore(
         property,
         List.of(
-            preference("BUDGET", "400000000", 1),
+            preference("SALE_PRICE", "400000000", 1),
             preference("REGION", "부산광역시 해운대구 우동", 2),
             preference("SUBWAY", "true", 3)
         ),
@@ -45,7 +45,7 @@ class RecommendationScoreServiceImplTest {
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple("BUDGET", false, 0),
+            org.assertj.core.groups.Tuple.tuple("SALE_PRICE", false, 0),
             org.assertj.core.groups.Tuple.tuple("REGION", true, 100),
             org.assertj.core.groups.Tuple.tuple("SUBWAY", true, 100)
         );
@@ -113,6 +113,76 @@ class RecommendationScoreServiceImplTest {
     assertThat(result.getEvaluatedCount()).isEqualTo(1);
     assertThat(result.getMatchedCount()).isEqualTo(1);
     assertThat(result.getMatchedReasons()).isEmpty();
+  }
+
+  @Test
+  void calculateMatchScore_월세는_월세거래의_보증금과_월세를_함께_판단한다() {
+    PropertyRecommendationCandidate property = property(
+        "26110",
+        "우동",
+        2018,
+        0L,
+        200_000_000L,
+        0L,
+        null
+    );
+    property.setLatestMonthlyRentDeposit(30_000_000L);
+    property.setLatestMonthlyRentAmount(700_000L);
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(
+            preference("DEPOSIT", "40000000", 1),
+            preference("MONTHLY_RENT", "800000", 2)
+        ),
+        null
+    );
+
+    assertThat(result.getScore()).isEqualTo(100);
+    assertThat(result.getEvaluatedCount()).isEqualTo(2);
+    assertThat(result.getMatchedCount()).isEqualTo(2);
+    assertThat(result.getMatchedReasons())
+        .containsExactly("보증금 조건과 적합", "보증금/월세 조건과 적합");
+    assertThat(result.getConditions())
+        .extracting("code", "matched", "score")
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("DEPOSIT", true, 100),
+            org.assertj.core.groups.Tuple.tuple("MONTHLY_RENT", true, 100)
+        );
+  }
+
+  @Test
+  void calculateMatchScore_월세조건이_있으면_전세보증금으로_보증금조건을_만족시키지_않는다() {
+    PropertyRecommendationCandidate property = property(
+        "26110",
+        "우동",
+        2018,
+        0L,
+        30_000_000L,
+        0L,
+        null
+    );
+    property.setLatestMonthlyRentDeposit(50_000_000L);
+    property.setLatestMonthlyRentAmount(700_000L);
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(
+            preference("DEPOSIT", "40000000", 1),
+            preference("MONTHLY_RENT", "800000", 2)
+        ),
+        null
+    );
+
+    assertThat(result.getScore()).isZero();
+    assertThat(result.getMatchedCount()).isZero();
+    assertThat(result.getMatchedReasons()).isEmpty();
+    assertThat(result.getConditions())
+        .extracting("code", "matched", "score")
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("DEPOSIT", false, 0),
+            org.assertj.core.groups.Tuple.tuple("MONTHLY_RENT", false, 0)
+        );
   }
 
   private PropertyRecommendationCandidate property(

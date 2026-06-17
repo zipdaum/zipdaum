@@ -137,8 +137,8 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     return (left, right) -> {
       for (UserPreferenceResponse preference : sortedPreferences) {
-        BigDecimal leftValue = calculateSortValue(left, preference);
-        BigDecimal rightValue = calculateSortValue(right, preference);
+        BigDecimal leftValue = calculateSortValue(left, preference, sortedPreferences);
+        BigDecimal rightValue = calculateSortValue(right, preference, sortedPreferences);
         int compared = rightValue.compareTo(leftValue);
         if (compared != 0) {
           return compared;
@@ -153,8 +153,10 @@ public class RecommendationServiceImpl implements RecommendationService {
     };
   }
 
-  private BigDecimal calculateSortValue(ScoredProperty scoredProperty,
-      UserPreferenceResponse preference) {
+  private BigDecimal calculateSortValue(
+      ScoredProperty scoredProperty,
+      UserPreferenceResponse preference,
+      List<UserPreferenceResponse> preferences) {
     PropertyRecommendationCondition condition = findCondition(scoredProperty.score(), preference);
     if (condition == null || !condition.isMatched()) {
       return BigDecimal.valueOf(Long.MIN_VALUE);
@@ -167,7 +169,11 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     PropertyRecommendationCandidate property = scoredProperty.candidate();
     return switch (type) {
-      case BUDGET -> subtract(parseBigDecimal(preference.getValue()), property.getLatestDealPrice());
+      case SALE_PRICE -> subtract(parseBigDecimal(preference.getValue()), property.getLatestSalePrice());
+      case DEPOSIT -> subtract(parseBigDecimal(preference.getValue()),
+          selectDepositForSorting(property, preferences));
+      case MONTHLY_RENT -> subtract(parseBigDecimal(preference.getValue()),
+          selectMonthlyRentForSorting(property));
       case AREA -> subtract(property.getExclusiveArea(), parseBigDecimal(preference.getValue()));
       case BUILD_YEAR -> subtract(property.getBuildYear(), parseInteger(preference.getValue()));
       case REGION -> BigDecimal.ONE;
@@ -244,6 +250,34 @@ public class RecommendationServiceImpl implements RecommendationService {
     return BigDecimal.valueOf(left - right);
   }
 
+  private Long selectDepositForSorting(
+      PropertyRecommendationCandidate property,
+      List<UserPreferenceResponse> preferences) {
+    if (hasPreference(preferences, UserPreferenceType.MONTHLY_RENT)) {
+      if (property.getLatestMonthlyRentAmount() != null
+          && property.getLatestMonthlyRentAmount() > 0
+          && property.getLatestMonthlyRentDeposit() != null) {
+        return property.getLatestMonthlyRentDeposit();
+      }
+      return null;
+    }
+    return property.getLatestDeposit();
+  }
+
+  private Long selectMonthlyRentForSorting(PropertyRecommendationCandidate property) {
+    if (property.getLatestMonthlyRentAmount() != null
+        && property.getLatestMonthlyRentAmount() > 0) {
+      return property.getLatestMonthlyRentAmount();
+    }
+    return property.getLatestMonthlyRent();
+  }
+
+  private boolean hasPreference(List<UserPreferenceResponse> preferences, UserPreferenceType type) {
+    return preferences.stream()
+        .anyMatch(preference -> preference.getCode() != null
+            && preference.getCode().equalsIgnoreCase(type.name()));
+  }
+
   private PropertyRecommendationResponse toResponse(
       PropertyRecommendationCandidate property,
       PropertyRecommendationScore score) {
@@ -260,6 +294,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         property.getLatestSalePrice(),
         property.getLatestDeposit(),
         property.getLatestMonthlyRent(),
+        property.getLatestMonthlyRentDeposit(),
+        property.getLatestMonthlyRentAmount(),
         property.getLatestDealPrice(),
         property.getLatestDealDate(),
         property.getExclusiveArea(),

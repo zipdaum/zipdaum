@@ -22,6 +22,8 @@ public class PropertyRecommendationResponse {
   private Long latestSalePrice;
   private Long latestDeposit;
   private Long latestMonthlyRent;
+  private Long latestMonthlyRentDeposit;
+  private Long latestMonthlyRentAmount;
   private Long latestDealPrice;
   private LocalDate latestDealDate;
   private BigDecimal exclusiveArea;

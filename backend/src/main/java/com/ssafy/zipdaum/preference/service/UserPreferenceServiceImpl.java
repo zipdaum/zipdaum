@@ -127,7 +127,8 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
 
     try {
       return switch (type) {
-        case BUDGET -> String.valueOf(validateBudget(normalizedValue));
+        case SALE_PRICE, DEPOSIT, MONTHLY_RENT ->
+            String.valueOf(validatePrice(type, normalizedValue));
         case AREA -> validateArea(normalizedValue).stripTrailingZeros().toPlainString();
         case BUILD_YEAR -> String.valueOf(validateBuildYear(normalizedValue));
         case REGION -> normalizedValue;
@@ -140,13 +141,13 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
     }
   }
 
-  private long validateBudget(String value) {
-    long budget = Long.parseLong(value);
-    if (budget < 0) {
-      log.warn("맞춤 조건 값 범위 오류 type=BUDGET");
+  private long validatePrice(UserPreferenceType type, String value) {
+    long price = Long.parseLong(value);
+    if (price < 0) {
+      log.warn("맞춤 조건 값 범위 오류 type={}", type.name());
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
-    return budget;
+    return price;
   }
 
   private BigDecimal validateArea(String value) {
