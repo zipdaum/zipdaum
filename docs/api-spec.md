@@ -53,6 +53,21 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 주택 주변 편의시설 조회 | GET | `/properties/{propertyId}/surroundings` |
 | 주택 맞춤 조건 적합도 조회 | GET | `/properties/{propertyId}/recommendation-score` |
 
+### 주택 맞춤 조건 적합도 점수 기준
+
+추천 점수는 사용자가 등록한 맞춤 조건을 기준으로 산정한다.
+
+- `recommendationStatus`가 `EVALUATED`이면 점수 산정이 완료된 상태이다.
+- `recommendationStatus`가 `NO_EVALUABLE_CONDITION`이면 평가 가능한 맞춤 조건이 없어 `score`는 `null`이다.
+- `score`는 0~100 범위의 정수이다.
+- 조건별 평가 결과는 `conditions`에 포함된다.
+- 시설 조건 값이 `false`인 경우 추천 점수 평가 대상에서 제외한다.
+- 가격 조건은 선호 금액 이하이면 100점, 선호 금액의 110% 이하이면 70점으로 평가한다.
+- 면적 조건은 선호 면적 이상이면 100점, 선호 면적의 90% 이상이면 70점으로 평가한다.
+- 건축연도 조건은 선호 연도 이상이면 100점, 선호 연도보다 5년 이내로 오래된 경우 70점으로 평가한다.
+- 지역 조건은 선호 지역과 주택 지역이 일치하면 100점으로 평가한다.
+- 시설 조건은 주택 반경 1000m 내 해당 시설이 1개 이상 있으면 100점으로 평가한다.
+
 ## 사용자 맞춤
 
 | 기능 | Method | URL |
