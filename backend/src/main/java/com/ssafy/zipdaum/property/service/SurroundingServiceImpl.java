@@ -88,6 +88,45 @@ public class SurroundingServiceImpl implements SurroundingService {
     );
   }
 
+  @Override
+  public SurroundingSummaryResponse findSurroundingSummary(BigDecimal latitude, BigDecimal longitude,
+      Integer radiusMeters) {
+    validateCoordinate(latitude, longitude);
+
+    int radius = normalizeRadius(radiusMeters);
+    double centerLat = latitude.doubleValue();
+    double centerLng = longitude.doubleValue();
+    int busCount = 0;
+    int subwayCount = 0;
+    int hospitalCount = 0;
+    int cctvCount = 0;
+    int parkCount = 0;
+
+    for (FacilitySource facility : localFacilities) {
+      int distance = calculateDistanceMeters(centerLat, centerLng,
+          facility.getLatitude().doubleValue(), facility.getLongitude().doubleValue());
+      if (distance > radius) {
+        continue;
+      }
+
+      switch (facility.getType()) {
+        case BUS -> busCount++;
+        case SUBWAY -> subwayCount++;
+        case HOSPITAL -> hospitalCount++;
+        case CCTV -> cctvCount++;
+        case PARK -> parkCount++;
+      }
+    }
+
+    return new SurroundingSummaryResponse(
+        busCount,
+        subwayCount,
+        hospitalCount,
+        cctvCount,
+        parkCount
+    );
+  }
+
   private void validatePropertyId(Long propertyId) {
     if (propertyId == null || propertyId < 1) {
       log.warn("주변 시설 조회 실패 - 잘못된 주택 ID propertyId={}", propertyId);
@@ -149,7 +188,7 @@ public class SurroundingServiceImpl implements SurroundingService {
   ) {
 
     SurroundingFacilityResponse toResponse(double centerLat, double centerLng) {
-      int distance = calculateDistanceMetersStatic(centerLat, centerLng,
+      int distance = calculateDistanceMeters(centerLat, centerLng,
           facility.getLatitude().doubleValue(), facility.getLongitude().doubleValue());
       return new SurroundingFacilityResponse(
           facility.getType(),
@@ -162,17 +201,17 @@ public class SurroundingServiceImpl implements SurroundingService {
           facility.getDetail()
       );
     }
+  }
 
-    private static int calculateDistanceMetersStatic(double lat1, double lng1,
-        double lat2, double lng2) {
-      double earthRadius = 6371000;
-      double latDistance = Math.toRadians(lat2 - lat1);
-      double lngDistance = Math.toRadians(lng2 - lng1);
-      double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
-          + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-          * Math.sin(lngDistance / 2) * Math.sin(lngDistance / 2);
-      double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return (int) Math.round(earthRadius * c);
-    }
+  private static int calculateDistanceMeters(double lat1, double lng1,
+      double lat2, double lng2) {
+    double earthRadius = 6371000;
+    double latDistance = Math.toRadians(lat2 - lat1);
+    double lngDistance = Math.toRadians(lng2 - lng1);
+    double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+        + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+        * Math.sin(lngDistance / 2) * Math.sin(lngDistance / 2);
+    double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return (int) Math.round(earthRadius * c);
   }
 }

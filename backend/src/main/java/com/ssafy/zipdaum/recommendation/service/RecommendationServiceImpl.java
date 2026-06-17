@@ -160,11 +160,11 @@ public class RecommendationServiceImpl implements RecommendationService {
       return null;
     }
 
-    return surroundingService.findSurroundings(
+    return surroundingService.findSurroundingSummary(
         property.getLatitude(),
         property.getLongitude(),
         RECOMMENDATION_SURROUNDING_RADIUS_METERS
-    ).getSummary();
+    );
   }
 
   private boolean hasFacilityPreference(List<UserPreferenceResponse> preferences) {
@@ -362,13 +362,11 @@ public class RecommendationServiceImpl implements RecommendationService {
         property.getLatestDeposit(),
         property.getLatestMonthlyRent(),
         property.getLatestMonthlyRentDeposit(),
-        property.getLatestMonthlyRentAmount(),
         property.getLatestDealPrice(),
         property.getLatestDealDate(),
         property.getExclusiveArea(),
         score.getRecommendationStatus(),
-        score.getScore(),
-        score.getConditions()
+        score.getScore()
     );
   }
 

@@ -12,7 +12,6 @@ import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.preference.service.UserPreferenceService;
-import com.ssafy.zipdaum.property.dto.SurroundingResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.property.service.SurroundingService;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
@@ -44,22 +43,15 @@ class RecommendationServiceImplTest {
     PropertyRecommendationCandidate property = property();
     List<UserPreferenceResponse> preferences = List.of(preference("SUBWAY", "true"));
     SurroundingSummaryResponse summary = new SurroundingSummaryResponse(1, 2, 0, 0, 0);
-    SurroundingResponse surroundings = new SurroundingResponse(
-        BigDecimal.valueOf(35.1),
-        BigDecimal.valueOf(129.1),
-        1000,
-        summary,
-        List.of()
-    );
     PropertyRecommendationScore score = new PropertyRecommendationScore(100, List.of());
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(surroundingService.findSurroundings(
+    given(surroundingService.findSurroundingSummary(
         BigDecimal.valueOf(35.1),
         BigDecimal.valueOf(129.1),
         1000
-    )).willReturn(surroundings);
+    )).willReturn(summary);
     given(recommendationScoreService.calculateMatchScore(property, preferences, summary))
         .willReturn(score);
 
@@ -187,16 +179,16 @@ class RecommendationServiceImplTest {
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
         .willReturn(List.of(fewSubwayProperty, manySubwayProperty));
-    given(surroundingService.findSurroundings(
+    given(surroundingService.findSurroundingSummary(
         BigDecimal.valueOf(35.1),
         BigDecimal.valueOf(129.1),
         1000
-    )).willReturn(surroundings(new SurroundingSummaryResponse(0, 1, 0, 0, 0)));
-    given(surroundingService.findSurroundings(
+    )).willReturn(new SurroundingSummaryResponse(0, 1, 0, 0, 0));
+    given(surroundingService.findSurroundingSummary(
         BigDecimal.valueOf(35.2),
         BigDecimal.valueOf(129.2),
         1000
-    )).willReturn(surroundings(new SurroundingSummaryResponse(0, 3, 0, 0, 0)));
+    )).willReturn(new SurroundingSummaryResponse(0, 3, 0, 0, 0));
 
     List<PropertyRecommendationResponse> result =
         serviceWithRealScore.findPropertyRecommendations(1L);
@@ -272,13 +264,4 @@ class RecommendationServiceImplTest {
     return preference;
   }
 
-  private SurroundingResponse surroundings(SurroundingSummaryResponse summary) {
-    return new SurroundingResponse(
-        BigDecimal.valueOf(35.1),
-        BigDecimal.valueOf(129.1),
-        1000,
-        summary,
-        List.of()
-    );
-  }
 }

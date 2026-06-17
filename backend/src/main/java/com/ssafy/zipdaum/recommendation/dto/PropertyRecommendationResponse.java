@@ -2,7 +2,6 @@ package com.ssafy.zipdaum.recommendation.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -23,11 +22,9 @@ public class PropertyRecommendationResponse {
   private Long latestDeposit;
   private Long latestMonthlyRent;
   private Long latestMonthlyRentDeposit;
-  private Long latestMonthlyRentAmount;
   private Long latestDealPrice;
   private LocalDate latestDealDate;
   private BigDecimal exclusiveArea;
   private RecommendationStatus recommendationStatus;
   private Integer score;
-  private List<PropertyRecommendationCondition> conditions;
 }
