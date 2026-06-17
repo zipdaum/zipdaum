@@ -2,6 +2,8 @@ package com.ssafy.zipdaum.recommendation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
@@ -14,12 +16,14 @@ import com.ssafy.zipdaum.property.dto.SurroundingResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.property.service.SurroundingService;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
+import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidateFilter;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.mapper.RecommendationMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class RecommendationServiceImplTest {
 
@@ -124,7 +128,7 @@ class RecommendationServiceImplTest {
     List<UserPreferenceResponse> preferences = List.of(preference("SALE_PRICE", "100000000"));
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recommendationMapper.selectPropertyRecommendationCandidates())
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
         .willReturn(List.of(expensiveProperty, cheapProperty));
 
     List<PropertyRecommendationResponse> result =
@@ -155,7 +159,7 @@ class RecommendationServiceImplTest {
     );
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recommendationMapper.selectPropertyRecommendationCandidates())
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
         .willReturn(List.of(higherMonthlyDepositProperty, lowerMonthlyDepositProperty));
 
     List<PropertyRecommendationResponse> result =
@@ -164,6 +168,76 @@ class RecommendationServiceImplTest {
     assertThat(result)
         .extracting(PropertyRecommendationResponse::getId)
         .containsExactly(1L, 2L);
+  }
+
+  @Test
+  void findPropertyRecommendations_시설조건은_실제_주변시설_개수가_많은_주택을_먼저_반환한다() {
+    RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
+        recommendationMapper,
+        userPreferenceService,
+        surroundingService,
+        new RecommendationScoreServiceImpl()
+    );
+    PropertyRecommendationCandidate fewSubwayProperty = property(1L, 300_000_000L);
+    PropertyRecommendationCandidate manySubwayProperty = property(2L, 300_000_000L);
+    manySubwayProperty.setLatitude(BigDecimal.valueOf(35.2));
+    manySubwayProperty.setLongitude(BigDecimal.valueOf(129.2));
+    List<UserPreferenceResponse> preferences = List.of(preference("SUBWAY", "true"));
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
+        .willReturn(List.of(fewSubwayProperty, manySubwayProperty));
+    given(surroundingService.findSurroundings(
+        BigDecimal.valueOf(35.1),
+        BigDecimal.valueOf(129.1),
+        1000
+    )).willReturn(surroundings(new SurroundingSummaryResponse(0, 1, 0, 0, 0)));
+    given(surroundingService.findSurroundings(
+        BigDecimal.valueOf(35.2),
+        BigDecimal.valueOf(129.2),
+        1000
+    )).willReturn(surroundings(new SurroundingSummaryResponse(0, 3, 0, 0, 0)));
+
+    List<PropertyRecommendationResponse> result =
+        serviceWithRealScore.findPropertyRecommendations(1L);
+
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getId)
+        .containsExactly(2L, 1L);
+  }
+
+  @Test
+  void findPropertyRecommendations_맞춤조건을_SQL_후보필터로_전달한다() {
+    RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
+        recommendationMapper,
+        userPreferenceService,
+        surroundingService,
+        new RecommendationScoreServiceImpl()
+    );
+    List<UserPreferenceResponse> preferences = List.of(
+        preference("REGION", " 부산광역시 해운대구 우동 ", 1),
+        preference("SALE_PRICE", "100000000", 2),
+        preference("DEPOSIT", "40000000", 3),
+        preference("MONTHLY_RENT", "800000", 4),
+        preference("AREA", "84.5", 5)
+    );
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
+        .willReturn(List.of());
+
+    serviceWithRealScore.findPropertyRecommendations(1L);
+
+    ArgumentCaptor<PropertyRecommendationCandidateFilter> captor =
+        ArgumentCaptor.forClass(PropertyRecommendationCandidateFilter.class);
+    then(recommendationMapper).should().selectPropertyRecommendationCandidates(captor.capture(), eq(200));
+    PropertyRecommendationCandidateFilter filter = captor.getValue();
+    assertThat(filter.getRegion()).isEqualTo("부산광역시 해운대구 우동");
+    assertThat(filter.getSalePriceMax()).isEqualTo(110_000_000L);
+    assertThat(filter.getDepositMax()).isEqualTo(44_000_000L);
+    assertThat(filter.getMonthlyRentMax()).isEqualTo(880_000L);
+    assertThat(filter.getMinExclusiveArea()).isEqualByComparingTo(new BigDecimal("76.05"));
+    assertThat(filter.isMonthlyRentPreferred()).isTrue();
   }
 
   private PropertyRecommendationCandidate property() {
@@ -196,5 +270,15 @@ class RecommendationServiceImplTest {
     UserPreferenceResponse preference = preference(code, value);
     preference.setPriority(priority);
     return preference;
+  }
+
+  private SurroundingResponse surroundings(SurroundingSummaryResponse summary) {
+    return new SurroundingResponse(
+        BigDecimal.valueOf(35.1),
+        BigDecimal.valueOf(129.1),
+        1000,
+        summary,
+        List.of()
+    );
   }
 }

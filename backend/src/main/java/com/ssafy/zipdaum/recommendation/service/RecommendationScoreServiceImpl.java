@@ -34,6 +34,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
             UserPreferenceResponse::getPriority,
             Comparator.nullsLast(Comparator.naturalOrder())
         ))
+        .filter(this::isEvaluablePreference)
         .map(preference -> scorePreference(property, preference, preferences, surroundingSummary))
         .toList();
 
@@ -113,6 +114,22 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       case PARK -> scoreFacility(preference, surroundingSummary, surroundingSummary == null
           ? 0 : surroundingSummary.getParkCount(), "공원이 가까움");
     };
+  }
+
+  private boolean isEvaluablePreference(UserPreferenceResponse preference) {
+    UserPreferenceType type = parseType(preference.getCode());
+    if (!isFacilityType(type)) {
+      return true;
+    }
+    return Boolean.TRUE.equals(parseBoolean(preference.getValue()));
+  }
+
+  private boolean isFacilityType(UserPreferenceType type) {
+    return type == UserPreferenceType.BUS
+        || type == UserPreferenceType.SUBWAY
+        || type == UserPreferenceType.HOSPITAL
+        || type == UserPreferenceType.CCTV
+        || type == UserPreferenceType.PARK;
   }
 
   private ScoredPreference scorePrice(

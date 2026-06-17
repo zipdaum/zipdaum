@@ -185,6 +185,35 @@ class RecommendationScoreServiceImplTest {
         );
   }
 
+  @Test
+  void calculateMatchScore_false_시설조건은_평가_대상에서_제외한다() {
+    PropertyRecommendationCandidate property = property(
+        "26110",
+        "우동",
+        2018,
+        0L,
+        0L,
+        0L,
+        null
+    );
+    SurroundingSummaryResponse surroundingSummary = new SurroundingSummaryResponse(3, 1, 0, 2, 0);
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(
+            preference("SUBWAY", "false", 1),
+            preference("PARK", "false", 2)
+        ),
+        surroundingSummary
+    );
+
+    assertThat(result.getScore()).isZero();
+    assertThat(result.getEvaluatedCount()).isZero();
+    assertThat(result.getMatchedCount()).isZero();
+    assertThat(result.getMatchedReasons()).isEmpty();
+    assertThat(result.getConditions()).isEmpty();
+  }
+
   private PropertyRecommendationCandidate property(
       String sggCd,
       String umdNm,

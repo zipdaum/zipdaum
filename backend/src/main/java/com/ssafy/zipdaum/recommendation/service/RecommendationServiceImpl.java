@@ -8,11 +8,13 @@ import com.ssafy.zipdaum.preference.service.UserPreferenceService;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.property.service.SurroundingService;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
+import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidateFilter;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCondition;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.mapper.RecommendationMapper;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,6 +30,9 @@ public class RecommendationServiceImpl implements RecommendationService {
 
   private static final int RECOMMENDATION_SURROUNDING_RADIUS_METERS = 1000;
   private static final int DEFAULT_RECOMMENDATION_SIZE = 20;
+  private static final int MAX_RECOMMENDATION_CANDIDATE_COUNT = 200;
+  private static final BigDecimal PRICE_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(1.1);
+  private static final BigDecimal AREA_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(0.9);
 
   private final RecommendationMapper recommendationMapper;
   private final UserPreferenceService userPreferenceService;
@@ -63,8 +68,9 @@ public class RecommendationServiceImpl implements RecommendationService {
   @Transactional(readOnly = true)
   public List<PropertyRecommendationResponse> findPropertyRecommendations(Long userId) {
     List<UserPreferenceResponse> preferences = userPreferenceService.findPreferences(userId);
+    PropertyRecommendationCandidateFilter filter = toCandidateFilter(preferences);
     List<PropertyRecommendationCandidate> candidates =
-        recommendationMapper.selectPropertyRecommendationCandidates();
+        recommendationMapper.selectPropertyRecommendationCandidates(filter, MAX_RECOMMENDATION_CANDIDATE_COUNT);
 
     List<ScoredProperty> scoredProperties = new ArrayList<>();
     for (PropertyRecommendationCandidate candidate : candidates) {
@@ -75,7 +81,7 @@ public class RecommendationServiceImpl implements RecommendationService {
           surroundingSummary
       );
       if (score.getScore() > 0) {
-        scoredProperties.add(new ScoredProperty(candidate, score));
+        scoredProperties.add(new ScoredProperty(candidate, score, surroundingSummary));
       }
     }
 
@@ -87,6 +93,60 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     log.info("사용자 맞춤 주택 추천 목록 조회 완료 resultCount={}", recommendations.size());
     return recommendations;
+  }
+
+  private PropertyRecommendationCandidateFilter toCandidateFilter(
+      List<UserPreferenceResponse> preferences) {
+    String region = null;
+    Long salePriceMax = null;
+    Long depositMax = null;
+    Long monthlyRentMax = null;
+    BigDecimal minExclusiveArea = null;
+    boolean monthlyRentPreferred = hasPreference(preferences, UserPreferenceType.MONTHLY_RENT);
+
+    for (UserPreferenceResponse preference : preferences) {
+      UserPreferenceType type = parsePreferenceType(preference.getCode());
+      if (type == null) {
+        continue;
+      }
+
+      switch (type) {
+        case SALE_PRICE -> salePriceMax = toPartialPriceMax(preference.getValue());
+        case DEPOSIT -> depositMax = toPartialPriceMax(preference.getValue());
+        case MONTHLY_RENT -> monthlyRentMax = toPartialPriceMax(preference.getValue());
+        case AREA -> minExclusiveArea = toPartialAreaMin(preference.getValue());
+        case REGION -> region = normalize(preference.getValue());
+        case BUILD_YEAR, BUS, SUBWAY, HOSPITAL, CCTV, PARK -> {
+        }
+      }
+    }
+
+    return new PropertyRecommendationCandidateFilter(
+        region,
+        salePriceMax,
+        depositMax,
+        monthlyRentMax,
+        minExclusiveArea,
+        monthlyRentPreferred
+    );
+  }
+
+  private Long toPartialPriceMax(String value) {
+    BigDecimal price = parseBigDecimal(value);
+    if (price == null) {
+      return null;
+    }
+    return price.multiply(PRICE_PARTIAL_MATCH_MULTIPLIER)
+        .setScale(0, RoundingMode.DOWN)
+        .longValue();
+  }
+
+  private BigDecimal toPartialAreaMin(String value) {
+    BigDecimal area = parseBigDecimal(value);
+    if (area == null) {
+      return null;
+    }
+    return area.multiply(AREA_PARTIAL_MATCH_MULTIPLIER);
   }
 
   private SurroundingSummaryResponse findSurroundingSummary(
@@ -229,6 +289,13 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
   }
 
+  private String normalize(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim();
+  }
+
   private BigDecimal subtract(BigDecimal left, Long right) {
     if (left == null || right == null) {
       return BigDecimal.valueOf(Long.MIN_VALUE);
@@ -309,35 +376,38 @@ public class RecommendationServiceImpl implements RecommendationService {
 
   private record ScoredProperty(
       PropertyRecommendationCandidate candidate,
-      PropertyRecommendationScore score
+      PropertyRecommendationScore score,
+      SurroundingSummaryResponse surroundingSummary
   ) {
 
     int surroundingBusCount() {
-      return countMatchedFacility("BUS");
+      return countMatchedFacility("BUS", surroundingSummary == null ? 0 : surroundingSummary.getBusCount());
     }
 
     int surroundingSubwayCount() {
-      return countMatchedFacility("SUBWAY");
+      return countMatchedFacility("SUBWAY",
+          surroundingSummary == null ? 0 : surroundingSummary.getSubwayCount());
     }
 
     int surroundingHospitalCount() {
-      return countMatchedFacility("HOSPITAL");
+      return countMatchedFacility("HOSPITAL",
+          surroundingSummary == null ? 0 : surroundingSummary.getHospitalCount());
     }
 
     int surroundingCctvCount() {
-      return countMatchedFacility("CCTV");
+      return countMatchedFacility("CCTV", surroundingSummary == null ? 0 : surroundingSummary.getCctvCount());
     }
 
     int surroundingParkCount() {
-      return countMatchedFacility("PARK");
+      return countMatchedFacility("PARK", surroundingSummary == null ? 0 : surroundingSummary.getParkCount());
     }
 
-    private int countMatchedFacility(String code) {
-      return score.getConditions().stream()
+    private int countMatchedFacility(String code, int count) {
+      boolean matched = score.getConditions().stream()
           .filter(condition -> code.equalsIgnoreCase(condition.getCode()) && condition.isMatched())
-          .mapToInt(condition -> condition.getScore())
           .findFirst()
-          .orElse(0);
+          .isPresent();
+      return matched ? count : 0;
     }
   }
 }
