@@ -6,6 +6,7 @@ import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCondition;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
+import com.ssafy.zipdaum.recommendation.dto.RecommendationStatus;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -26,7 +27,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       List<UserPreferenceResponse> preferences,
       SurroundingSummaryResponse surroundingSummary) {
     if (preferences == null || preferences.isEmpty()) {
-      return new PropertyRecommendationScore(0, 0, 0, List.of(), List.of());
+      return noEvaluableConditionScore();
     }
 
     List<ScoredPreference> scoredPreferences = preferences.stream()
@@ -39,7 +40,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
         .toList();
 
     if (scoredPreferences.isEmpty()) {
-      return new PropertyRecommendationScore(0, 0, 0, List.of(), List.of());
+      return noEvaluableConditionScore();
     }
 
     int maxPriority = scoredPreferences.stream()
@@ -50,8 +51,6 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
 
     int weightedScoreSum = 0;
     int weightSum = 0;
-    int matchedCount = 0;
-    List<String> matchedReasons = new ArrayList<>();
     List<PropertyRecommendationCondition> conditions = new ArrayList<>();
 
     for (ScoredPreference scoredPreference : scoredPreferences) {
@@ -59,22 +58,21 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       weightedScoreSum += scoredPreference.score() * weight;
       weightSum += weight;
 
-      if (scoredPreference.score() > 0) {
-        matchedCount++;
-      }
-      if (scoredPreference.score() == FULL_MATCH_SCORE && scoredPreference.reason() != null) {
-        matchedReasons.add(scoredPreference.reason());
-      }
       conditions.add(toCondition(scoredPreference));
     }
 
     int score = Math.round((float) weightedScoreSum / weightSum);
     return new PropertyRecommendationScore(
         score,
-        scoredPreferences.size(),
-        matchedCount,
-        matchedReasons,
         conditions
+    );
+  }
+
+  private PropertyRecommendationScore noEvaluableConditionScore() {
+    return new PropertyRecommendationScore(
+        RecommendationStatus.NO_EVALUABLE_CONDITION,
+        null,
+        List.of()
     );
   }
 

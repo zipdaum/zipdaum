@@ -59,8 +59,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         surroundingSummary
     );
 
-    log.info("주택 맞춤 조건 적합도 계산 완료 score={}, evaluatedCount={}, matchedCount={}",
-        score.getScore(), score.getEvaluatedCount(), score.getMatchedCount());
+    log.info("주택 맞춤 조건 적합도 계산 완료 score={}, conditionCount={}",
+        score.getScore(), score.getConditions().size());
     return score;
   }
 
@@ -80,7 +80,7 @@ public class RecommendationServiceImpl implements RecommendationService {
           preferences,
           surroundingSummary
       );
-      if (score.getScore() > 0) {
+      if (isPositiveScore(score)) {
         scoredProperties.add(new ScoredProperty(candidate, score, surroundingSummary));
       }
     }
@@ -205,7 +205,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
       }
 
-      int scoreCompared = Integer.compare(right.score().getScore(), left.score().getScore());
+      int scoreCompared = Integer.compare(scoreValue(right.score()), scoreValue(left.score()));
       if (scoreCompared != 0) {
         return scoreCompared;
       }
@@ -366,12 +366,18 @@ public class RecommendationServiceImpl implements RecommendationService {
         property.getLatestDealPrice(),
         property.getLatestDealDate(),
         property.getExclusiveArea(),
+        score.getRecommendationStatus(),
         score.getScore(),
-        score.getEvaluatedCount(),
-        score.getMatchedCount(),
-        score.getMatchedReasons(),
         score.getConditions()
     );
+  }
+
+  private boolean isPositiveScore(PropertyRecommendationScore score) {
+    return score.getScore() != null && score.getScore() > 0;
+  }
+
+  private int scoreValue(PropertyRecommendationScore score) {
+    return score.getScore() == null ? 0 : score.getScore();
   }
 
   private record ScoredProperty(

@@ -6,6 +6,7 @@ import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
+import com.ssafy.zipdaum.recommendation.dto.RecommendationStatus;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -38,10 +39,6 @@ class RecommendationScoreServiceImplTest {
     );
 
     assertThat(result.getScore()).isEqualTo(50);
-    assertThat(result.getEvaluatedCount()).isEqualTo(3);
-    assertThat(result.getMatchedCount()).isEqualTo(2);
-    assertThat(result.getMatchedReasons())
-        .containsExactly("선호 지역과 일치", "지하철역이 가까움");
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
@@ -49,6 +46,9 @@ class RecommendationScoreServiceImplTest {
             org.assertj.core.groups.Tuple.tuple("REGION", true, 100),
             org.assertj.core.groups.Tuple.tuple("SUBWAY", true, 100)
         );
+    assertThat(result.getConditions())
+        .extracting("reason")
+        .containsExactly(null, "선호 지역과 일치", "지하철역이 가까움");
   }
 
   @Test
@@ -76,10 +76,6 @@ class RecommendationScoreServiceImplTest {
     );
 
     assertThat(result.getScore()).isEqualTo(63);
-    assertThat(result.getEvaluatedCount()).isEqualTo(5);
-    assertThat(result.getMatchedCount()).isEqualTo(3);
-    assertThat(result.getMatchedReasons())
-        .containsExactly("희망 면적과 일치", "선호 지역과 일치");
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
@@ -89,6 +85,9 @@ class RecommendationScoreServiceImplTest {
             org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 70),
             org.assertj.core.groups.Tuple.tuple("PARK", false, 0)
         );
+    assertThat(result.getConditions())
+        .extracting("reason")
+        .containsExactly("희망 면적과 일치", null, "선호 지역과 일치", null, null);
   }
 
   @Test
@@ -110,9 +109,9 @@ class RecommendationScoreServiceImplTest {
     );
 
     assertThat(result.getScore()).isEqualTo(70);
-    assertThat(result.getEvaluatedCount()).isEqualTo(1);
-    assertThat(result.getMatchedCount()).isEqualTo(1);
-    assertThat(result.getMatchedReasons()).isEmpty();
+    assertThat(result.getConditions())
+        .extracting("code", "matched", "score", "reason")
+        .containsExactly(org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 70, null));
   }
 
   @Test
@@ -139,16 +138,15 @@ class RecommendationScoreServiceImplTest {
     );
 
     assertThat(result.getScore()).isEqualTo(100);
-    assertThat(result.getEvaluatedCount()).isEqualTo(2);
-    assertThat(result.getMatchedCount()).isEqualTo(2);
-    assertThat(result.getMatchedReasons())
-        .containsExactly("보증금 조건과 적합", "보증금/월세 조건과 적합");
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
             org.assertj.core.groups.Tuple.tuple("DEPOSIT", true, 100),
             org.assertj.core.groups.Tuple.tuple("MONTHLY_RENT", true, 100)
         );
+    assertThat(result.getConditions())
+        .extracting("reason")
+        .containsExactly("보증금 조건과 적합", "보증금/월세 조건과 적합");
   }
 
   @Test
@@ -175,8 +173,6 @@ class RecommendationScoreServiceImplTest {
     );
 
     assertThat(result.getScore()).isZero();
-    assertThat(result.getMatchedCount()).isZero();
-    assertThat(result.getMatchedReasons()).isEmpty();
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
@@ -186,7 +182,7 @@ class RecommendationScoreServiceImplTest {
   }
 
   @Test
-  void calculateMatchScore_false_시설조건은_평가_대상에서_제외한다() {
+  void calculateMatchScore_false_시설조건만_있으면_추천할_수_없는_상태를_반환한다() {
     PropertyRecommendationCandidate property = property(
         "26110",
         "우동",
@@ -207,10 +203,8 @@ class RecommendationScoreServiceImplTest {
         surroundingSummary
     );
 
-    assertThat(result.getScore()).isZero();
-    assertThat(result.getEvaluatedCount()).isZero();
-    assertThat(result.getMatchedCount()).isZero();
-    assertThat(result.getMatchedReasons()).isEmpty();
+    assertThat(result.getRecommendationStatus()).isEqualTo(RecommendationStatus.NO_EVALUABLE_CONDITION);
+    assertThat(result.getScore()).isNull();
     assertThat(result.getConditions()).isEmpty();
   }
 

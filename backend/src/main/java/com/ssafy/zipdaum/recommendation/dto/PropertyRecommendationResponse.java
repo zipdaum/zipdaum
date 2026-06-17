@@ -27,9 +27,7 @@ public class PropertyRecommendationResponse {
   private Long latestDealPrice;
   private LocalDate latestDealDate;
   private BigDecimal exclusiveArea;
-  private int score;
-  private int evaluatedCount;
-  private int matchedCount;
-  private List<String> matchedReasons;
+  private RecommendationStatus recommendationStatus;
+  private Integer score;
   private List<PropertyRecommendationCondition> conditions;
 }

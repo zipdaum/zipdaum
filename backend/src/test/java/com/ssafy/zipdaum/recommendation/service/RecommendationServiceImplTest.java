@@ -51,7 +51,7 @@ class RecommendationServiceImplTest {
         summary,
         List.of()
     );
-    PropertyRecommendationScore score = new PropertyRecommendationScore(100, 1, 1, List.of(), List.of());
+    PropertyRecommendationScore score = new PropertyRecommendationScore(100, List.of());
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
@@ -82,7 +82,7 @@ class RecommendationServiceImplTest {
   void findPropertyRecommendationScore_시설_조건이_없으면_주변시설을_조회하지_않는다() {
     PropertyRecommendationCandidate property = property();
     List<UserPreferenceResponse> preferences = List.of(preference("DEPOSIT", "300000000"));
-    PropertyRecommendationScore score = new PropertyRecommendationScore(100, 1, 1, List.of(), List.of());
+    PropertyRecommendationScore score = new PropertyRecommendationScore(100, List.of());
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
@@ -101,7 +101,7 @@ class RecommendationServiceImplTest {
     property.setLatitude(null);
     property.setLongitude(null);
     List<UserPreferenceResponse> preferences = List.of(preference("PARK", "true"));
-    PropertyRecommendationScore score = new PropertyRecommendationScore(0, 1, 0, List.of(), List.of());
+    PropertyRecommendationScore score = new PropertyRecommendationScore(0, List.of());
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
