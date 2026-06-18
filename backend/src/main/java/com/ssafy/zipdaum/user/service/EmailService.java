@@ -9,7 +9,6 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
@@ -34,10 +33,7 @@ public class EmailService {
         return String.valueOf(code);
     }
 
-    private MimeMessage createEmailForm(String email) throws MessagingException {
-        String authCode = createCode();
-
-
+    private MimeMessage createEmailForm(String email, String authCode) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         message.addRecipients(MimeMessage.RecipientType.TO, email);
         message.setSubject("집다음 회원가입 인증번호 발송");
@@ -58,13 +54,11 @@ public class EmailService {
 
         message.setFrom(configEmail);
 
-        redisUtil.setDataWithTTL(email, authCode, 60 * 3L);
-
         return message;
 
     }
 
-    public void sendVerificationCode(String toEmail) throws MessagingException {
+    public void sendVerificationCode(String toEmail) {
 
         Optional<UserDto> userByEmail = Optional.ofNullable(userMapper.findByEmail(toEmail));
         if (userByEmail.isPresent()) throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
@@ -73,10 +67,16 @@ public class EmailService {
             redisUtil.delete(toEmail);
         }
 
-        MimeMessage emailForm = createEmailForm(toEmail);
+        String authCode = createCode();
+        redisUtil.setDataWithTTL(toEmail, authCode, 60 * 3L);
 
-
-        mailSender.send(emailForm);
+        try {
+            MimeMessage emailForm = createEmailForm(toEmail, authCode);
+            mailSender.send(emailForm);
+        } catch (Exception e) {
+            redisUtil.delete(toEmail);
+            throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+        }
 
     }
 
@@ -97,13 +97,11 @@ public class EmailService {
 
     }
 
-    // 회원가입 직전에 확인할 메서드
     public boolean checkEmailVerified(String email) {
         String isVerified = redisUtil.getData("SIGNUP_VERIFIED:" + email);
         return "TRUE".equals(isVerified);
     }
 
-    // 회원가입 완료 후 인증 상태 삭제할 메서드
     public void deleteVerifiedState(String email) {
         redisUtil.delete("SIGNUP_VERIFIED:" + email);
     }
