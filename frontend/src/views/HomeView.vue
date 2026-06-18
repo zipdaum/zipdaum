@@ -676,17 +676,18 @@ async function handleBrowserBack(event) {
     return;
   }
 
+  if (route.view === "results") {
+    await loadRegionSearchView(route);
+    return;
+  }
+
   openHomeView({ updateHistory: false });
 }
 
 async function restoreViewFromUrl() {
   const route = getCurrentRoute();
 
-  window.history.replaceState(
-    route,
-    "",
-    getViewUrl(route.view, route.propertyId),
-  );
+  window.history.replaceState(route, "", getRouteUrl(route));
 
   if (route.view === "deal-history") {
     await loadPropertyDetailView(route.propertyId, "deal-history");
@@ -698,6 +699,11 @@ async function restoreViewFromUrl() {
     return;
   }
 
+  if (route.view === "results") {
+    await loadRegionSearchView(route);
+    return;
+  }
+
   openHomeView({ updateHistory: false });
 }
 
@@ -705,12 +711,35 @@ function getCurrentRoute() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
   const propertyId = normalizePropertyId(params.get("propertyId"));
+  const sggCd = normalizeTextParam(params.get("sggCd"));
+  const umdNm = normalizeTextParam(params.get("umdNm"));
 
   if ((view === "detail" || view === "deal-history") && propertyId) {
     return { view, propertyId };
   }
 
+  if (view === "results" && (sggCd || umdNm)) {
+    return { view, sggCd, umdNm };
+  }
+
   return { view: "home" };
+}
+
+function getRouteUrl(route) {
+  if (route.view === "results") {
+    const params = new URLSearchParams({ view: "results" });
+
+    if (route.sggCd) {
+      params.set("sggCd", route.sggCd);
+    }
+    if (route.umdNm) {
+      params.set("umdNm", route.umdNm);
+    }
+
+    return `${window.location.pathname}?${params.toString()}`;
+  }
+
+  return getViewUrl(route.view, route.propertyId);
 }
 
 function getViewUrl(view, propertyId) {
@@ -728,6 +757,28 @@ function getViewUrl(view, propertyId) {
 function normalizePropertyId(propertyId) {
   const normalized = Number(propertyId);
   return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+}
+
+function normalizeTextParam(value) {
+  return value?.trim() || "";
+}
+
+async function loadRegionSearchView(route) {
+  currentView.value = "results";
+  selectedPropertyDetail.value = null;
+  detailErrorMessage.value = "";
+  historiesErrorMessage.value = "";
+  searchForm.value = {
+    ...searchForm.value,
+    sggCd: route.sggCd || searchForm.value.sggCd,
+    umdNm: route.umdNm || "",
+    name: "",
+    propertyType: "",
+    dealType: "",
+    priceRangeIndex: 0,
+    sortIndex: 0,
+  };
+  await runSearch();
 }
 
 function sortProperties(properties, selectedSort) {

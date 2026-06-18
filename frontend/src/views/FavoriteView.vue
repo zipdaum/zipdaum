@@ -17,9 +17,24 @@ const isLoading = ref(false);
 const errorMessage = ref("");
 const regionMessage = ref("");
 const propertyMessage = ref("");
+const favoritePageSize = 3;
+const regionPage = ref(1);
+const propertyPage = ref(1);
 
 const totalFavoriteCount = computed(
   () => favoriteRegions.value.length + favoriteProperties.value.length,
+);
+const regionPageCount = computed(() =>
+  calculatePageCount(favoriteRegions.value.length),
+);
+const propertyPageCount = computed(() =>
+  calculatePageCount(favoriteProperties.value.length),
+);
+const paginatedFavoriteRegions = computed(() =>
+  getPaginatedItems(favoriteRegions.value, regionPage.value),
+);
+const paginatedFavoriteProperties = computed(() =>
+  getPaginatedItems(favoriteProperties.value, propertyPage.value),
 );
 
 onMounted(loadFavorites);
@@ -36,6 +51,7 @@ async function loadFavorites() {
 
     favoriteRegions.value = regions.map(mapFavoriteRegion);
     favoriteProperties.value = properties.map(mapFavoriteProperty);
+    clampFavoritePages();
   } catch (error) {
     errorMessage.value = getErrorMessage(
       error,
@@ -54,7 +70,9 @@ function openRegionDeals(region) {
   router.push({
     name: "home",
     query: {
-      region: region.regionName,
+      view: "results",
+      sggCd: region.sggCd,
+      umdNm: region.umdNm,
     },
   });
 }
@@ -63,6 +81,7 @@ function openPropertyDeals(property) {
   router.push({
     name: "home",
     query: {
+      view: "detail",
       propertyId: property.propertyId,
     },
   });
@@ -184,6 +203,58 @@ function formatDealCount(count) {
   return `${Number(count || 0).toLocaleString()}건`;
 }
 
+function getFavoriteDealSummaries(item) {
+  return [
+    {
+      type: "매매",
+      price: formatPrice(item.salePrice),
+      count: `최근 매매 ${formatDealCount(item.yearlyDealCounts.sale)}`,
+    },
+    {
+      type: "전세",
+      price: formatPrice(item.jeonseDeposit),
+      count: `최근 전세 ${formatDealCount(item.yearlyDealCounts.jeonse)}`,
+    },
+    {
+      type: "월세",
+      price: formatMonthlyRent(item.monthlyRentDeposit, item.monthlyRent),
+      count: `최근 월세 ${formatDealCount(item.yearlyDealCounts.monthlyRent)}`,
+    },
+  ];
+}
+
+function calculatePageCount(totalCount) {
+  return Math.max(Math.ceil(totalCount / favoritePageSize), 1);
+}
+
+function getPaginatedItems(items, page) {
+  const startIndex = (page - 1) * favoritePageSize;
+  return items.slice(startIndex, startIndex + favoritePageSize);
+}
+
+function getVisibleFavoritePages(pageCount, currentPage) {
+  const groupStart = Math.floor((currentPage - 1) / 5) * 5 + 1;
+  const groupEnd = Math.min(groupStart + 4, pageCount);
+
+  return Array.from(
+    { length: groupEnd - groupStart + 1 },
+    (_, index) => groupStart + index,
+  );
+}
+
+function setRegionPage(page) {
+  regionPage.value = Math.min(Math.max(page, 1), regionPageCount.value);
+}
+
+function setPropertyPage(page) {
+  propertyPage.value = Math.min(Math.max(page, 1), propertyPageCount.value);
+}
+
+function clampFavoritePages() {
+  setRegionPage(regionPage.value);
+  setPropertyPage(propertyPage.value);
+}
+
 function getErrorMessage(error, fallbackMessage) {
   return (
     error.response?.data?.message || error.response?.data || fallbackMessage
@@ -239,65 +310,90 @@ function getErrorMessage(error, fallbackMessage) {
           등록된 관심 지역이 없습니다.
         </p>
 
-        <div v-else class="favorite-list">
-          <article
-            v-for="region in favoriteRegions"
-            :key="region.id"
-            class="favorite-row region-row"
+        <template v-else>
+          <div class="favorite-list">
+            <article
+              v-for="region in paginatedFavoriteRegions"
+              :key="region.id"
+              class="favorite-row region-row"
+            >
+              <div class="favorite-row-header">
+                <div class="favorite-main">
+                  <strong>{{ region.regionName }}</strong>
+                  <span>최근 거래 기준 요약</span>
+                </div>
+
+                <div class="favorite-actions">
+                  <button
+                    class="secondary-button"
+                    type="button"
+                    @click="openRegionDeals(region)"
+                  >
+                    전체 거래 조회
+                  </button>
+                  <button
+                    class="ghost-button"
+                    type="button"
+                    @click="handleDeleteRegion(region)"
+                  >
+                    관심 해제
+                  </button>
+                </div>
+              </div>
+
+              <div class="favorite-summary-list" aria-label="최근 거래 요약">
+                <div
+                  v-for="summary in getFavoriteDealSummaries(region)"
+                  :key="`${region.id}-${summary.type}`"
+                  class="favorite-summary-item"
+                >
+                  <span>{{ summary.type }}</span>
+                  <strong>{{ summary.price }}</strong>
+                  <em>{{ summary.count }}</em>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div
+            v-if="regionPageCount > 1"
+            class="favorite-pagination"
+            aria-label="관심 지역 페이지"
           >
-            <div class="favorite-main">
-              <strong>{{ region.regionName }}</strong>
-              <span>최근 거래 기준 요약</span>
-            </div>
-
-            <dl class="price-summary">
-              <div>
-                <dt>매매 최근 거래가</dt>
-                <dd>{{ formatPrice(region.salePrice) }}</dd>
-              </div>
-              <div>
-                <dt>전세 최근 보증금</dt>
-                <dd>{{ formatPrice(region.jeonseDeposit) }}</dd>
-              </div>
-              <div>
-                <dt>월세 최근 보증금 / 월세</dt>
-                <dd>
-                  {{
-                    formatMonthlyRent(
-                      region.monthlyRentDeposit,
-                      region.monthlyRent,
-                    )
-                  }}
-                </dd>
-              </div>
-            </dl>
-
-            <div class="deal-counts" aria-label="최근 1년간 거래 건수">
-              <span>매매 {{ formatDealCount(region.yearlyDealCounts.sale) }}</span>
-              <span>전세 {{ formatDealCount(region.yearlyDealCounts.jeonse) }}</span>
-              <span>
-                월세 {{ formatDealCount(region.yearlyDealCounts.monthlyRent) }}
-              </span>
-            </div>
-
-            <div class="favorite-actions">
-              <button
-                class="secondary-button"
-                type="button"
-                @click="openRegionDeals(region)"
-              >
-                전체 거래 조회
-              </button>
-              <button
-                class="ghost-button"
-                type="button"
-                @click="handleDeleteRegion(region)"
-              >
-                관심 해제
-              </button>
-            </div>
-          </article>
-        </div>
+            <button
+              type="button"
+              :disabled="regionPage === 1"
+              @click="setRegionPage(regionPage - 1)"
+            >
+              이전
+            </button>
+            <button
+              v-for="page in getVisibleFavoritePages(
+                regionPageCount,
+                regionPage,
+              )"
+              :key="`region-page-${page}`"
+              :class="{ active: regionPage === page }"
+              type="button"
+              :aria-current="regionPage === page ? 'page' : undefined"
+              @click="setRegionPage(page)"
+            >
+              {{ page }}
+            </button>
+            <button
+              type="button"
+              :disabled="regionPage === regionPageCount"
+              @click="setRegionPage(regionPage + 1)"
+            >
+              다음
+            </button>
+          </div>
+        </template>
+        <div
+          v-if="isLoading || favoriteRegions.length === 0 || regionPageCount <= 1"
+          class="favorite-pagination favorite-pagination-placeholder"
+          aria-hidden="true"
+        ></div>
       </article>
 
       <article class="favorite-panel" aria-labelledby="favorite-property-title">
@@ -326,68 +422,95 @@ function getErrorMessage(error, fallbackMessage) {
           등록된 관심 주택이 없습니다.
         </p>
 
-        <div v-else class="favorite-list">
-          <article
-            v-for="property in favoriteProperties"
-            :key="property.id"
-            class="favorite-row property-row"
+        <template v-else>
+          <div class="favorite-list">
+            <article
+              v-for="property in paginatedFavoriteProperties"
+              :key="property.id"
+              class="favorite-row property-row"
+            >
+              <div class="favorite-row-header">
+                <div class="favorite-main">
+                  <strong>{{ property.propertyName }}</strong>
+                  <span>
+                    {{ getPropertyTypeLabel(property.propertyType) }} ·
+                    {{ property.regionName }}
+                  </span>
+                </div>
+
+                <div class="favorite-actions">
+                  <button
+                    class="secondary-button"
+                    type="button"
+                    @click="openPropertyDeals(property)"
+                  >
+                    상세 거래 조회
+                  </button>
+                  <button
+                    class="ghost-button"
+                    type="button"
+                    @click="handleDeleteProperty(property)"
+                  >
+                    관심 해제
+                  </button>
+                </div>
+              </div>
+
+              <div class="favorite-summary-list" aria-label="최근 거래 요약">
+                <div
+                  v-for="summary in getFavoriteDealSummaries(property)"
+                  :key="`${property.id}-${summary.type}`"
+                  class="favorite-summary-item"
+                >
+                  <span>{{ summary.type }}</span>
+                  <strong>{{ summary.price }}</strong>
+                  <em>{{ summary.count }}</em>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div
+            v-if="propertyPageCount > 1"
+            class="favorite-pagination"
+            aria-label="관심 주택 페이지"
           >
-            <div class="favorite-main">
-              <strong>{{ property.propertyName }}</strong>
-              <span>
-                {{ getPropertyTypeLabel(property.propertyType) }} ·
-                {{ property.regionName }}
-              </span>
-            </div>
-
-            <dl class="price-summary">
-              <div>
-                <dt>매매 최근 거래가</dt>
-                <dd>{{ formatPrice(property.salePrice) }}</dd>
-              </div>
-              <div>
-                <dt>전세 최근 보증금</dt>
-                <dd>{{ formatPrice(property.jeonseDeposit) }}</dd>
-              </div>
-              <div>
-                <dt>월세 최근 보증금 / 월세</dt>
-                <dd>
-                  {{
-                    formatMonthlyRent(
-                      property.monthlyRentDeposit,
-                      property.monthlyRent,
-                    )
-                  }}
-                </dd>
-              </div>
-            </dl>
-
-            <div class="deal-counts" aria-label="최근 1년간 거래 건수">
-              <span>매매 {{ formatDealCount(property.yearlyDealCounts.sale) }}</span>
-              <span>전세 {{ formatDealCount(property.yearlyDealCounts.jeonse) }}</span>
-              <span>
-                월세 {{ formatDealCount(property.yearlyDealCounts.monthlyRent) }}
-              </span>
-            </div>
-
-            <div class="favorite-actions">
-              <button
-                class="secondary-button"
-                type="button"
-                @click="openPropertyDeals(property)"
-              >
-                전체 거래 조회
-              </button>
-              <button
-                class="ghost-button"
-                type="button"
-                @click="handleDeleteProperty(property)"
-              >
-                관심 해제
-              </button>
-            </div>
-          </article>
-        </div>
+            <button
+              type="button"
+              :disabled="propertyPage === 1"
+              @click="setPropertyPage(propertyPage - 1)"
+            >
+              이전
+            </button>
+            <button
+              v-for="page in getVisibleFavoritePages(
+                propertyPageCount,
+                propertyPage,
+              )"
+              :key="`property-page-${page}`"
+              :class="{ active: propertyPage === page }"
+              type="button"
+              :aria-current="propertyPage === page ? 'page' : undefined"
+              @click="setPropertyPage(page)"
+            >
+              {{ page }}
+            </button>
+            <button
+              type="button"
+              :disabled="propertyPage === propertyPageCount"
+              @click="setPropertyPage(propertyPage + 1)"
+            >
+              다음
+            </button>
+          </div>
+        </template>
+        <div
+          v-if="
+            isLoading || favoriteProperties.length === 0 || propertyPageCount <= 1
+          "
+          class="favorite-pagination favorite-pagination-placeholder"
+          aria-hidden="true"
+        ></div>
       </article>
     </section>
   </main>

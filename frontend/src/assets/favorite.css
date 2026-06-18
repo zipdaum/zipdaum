@@ -68,13 +68,27 @@
 }
 
 .favorite-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
   min-width: 0;
   padding: 22px;
 }
 
 .favorite-list {
   display: grid;
-  gap: 12px;
+  align-content: start;
+  gap: 10px;
+  min-height: 396px;
+}
+
+.favorite-panel > .empty-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 396px;
+  height: 396px;
+  min-height: 396px;
 }
 
 .favorite-message {
@@ -96,12 +110,21 @@
 
 .favorite-row {
   display: grid;
-  gap: 16px;
+  gap: 6px;
+  height: 126px;
   min-width: 0;
+  overflow: hidden;
   border: 1px solid #e2ebfb;
   border-radius: 8px;
   background: #ffffff;
-  padding: 16px;
+  padding: 10px;
+}
+
+.favorite-row-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
 }
 
 .favorite-main {
@@ -112,8 +135,8 @@
   display: block;
   overflow: hidden;
   color: #17233f;
-  font-size: 16px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -121,90 +144,133 @@
 .favorite-main span {
   display: block;
   overflow: hidden;
-  margin-top: 6px;
+  margin-top: 3px;
   color: #71809d;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.price-summary {
+.favorite-summary-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
+  gap: 4px;
 }
 
-.price-summary div {
-  min-width: 0;
-  border: 1px solid #edf2ff;
+.favorite-summary-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 20px;
   border-radius: 8px;
   background: #f8fbff;
-  padding: 12px;
+  padding: 0 8px;
 }
 
-.price-summary dt {
+.favorite-summary-item span,
+.favorite-summary-item strong,
+.favorite-summary-item em {
   overflow: hidden;
-  color: #71809d;
-  font-size: 12px;
-  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.price-summary dd {
-  overflow: hidden;
-  margin: 7px 0 0;
+.favorite-summary-item span {
+  color: #0b5cff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.favorite-summary-item strong {
   color: #17233f;
-  font-size: 14px;
-  font-weight: 900;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.deal-counts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.deal-counts span {
-  min-width: 0;
-  border-radius: 999px;
-  background: #eef4ff;
-  color: #24456f;
-  padding: 7px 9px;
   font-size: 12px;
   font-weight: 900;
-  text-align: center;
-  white-space: nowrap;
+}
+
+.favorite-summary-item em {
+  color: #71809d;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .favorite-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 .favorite-actions button {
+  min-height: 28px;
+  padding-inline: 9px;
+  white-space: nowrap;
+}
+
+.favorite-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   min-height: 34px;
+  margin-top: 16px;
+}
+
+.favorite-pagination-placeholder {
+  visibility: hidden;
+}
+
+.favorite-pagination button {
+  min-width: 36px;
+  min-height: 34px;
+  border: 1px solid #dbe7ff;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #24456f;
+  padding: 0 11px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.favorite-pagination button:disabled {
+  background: #f5f7fb;
+  color: #a6b1c5;
+  cursor: not-allowed;
+}
+
+.favorite-pagination button.active {
+  border-color: #0b5cff;
+  background: #0b5cff;
+  color: #ffffff;
 }
 
 @media (max-width: 1080px) {
-  .price-summary,
-  .deal-counts {
+  .favorite-row {
+    height: auto;
+  }
+
+  .favorite-row-header {
     grid-template-columns: 1fr;
   }
 
-  .deal-counts span {
-    text-align: left;
+  .favorite-actions {
+    justify-content: flex-start;
   }
 }
 
 @media (max-width: 900px) {
   .favorite-grid {
     grid-template-columns: 1fr;
+  }
+
+  .favorite-panel,
+  .favorite-list,
+  .favorite-panel > .empty-message {
+    min-height: 0;
   }
 }
 
