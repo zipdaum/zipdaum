@@ -29,9 +29,7 @@ public class UserServiceImpl implements UserService{
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
     }
 
-    // 2. 이메일 인증 완료 여부 확인
     if (!emailService.checkEmailVerified(request.getEmail())) {
-      // "인증되지 않은 이메일입니다" 라는 에러코드 던지기 (ErrorCode에 추가 필요)
       throw new BusinessException(ErrorCode.UNAUTHORIZED_EMAIL);
     }
 
@@ -42,6 +40,7 @@ public class UserServiceImpl implements UserService{
 
     try {
       userMapper.insertUser(userDto);
+      emailService.deleteVerifiedState(userDto.getEmail());
     } catch (DuplicateKeyException e) {
       log.warn("회원가입 실패 - 중복 이메일");
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
