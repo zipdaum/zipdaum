@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
@@ -32,6 +33,7 @@ class UserServiceImplTest {
     request.setName("홍길동");
 
     given(userMapper.findByEmail("user@example.com")).willReturn(null);
+    given(emailService.checkEmailVerified("user@example.com")).willReturn(true);
     given(passwordEncoder.encode("password1234")).willReturn("encoded-password");
 
     service.signUp(request);
@@ -63,6 +65,7 @@ class UserServiceImplTest {
     request.setName("홍길동");
 
     given(userMapper.findByEmail("user@example.com")).willReturn(null);
+    given(emailService.checkEmailVerified("user@example.com")).willReturn(true);
     given(passwordEncoder.encode("password1234")).willReturn("encoded-password");
     willThrow(new DuplicateKeyException("중복 이메일"))
         .given(userMapper).insertUser(any(UserDto.class));
@@ -71,6 +74,24 @@ class UserServiceImplTest {
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DUPLICATED_EMAIL)
         );
+  }
+
+  @Test
+  void signUp_인증되지_않은_이메일이면_UNAUTHORIZED_EMAIL_예외가_발생한다() {
+    UserSignUpRequest request = new UserSignUpRequest();
+    request.setEmail("user@example.com");
+    request.setPassword("password1234");
+    request.setName("홍길동");
+
+    given(userMapper.findByEmail("user@example.com")).willReturn(null);
+    given(emailService.checkEmailVerified("user@example.com")).willReturn(false);
+
+    assertThatThrownBy(() -> service.signUp(request))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED_EMAIL)
+        );
+
+    then(userMapper).should(never()).insertUser(any(UserDto.class));
   }
 
   @Test
