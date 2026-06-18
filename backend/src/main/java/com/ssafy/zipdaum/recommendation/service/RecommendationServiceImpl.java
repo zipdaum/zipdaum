@@ -68,7 +68,7 @@ public class RecommendationServiceImpl implements RecommendationService {
   public List<PropertyRecommendationResponse> findPropertyRecommendations(Long userId) {
     List<UserPreferenceResponse> preferences = userPreferenceService.findPreferences(userId);
     if (!hasEvaluablePreference(preferences)) {
-      log.info("사용자 맞춤 주택 추천 목록 조회 완료 resultCount=0");
+      log.debug("사용자 맞춤 주택 추천 목록 조회 완료 resultCount=0");
       return List.of();
     }
 
