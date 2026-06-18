@@ -16,6 +16,42 @@
     <result property="monthlyRentDealCount" column="monthly_rent_deal_count"/>
   </resultMap>
 
+  <resultMap id="favoriteRegionCandidateResponseResultMap"
+             type="com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse">
+    <id property="sggCd" column="sgg_cd"/>
+    <id property="umdNm" column="umd_nm"/>
+  </resultMap>
+
+  <select id="selectFavoriteRegionCandidates"
+          resultMap="favoriteRegionCandidateResponseResultMap">
+    SELECT DISTINCT
+      p.sgg_cd,
+      p.umd_nm
+    FROM property p
+    <where>
+      <choose>
+        <when test="sggCds != null and sggCds.size() > 0 and umdKeyword != null">
+          p.sgg_cd IN
+          <foreach collection="sggCds" item="sggCd" open="(" separator="," close=")">
+            #{sggCd}
+          </foreach>
+          AND p.umd_nm LIKE CONCAT('%', #{umdKeyword}, '%') ESCAPE '\\'
+        </when>
+        <when test="sggCds != null and sggCds.size() > 0">
+          p.sgg_cd IN
+          <foreach collection="sggCds" item="sggCd" open="(" separator="," close=")">
+            #{sggCd}
+          </foreach>
+        </when>
+        <otherwise>
+          p.umd_nm LIKE CONCAT('%', #{umdKeyword}, '%') ESCAPE '\\'
+        </otherwise>
+      </choose>
+    </where>
+    ORDER BY p.sgg_cd ASC, p.umd_nm ASC
+    LIMIT 20
+  </select>
+
   <select id="selectFavoriteRegions" resultMap="favoriteRegionResponseResultMap">
     SELECT
       fr.sgg_cd,

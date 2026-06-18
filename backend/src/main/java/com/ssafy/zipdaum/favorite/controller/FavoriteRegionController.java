@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.favorite.controller;
 
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionCreateRequest;
+import com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse;
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import com.ssafy.zipdaum.favorite.service.FavoriteRegionService;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
@@ -33,6 +34,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class FavoriteRegionController {
 
   private final FavoriteRegionService favoriteRegionService;
+
+  @GetMapping("/candidates")
+  @Operation(summary = "관심 지역 등록 후보 검색", description = "관심 지역으로 등록할 수 있는 지역 후보를 검색합니다.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "관심 지역 등록 후보 검색 성공"),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<List<FavoriteRegionCandidateResponse>> getFavoriteRegionCandidates(
+      @RequestParam String keyword
+  ) {
+    log.info("GET /users/info/regions/candidates 요청");
+
+    return ResponseEntity.ok(
+        favoriteRegionService.findFavoriteRegionCandidates(keyword)
+    );
+  }
 
   @GetMapping
   @Operation(summary = "관심 지역 조회", description = "현재 로그인한 사용자의 관심 지역 거래 정보를 조회합니다.")
