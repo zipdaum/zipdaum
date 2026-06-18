@@ -21,7 +21,8 @@ class UserServiceImplTest {
 
   private final UserMapper userMapper = mock(UserMapper.class);
   private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-  private final UserServiceImpl service = new UserServiceImpl(userMapper, passwordEncoder);
+  private final EmailService emailService = mock(EmailService.class);
+  private final UserServiceImpl service = new UserServiceImpl(userMapper, passwordEncoder, emailService);
 
   @Test
   void signUp_회원가입_성공시_비밀번호를_암호화하여_저장한다() {

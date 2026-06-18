@@ -19,6 +19,7 @@ public class UserServiceImpl implements UserService{
 
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
+  private final EmailService emailService;
 
   @Transactional
   public void signUp(UserSignUpRequest request) {
@@ -26,6 +27,12 @@ public class UserServiceImpl implements UserService{
     if (userMapper.findByEmail(request.getEmail()) != null) {
       log.warn("회원가입 실패 - 중복 이메일");
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
+    }
+
+    // 2. 이메일 인증 완료 여부 확인
+    if (!emailService.checkEmailVerified(request.getEmail())) {
+      // "인증되지 않은 이메일입니다" 라는 에러코드 던지기 (ErrorCode에 추가 필요)
+      throw new BusinessException(ErrorCode.UNAUTHORIZED_EMAIL);
     }
 
     UserDto userDto = new UserDto();
