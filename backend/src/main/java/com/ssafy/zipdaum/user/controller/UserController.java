@@ -110,7 +110,7 @@ public class UserController {
           @ApiResponse(responseCode = "200", description = "인증 코드 발송 성공", content = @Content),
           @ApiResponse(responseCode = "400", description = "인증 코드 발송 실패", content = @Content),
   })
-  public ResponseEntity<String> sendVerificationCode(@RequestBody UserVerificationCodeRequest userEmailRequest) throws MessagingException {
+  public ResponseEntity<String> sendVerificationCode(@RequestBody @Valid UserVerificationCodeRequest userEmailRequest) throws MessagingException {
     log.info("POST /users/mail/request 요청");
     String email = userEmailRequest.getEmail();
     emailService.sendVerificationCode(email);
@@ -124,7 +124,7 @@ public class UserController {
           @ApiResponse(responseCode = "400", description = "이메일 인증 실패", content = @Content),
           @ApiResponse(responseCode = "408", description = "이메일 인증 시간 초과", content = @Content),
   })
-  public ResponseEntity<String> verifyCode(@RequestBody UserEmailVerificationRequest userEmailVerify) {
+  public ResponseEntity<String> verifyCode(@RequestBody @Valid UserEmailVerificationRequest userEmailVerify) {
     log.info("POST /users/mail/verify 요청");
     String email = userEmailVerify.getEmail();
     String code = userEmailVerify.getCode();
