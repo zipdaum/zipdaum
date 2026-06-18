@@ -1,10 +1,7 @@
 package com.ssafy.zipdaum.user.controller;
 
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
-import com.ssafy.zipdaum.user.dto.UserInfoResponse;
-import com.ssafy.zipdaum.user.dto.UserDto;
-import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
-import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
+import com.ssafy.zipdaum.user.dto.*;
 import com.ssafy.zipdaum.user.service.EmailService;
 import com.ssafy.zipdaum.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,8 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @Slf4j
 @RestController
@@ -108,25 +103,20 @@ public class UserController {
     return ResponseEntity.ok("회원 탈퇴 성공");
   }
 
-  /**
-   * 인증번호 발송
-   */
+
   @PostMapping("/mail/request")
   @Operation(summary = "인증코드 발송 요청", description = "이메일 인증 코드를 발송합니다.")
   @ApiResponses({
           @ApiResponse(responseCode = "200", description = "인증 코드 발송 성공", content = @Content),
           @ApiResponse(responseCode = "400", description = "인증 코드 발송 실패", content = @Content),
   })
-  public ResponseEntity<String> sendVerificationCode(@RequestBody Map<String, String> body) throws MessagingException {
+  public ResponseEntity<String> sendVerificationCode(@RequestBody UserVerificationCodeRequest userEmailRequest) throws MessagingException {
     log.info("POST /users/mail/request 요청");
-    String email = body.get("email");
+    String email = userEmailRequest.getEmail();
     emailService.sendVerificationCode(email);
     return ResponseEntity.ok("인증코드를 발송하였습니다.");
   }
 
-  /**
-   * 인증번호 검증
-   */
   @PostMapping("/mail/verify")
   @Operation(summary = "이메일 인증 요청", description = "이메일 인증을 요청합니다.")
   @ApiResponses({
@@ -134,10 +124,10 @@ public class UserController {
           @ApiResponse(responseCode = "400", description = "이메일 인증 실패", content = @Content),
           @ApiResponse(responseCode = "408", description = "이메일 인증 시간 초과", content = @Content),
   })
-  public ResponseEntity<String> verifyCode(@RequestBody Map<String, String> body) {
+  public ResponseEntity<String> verifyCode(@RequestBody UserEmailVerificationRequest userEmailVerify) {
     log.info("POST /users/mail/verify 요청");
-    String email = body.get("email");
-    String code = body.get("code");
+    String email = userEmailVerify.getEmail();
+    String code = userEmailVerify.getCode();
 
     emailService.verifyEmailCode(email, code);
     return ResponseEntity.ok("이메일 인증 완료");
