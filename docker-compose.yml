@@ -23,5 +23,17 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis/redis-stack:latest
+    container_name: zipdaum_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    volumes:
+      - redis_data:/data
+
+
 volumes:
   mysql-data:
+  redis_data:
