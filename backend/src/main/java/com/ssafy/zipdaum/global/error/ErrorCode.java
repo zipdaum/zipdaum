@@ -10,6 +10,9 @@ public enum ErrorCode {
   INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C001", "잘못된 입력값입니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C002", "서버 내부 오류가 발생했습니다."),
   METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C003", "지원하지 않는 HTTP 메서드입니다."),
+  REQUEST_TIME_OUT(HttpStatus.REQUEST_TIMEOUT, "C004", "유효시간이 끝났습니다."),
+  INVALID_INPUT_CODE(HttpStatus.BAD_REQUEST, "C005", "인증코드가 일치하지 않습니다."),
+  UNAUTHORIZED_EMAIL(HttpStatus.BAD_REQUEST, "C006", "인증되지 않은 이메일입니다."),
 
   // 2. Auth
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
