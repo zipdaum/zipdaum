@@ -30,7 +30,6 @@ public class RecommendationServiceImpl implements RecommendationService {
 
   private static final int RECOMMENDATION_SURROUNDING_RADIUS_METERS = 1000;
   private static final int DEFAULT_RECOMMENDATION_SIZE = 20;
-  private static final int MAX_RECOMMENDATION_CANDIDATE_COUNT = 200;
   private static final BigDecimal PRICE_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(1.1);
   private static final BigDecimal AREA_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(0.9);
 
@@ -68,9 +67,14 @@ public class RecommendationServiceImpl implements RecommendationService {
   @Transactional(readOnly = true)
   public List<PropertyRecommendationResponse> findPropertyRecommendations(Long userId) {
     List<UserPreferenceResponse> preferences = userPreferenceService.findPreferences(userId);
+    if (!hasEvaluablePreference(preferences)) {
+      log.info("사용자 맞춤 주택 추천 목록 조회 완료 resultCount=0");
+      return List.of();
+    }
+
     PropertyRecommendationCandidateFilter filter = toCandidateFilter(preferences);
     List<PropertyRecommendationCandidate> candidates =
-        recommendationMapper.selectPropertyRecommendationCandidates(filter, MAX_RECOMMENDATION_CANDIDATE_COUNT);
+        recommendationMapper.selectPropertyRecommendationCandidates(filter);
 
     List<ScoredProperty> scoredProperties = new ArrayList<>();
     for (PropertyRecommendationCandidate candidate : candidates) {
@@ -172,6 +176,22 @@ public class RecommendationServiceImpl implements RecommendationService {
         .anyMatch(preference ->
             isFacilityCode(preference.getCode()) && "true".equalsIgnoreCase(preference.getValue())
         );
+  }
+
+  private boolean hasEvaluablePreference(List<UserPreferenceResponse> preferences) {
+    return preferences.stream()
+        .anyMatch(this::isEvaluablePreference);
+  }
+
+  private boolean isEvaluablePreference(UserPreferenceResponse preference) {
+    UserPreferenceType type = parsePreferenceType(preference.getCode());
+    if (type == null) {
+      return false;
+    }
+    if (!isFacilityCode(type.name())) {
+      return true;
+    }
+    return "true".equalsIgnoreCase(preference.getValue());
   }
 
   private boolean isFacilityCode(String code) {

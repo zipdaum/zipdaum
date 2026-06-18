@@ -3,7 +3,6 @@ package com.ssafy.zipdaum.recommendation.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
@@ -120,7 +119,7 @@ class RecommendationServiceImplTest {
     List<UserPreferenceResponse> preferences = List.of(preference("SALE_PRICE", "100000000"));
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
         .willReturn(List.of(expensiveProperty, cheapProperty));
 
     List<PropertyRecommendationResponse> result =
@@ -151,7 +150,7 @@ class RecommendationServiceImplTest {
     );
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
         .willReturn(List.of(higherMonthlyDepositProperty, lowerMonthlyDepositProperty));
 
     List<PropertyRecommendationResponse> result =
@@ -177,7 +176,7 @@ class RecommendationServiceImplTest {
     List<UserPreferenceResponse> preferences = List.of(preference("SUBWAY", "true"));
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
         .willReturn(List.of(fewSubwayProperty, manySubwayProperty));
     given(surroundingService.findSurroundingSummary(
         BigDecimal.valueOf(35.1),
@@ -199,6 +198,23 @@ class RecommendationServiceImplTest {
   }
 
   @Test
+  void findPropertyRecommendations_평가가능한_조건이_없으면_후보를_조회하지_않는다() {
+    List<UserPreferenceResponse> preferences = List.of(
+        preference("SUBWAY", "false"),
+        preference("PARK", "false", 2)
+    );
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+
+    List<PropertyRecommendationResponse> result = service.findPropertyRecommendations(1L);
+
+    assertThat(result).isEmpty();
+    then(recommendationMapper).shouldHaveNoInteractions();
+    then(surroundingService).shouldHaveNoInteractions();
+    then(recommendationScoreService).shouldHaveNoInteractions();
+  }
+
+  @Test
   void findPropertyRecommendations_맞춤조건을_SQL_후보필터로_전달한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
@@ -215,14 +231,14 @@ class RecommendationServiceImplTest {
     );
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recommendationMapper.selectPropertyRecommendationCandidates(any(), eq(200)))
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
         .willReturn(List.of());
 
     serviceWithRealScore.findPropertyRecommendations(1L);
 
     ArgumentCaptor<PropertyRecommendationCandidateFilter> captor =
         ArgumentCaptor.forClass(PropertyRecommendationCandidateFilter.class);
-    then(recommendationMapper).should().selectPropertyRecommendationCandidates(captor.capture(), eq(200));
+    then(recommendationMapper).should().selectPropertyRecommendationCandidates(captor.capture());
     PropertyRecommendationCandidateFilter filter = captor.getValue();
     assertThat(filter.getRegion()).isEqualTo("부산광역시 해운대구 우동");
     assertThat(filter.getSalePriceMax()).isEqualTo(110_000_000L);

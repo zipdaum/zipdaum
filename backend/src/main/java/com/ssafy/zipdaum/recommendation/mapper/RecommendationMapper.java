@@ -13,6 +13,5 @@ public interface RecommendationMapper {
       @Param("propertyId") Long propertyId);
 
   List<PropertyRecommendationCandidate> selectPropertyRecommendationCandidates(
-      @Param("filter") PropertyRecommendationCandidateFilter filter,
-      @Param("limit") int limit);
+      @Param("filter") PropertyRecommendationCandidateFilter filter);
 }

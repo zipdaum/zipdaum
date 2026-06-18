@@ -39,7 +39,6 @@
     p.latest_sale_price,
     p.latest_deposit,
     p.latest_monthly_rent,
-    p.updated_at AS recommendation_updated_at,
     <!-- TODO: 성능 테스트 후 최신 거래 요약 테이블 또는 캐시 컬럼으로 개선 검토 -->
     (
       SELECT rd.deposit
@@ -152,7 +151,5 @@
         AND candidate.exclusive_area &gt;= #{filter.minExclusiveArea}
       </if>
     </where>
-    ORDER BY candidate.recommendation_updated_at DESC, candidate.id DESC
-    LIMIT #{limit}
   </select>
 </mapper>
