@@ -19,6 +19,7 @@ public class UserServiceImpl implements UserService{
 
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
+  private final EmailService emailService;
 
   @Transactional
   public void signUp(UserSignUpRequest request) {
@@ -28,6 +29,10 @@ public class UserServiceImpl implements UserService{
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
     }
 
+    if (!emailService.checkEmailVerified(request.getEmail())) {
+      throw new BusinessException(ErrorCode.UNAUTHORIZED_EMAIL);
+    }
+
     UserDto userDto = new UserDto();
     userDto.setEmail(request.getEmail());
     userDto.setName(request.getName());
@@ -35,6 +40,7 @@ public class UserServiceImpl implements UserService{
 
     try {
       userMapper.insertUser(userDto);
+      emailService.deleteVerifiedState(userDto.getEmail());
     } catch (DuplicateKeyException e) {
       log.warn("회원가입 실패 - 중복 이메일");
       throw new BusinessException(ErrorCode.DUPLICATED_EMAIL);
