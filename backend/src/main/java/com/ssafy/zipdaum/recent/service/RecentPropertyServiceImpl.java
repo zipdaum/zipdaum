@@ -4,7 +4,6 @@ import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
 import com.ssafy.zipdaum.recent.dto.RecentPropertyResponse;
-import com.ssafy.zipdaum.recent.dto.RecentPropertySaveRequest;
 import com.ssafy.zipdaum.recent.mapper.RecentPropertyMapper;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -33,52 +32,28 @@ public class RecentPropertyServiceImpl implements RecentPropertyService {
 
   @Override
   @Transactional
-  public void saveRecentProperty(Long userId, RecentPropertySaveRequest request) {
-    validateRequest(request);
+  public void recordRecentProperty(Long userId, Long propertyId) {
+    validatePropertyId(propertyId);
 
-    if (!propertyMapper.existsPropertyById(request.getPropertyId())) {
-      log.warn("존재하지 않는 주택 propertyId={}", request.getPropertyId());
+    if (!propertyMapper.existsPropertyById(propertyId)) {
+      log.warn("존재하지 않는 주택 propertyId={}", propertyId);
       throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
     }
 
-    validateLastDeal(request);
-    recentPropertyMapper.upsertRecentProperty(
-        userId,
-        request.getPropertyId(),
-        request.getLastDealType(),
-        request.getLastDealId()
-    );
+    recentPropertyMapper.upsertRecentProperty(userId, propertyId);
     deleteRecentPropertiesOverLimit(userId);
 
-    log.info("최근 본 주택 저장 완료 userId={}, propertyId={}, lastDealType={}, lastDealId={}",
-        userId, request.getPropertyId(), request.getLastDealType(), request.getLastDealId());
+    log.info("최근 본 주택 저장 완료 userId={}, propertyId={}", userId, propertyId);
   }
 
-  private void validateRequest(RecentPropertySaveRequest request) {
-    if (request.getPropertyId() == null) {
+  private void validatePropertyId(Long propertyId) {
+    if (propertyId == null) {
       log.warn("최근 본 주택 저장 실패 - 주택 ID 누락");
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
-    boolean hasDealType = request.getLastDealType() != null;
-    boolean hasDealId = request.getLastDealId() != null;
-    if (hasDealType != hasDealId) {
-      log.warn("최근 본 주택 저장 실패 - 마지막 거래 정보 불완전 propertyId={}", request.getPropertyId());
-      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-    }
-  }
-
-  private void validateLastDeal(RecentPropertySaveRequest request) {
-    if (request.getLastDealType() == null) {
-      return;
-    }
-    if (!recentPropertyMapper.existsDealForProperty(
-        request.getPropertyId(),
-        request.getLastDealType(),
-        request.getLastDealId()
-    )) {
-      log.warn("주택에 속하지 않는 거래 propertyId={}, dealType={}, dealId={}",
-          request.getPropertyId(), request.getLastDealType(), request.getLastDealId());
-      throw new BusinessException(ErrorCode.DEAL_NOT_FOUND);
+    if (propertyId < 1) {
+      log.warn("최근 본 주택 저장 실패 - 잘못된 주택 ID propertyId={}", propertyId);
+      throw new BusinessException(ErrorCode.INVALID_PROPERTY_ID);
     }
   }
 
