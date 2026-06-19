@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.zipdaum.recent.mapper.RecentPropertyMapper">
+
+  <resultMap id="recentPropertyResponseResultMap"
+             type="com.ssafy.zipdaum.recent.dto.RecentPropertyResponse">
+    <id property="recentPropertyId" column="recent_property_id"/>
+    <result property="propertyId" column="property_id"/>
+    <result property="propertyType" column="property_type"/>
+    <result property="name" column="name"/>
+    <result property="sggCd" column="sgg_cd"/>
+    <result property="umdNm" column="umd_nm"/>
+    <result property="jibun" column="jibun"/>
+    <result property="buildYear" column="build_year"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
+    <result property="latestSalePrice" column="latest_sale_price"/>
+    <result property="latestDeposit" column="latest_deposit"/>
+    <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+    <result property="lastDealType" column="last_deal_type"/>
+    <result property="lastDealId" column="last_deal_id"/>
+    <result property="viewCount" column="view_count"/>
+    <result property="viewedAt" column="viewed_at"/>
+  </resultMap>
+
+  <select id="existsDealForProperty" resultType="boolean">
+    <choose>
+      <when test="dealType.name() == 'SALE'">
+        SELECT EXISTS(
+          SELECT 1
+          FROM sale_deal
+          WHERE id = #{dealId}
+            AND property_id = #{propertyId}
+        )
+      </when>
+      <when test="dealType.name() == 'JEONSE'">
+        SELECT EXISTS(
+          SELECT 1
+          FROM rent_deal
+          WHERE id = #{dealId}
+            AND property_id = #{propertyId}
+            AND monthly_rent = 0
+        )
+      </when>
+      <otherwise>
+        SELECT EXISTS(
+          SELECT 1
+          FROM rent_deal
+          WHERE id = #{dealId}
+            AND property_id = #{propertyId}
+            AND monthly_rent &gt; 0
+        )
+      </otherwise>
+    </choose>
+  </select>
+
+  <select id="selectRecentProperties" resultMap="recentPropertyResponseResultMap">
+    SELECT
+      rp.id AS recent_property_id,
+      p.id AS property_id,
+      p.property_type,
+      p.name,
+      p.sgg_cd,
+      p.umd_nm,
+      p.jibun,
+      p.build_year,
+      p.latitude,
+      p.longitude,
+      p.latest_sale_price,
+      p.latest_deposit,
+      p.latest_monthly_rent,
+      rp.last_deal_type,
+      rp.last_deal_id,
+      rp.view_count,
+      rp.updated_at AS viewed_at
+    FROM recent_property rp
+    JOIN property p ON p.id = rp.property_id
+    WHERE rp.user_id = #{userId}
+    ORDER BY rp.updated_at DESC, rp.id DESC
+    LIMIT 30
+  </select>
+
+  <insert id="upsertRecentProperty">
+    INSERT INTO recent_property (
+      user_id, property_id, last_deal_type, last_deal_id, view_count
+    ) VALUES (
+      #{userId}, #{propertyId}, #{lastDealType}, #{lastDealId}, 1
+    )
+    ON DUPLICATE KEY UPDATE
+      last_deal_type = VALUES(last_deal_type),
+      last_deal_id = VALUES(last_deal_id),
+      view_count = view_count + 1,
+      updated_at = CURRENT_TIMESTAMP
+  </insert>
+
+  <select id="selectRecentPropertyIdsOverLimit" resultType="long">
+    SELECT id
+    FROM recent_property
+    WHERE user_id = #{userId}
+    ORDER BY updated_at DESC, id DESC
+    LIMIT 18446744073709551615
+    OFFSET #{limit}
+  </select>
+
+  <delete id="deleteRecentPropertiesByIds">
+    DELETE FROM recent_property
+    WHERE id IN
+    <foreach collection="ids" item="id" open="(" separator="," close=")">
+      #{id}
+    </foreach>
+  </delete>
+</mapper>

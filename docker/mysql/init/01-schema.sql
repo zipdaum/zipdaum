@@ -108,6 +108,27 @@ CREATE TABLE favorite_region (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE recent_property (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  property_id BIGINT NOT NULL,
+  last_deal_type VARCHAR(20) NULL,
+  last_deal_id BIGINT NULL,
+  view_count INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_recent_property_user_property (user_id, property_id),
+  KEY idx_recent_property_user_viewed_at (user_id, updated_at),
+  KEY idx_recent_property_property_id (property_id),
+  CONSTRAINT fk_recent_property_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_recent_property_property
+    FOREIGN KEY (property_id) REFERENCES property (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE preference_type (
   id BIGINT NOT NULL AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
