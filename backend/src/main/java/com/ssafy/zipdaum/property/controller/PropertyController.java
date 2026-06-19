@@ -82,7 +82,7 @@ public class PropertyController {
   @Operation(
       summary = "사용자 맞춤 주택 추천 목록 조회",
       description = "현재 로그인한 사용자의 맞춤 조건을 기준으로 적합한 주택 목록을 조회합니다. "
-          + "맞춤 조건 우선순위 순서로 조건별 정렬 값을 먼저 비교하고, 조건별 정렬 값이 같으면 추천 점수 순서로 정렬합니다."
+          + "최근 본 주택 가산점을 반영한 최종 추천 점수가 높은 순서로 정렬합니다."
   )
   @ApiResponses({
       @ApiResponse(
