@@ -44,6 +44,17 @@
     LIMIT 30
   </select>
 
+  <select id="selectRecentPropertyScoreFactors"
+          resultType="com.ssafy.zipdaum.recent.dto.RecentPropertyScoreFactor">
+    SELECT
+      property_id AS propertyId,
+      view_count AS viewCount
+    FROM recent_property
+    WHERE user_id = #{userId}
+    ORDER BY updated_at DESC, id DESC
+    LIMIT 30
+  </select>
+
   <insert id="upsertRecentProperty">
     INSERT INTO recent_property (
       user_id, property_id, view_count
