@@ -1516,6 +1516,15 @@ a {
   align-items: center;
 }
 
+.recommendation-property-panel {
+  align-self: start;
+  padding: 20px;
+}
+
+.recommendation-property-panel .panel-title-row {
+  margin-bottom: 14px;
+}
+
 .recommendation-detail-list {
   display: grid;
   gap: 12px;
@@ -1584,6 +1593,26 @@ a {
   border-radius: 6px;
   background: #ffffff;
   padding: 11px 12px;
+}
+
+.recommendation-property-panel dl {
+  gap: 0;
+}
+
+.recommendation-property-panel dl > div {
+  border-radius: 0;
+  border-bottom: 1px solid #edf2fb;
+  background: transparent;
+  padding: 12px 0;
+}
+
+.recommendation-property-panel dl > div:first-child {
+  padding-top: 0;
+}
+
+.recommendation-property-panel dl > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .recommendation-detail-item dt,
