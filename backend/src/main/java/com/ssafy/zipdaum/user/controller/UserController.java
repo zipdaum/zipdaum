@@ -1,10 +1,8 @@
 package com.ssafy.zipdaum.user.controller;
 
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
-import com.ssafy.zipdaum.user.dto.UserInfoResponse;
-import com.ssafy.zipdaum.user.dto.UserDto;
-import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
-import com.ssafy.zipdaum.user.dto.UserUpdateRequest;
+import com.ssafy.zipdaum.user.dto.*;
+import com.ssafy.zipdaum.user.service.EmailService;
 import com.ssafy.zipdaum.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -13,19 +11,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -34,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "회원", description = "회원가입, 회원 정보 조회/수정/탈퇴 API")
 public class UserController {
   private final UserService userService;
+  private final EmailService emailService;
 
   @PostMapping
   @Operation(summary = "회원가입", description = "이메일, 비밀번호, 이름으로 회원가입을 진행합니다.")
@@ -42,7 +36,7 @@ public class UserController {
       @ApiResponse(responseCode = "400", description = "중복 이메일 또는 입력값 오류", content = @Content)
   })
   public ResponseEntity<String> signUp(@Valid @RequestBody UserSignUpRequest request) {
-    log.info("POST /users 요청 email={}", request.getEmail());
+    log.info("POST /users 요청");
     userService.signUp(request);
     return ResponseEntity.status(HttpStatus.CREATED).body("회원가입 성공");
   }
@@ -62,7 +56,7 @@ public class UserController {
   public ResponseEntity<UserInfoResponse> getUserInfo(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
-    log.info("GET /users/info 요청 userId={}", authenticatedUser.getId());
+    log.info("GET /users/info 요청");
 
     UserDto user = userService.findById(authenticatedUser.getId());
     UserInfoResponse response = new UserInfoResponse(
@@ -88,7 +82,7 @@ public class UserController {
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
       @Valid @RequestBody UserUpdateRequest userUpdateRequest
   ) {
-    log.info("PATCH /users/info 요청 userId={}", authenticatedUser.getId());
+    log.info("PATCH /users/info 요청");
     userService.updateName(authenticatedUser.getId(), userUpdateRequest.getName());
     return ResponseEntity.ok("회원 정보 수정 성공");
   }
@@ -104,8 +98,40 @@ public class UserController {
   public ResponseEntity<String> deleteUser(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
-    log.info("DELETE /users/info 요청 userId={}", authenticatedUser.getId());
+    log.info("DELETE /users/info 요청");
     userService.deleteById(authenticatedUser.getId());
     return ResponseEntity.ok("회원 탈퇴 성공");
   }
+
+
+  @PostMapping("/mail/request")
+  @Operation(summary = "인증코드 발송 요청", description = "이메일 인증 코드를 발송합니다.")
+  @ApiResponses({
+          @ApiResponse(responseCode = "200", description = "인증 코드 발송 성공", content = @Content),
+          @ApiResponse(responseCode = "400", description = "인증 코드 발송 실패", content = @Content),
+  })
+  public ResponseEntity<String> sendVerificationCode(@RequestBody @Valid UserVerificationCodeRequest userEmailRequest) throws MessagingException {
+    log.info("POST /users/mail/request 요청");
+    String email = userEmailRequest.getEmail();
+    emailService.sendVerificationCode(email);
+    return ResponseEntity.ok("인증코드를 발송하였습니다.");
+  }
+
+  @PostMapping("/mail/verify")
+  @Operation(summary = "이메일 인증 요청", description = "이메일 인증을 요청합니다.")
+  @ApiResponses({
+          @ApiResponse(responseCode = "200", description = "이메일 인증 성공", content = @Content),
+          @ApiResponse(responseCode = "400", description = "이메일 인증 실패", content = @Content),
+          @ApiResponse(responseCode = "408", description = "이메일 인증 시간 초과", content = @Content),
+  })
+  public ResponseEntity<String> verifyCode(@RequestBody @Valid UserEmailVerificationRequest userEmailVerify) {
+    log.info("POST /users/mail/verify 요청");
+    String email = userEmailVerify.getEmail();
+    String code = userEmailVerify.getCode();
+
+    emailService.verifyEmailCode(email, code);
+    return ResponseEntity.ok("이메일 인증 완료");
+  }
+
+
 }

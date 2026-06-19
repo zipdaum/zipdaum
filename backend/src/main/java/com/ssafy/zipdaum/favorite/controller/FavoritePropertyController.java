@@ -44,7 +44,7 @@ public class FavoritePropertyController {
   public ResponseEntity<List<FavoritePropertyResponse>> getFavoriteProperties(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
-    log.info("GET /users/info/properties 요청 userId={}", authenticatedUser.getId());
+    log.info("GET /users/info/properties 요청");
 
     return ResponseEntity.ok(
         favoritePropertyService.findFavoriteProperties(authenticatedUser.getId())
@@ -64,11 +64,7 @@ public class FavoritePropertyController {
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
       @Valid @RequestBody FavoritePropertyCreateRequest request
   ) {
-    log.info(
-        "POST /users/info/properties 요청 userId={}, propertyId={}",
-        authenticatedUser.getId(),
-        request.getPropertyId()
-    );
+    log.info("POST /users/info/properties 요청");
 
     favoritePropertyService.saveFavoriteProperty(
         authenticatedUser.getId(),
@@ -90,11 +86,7 @@ public class FavoritePropertyController {
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
       @RequestParam Long propertyId
   ) {
-    log.info(
-        "DELETE /users/info/properties 요청 userId={}, propertyId={}",
-        authenticatedUser.getId(),
-        propertyId
-    );
+    log.info("DELETE /users/info/properties 요청");
 
     favoritePropertyService.removeFavoriteProperty(
         authenticatedUser.getId(),

@@ -39,7 +39,7 @@ public class AuthController {
       @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음", content = @Content)
   })
   public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest authRequest) {
-    log.info("POST /auth/login 요청 email={}", authRequest.getEmail());
+    log.info("POST /auth/login 요청");
     AuthResponse authResponse = authService.login(authRequest);
     return ResponseEntity.ok(authResponse);
   }

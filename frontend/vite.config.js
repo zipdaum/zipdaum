@@ -9,6 +9,14 @@ export default defineConfig({
       '/properties': {
         target: 'http://localhost:8080',
         changeOrigin: true
+      },
+      '/auth': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
+      '/users': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
       }
     }
   }

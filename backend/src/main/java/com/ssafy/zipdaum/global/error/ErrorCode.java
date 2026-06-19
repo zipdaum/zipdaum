@@ -10,6 +10,9 @@ public enum ErrorCode {
   INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C001", "잘못된 입력값입니다."),
   INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C002", "서버 내부 오류가 발생했습니다."),
   METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C003", "지원하지 않는 HTTP 메서드입니다."),
+  REQUEST_TIME_OUT(HttpStatus.REQUEST_TIMEOUT, "C004", "유효시간이 끝났습니다."),
+  INVALID_INPUT_CODE(HttpStatus.BAD_REQUEST, "C005", "인증코드가 일치하지 않습니다."),
+  UNAUTHORIZED_EMAIL(HttpStatus.BAD_REQUEST, "C006", "인증되지 않은 이메일입니다."),
 
   // 2. Auth
   USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
@@ -34,14 +37,16 @@ public enum ErrorCode {
   INVALID_DEAL_TYPE(HttpStatus.BAD_REQUEST, "P011", "거래 유형은 SALE, JEONSE, MONTHLY_RENT 중 하나여야 합니다."),
   INVALID_SORT_OPTION(HttpStatus.BAD_REQUEST, "P012", "정렬 기준은 LATEST, PRICE, NAME 중 하나여야 합니다."),
   INVALID_SORT_DIRECTION(HttpStatus.BAD_REQUEST, "P013", "정렬 방향은 ASC, DESC 중 하나여야 합니다."),
-  INVALID_REGION_CODE(HttpStatus.BAD_REQUEST, "P014", "지원하지 않는 지역 코드입니다."),
+  INVALID_PROPERTY_ID(HttpStatus.BAD_REQUEST, "P014", "주택 ID는 1 이상의 숫자여야 합니다."),
+  INVALID_REGION_CODE(HttpStatus.BAD_REQUEST, "P015", "지원하지 않는 지역 코드입니다."),
+  REAL_ESTATE_API_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "P016", "공공데이터 API 응답 시간이 초과되었습니다."),
 
   // 4. Favorite
   FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "F001", "관심 목록에서 해당 정보를 찾을 수 없습니다."),
   FAVORITE_ALREADY_EXISTS(HttpStatus.BAD_REQUEST, "F002", "이미 관심 목록에 존재하는 정보입니다."),
 
-  // 5. Condition
-  CONDITION_NOT_FOUND(HttpStatus.NOT_FOUND, "M001", "설정된 맞춤 조건 정보를 찾을 수 없습니다."),
+  // 5. Preference
+  PREFERENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "M001", "설정된 맞춤 조건 정보를 찾을 수 없습니다."),
 
   // 6. Notification
   NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "알림 정보를 찾을 수 없습니다."),

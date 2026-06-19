@@ -6,6 +6,7 @@
 
 - 코드는 팀원이 읽기 쉽게 작성한다.
 - 임시 코드, 테스트용 주석, 사용하지 않는 코드는 커밋하지 않는다.
+- 변수명과 함수명만으로도 역할과 의도를 파악할 수 있도록 작성하며, 불필요한 주석은 남기지 않는다.
 - 기능 구현 전 API 명세, ERD, 화면 흐름을 먼저 확인한다.
 - 하나의 메서드는 하나의 책임만 가지도록 작성한다.
 - 중복 로직은 공통 메서드 또는 유틸 클래스로 분리한다.
@@ -23,7 +24,7 @@ com.ssafy.zipdaum
 ├── user
 ├── property
 ├── favorite
-├── condition
+├── preference
 ├── notification
 ├── report
 └── global
@@ -88,7 +89,7 @@ MyBatis Mapper는 다음 형식으로 작성한다.
 UserMapper
 PropertyMapper
 FavoritePropertyMapper
-ConditionItemMapper
+UserPreferenceMapper
 ```
 
 ### DTO
@@ -103,7 +104,7 @@ PropertySearchRequest
 PropertySearchResponse
 
 PropertyDetailResponse
-ConditionSaveRequest
+PreferenceSaveRequest
 NotificationResponse
 ```
 
@@ -118,8 +119,8 @@ SaleDeal
 RentDeal
 FavoriteProperty
 FavoriteRegion
-ConditionItem
-ConditionType
+UserPreference
+PreferenceType
 Notification
 ```
 
@@ -146,7 +147,7 @@ searchProperties()
 findPropertyDetail()
 saveFavoriteProperty()
 removeFavoriteProperty()
-saveConditionItems()
+savePreferences()
 calculateMatchScore()
 ```
 
@@ -158,7 +159,7 @@ selectPropertyById()
 selectProperties()
 insertFavoriteProperty()
 deleteFavoriteProperty()
-selectConditionItemsByUserId()
+selectUserPreferencesByUserId()
 ```
 
 ---
@@ -180,8 +181,8 @@ sale_deal
 rent_deal
 favorite_property
 favorite_region
-condition_item
-condition_type
+user_preference
+preference_type
 notification
 ```
 
@@ -190,7 +191,7 @@ notification
 ```
 user_id
 property_id
-condition_type_id
+preference_type_id
 created_at
 updated_at
 ```
@@ -269,6 +270,24 @@ EXTERNAL_API_ERROR
 ```
 
 Controller나 Service에서 문자열로 직접 에러 응답을 만들지 않는다.
+
+---
+
+## 9. 로깅 규칙
+
+- Controller는 요청 진입 시점에만 INFO 로그를 기록한다.
+- Controller에는 요청 처리 완료/종료 로그를 기록하지 않는다.
+- Controller 로그에는 민감 정보를 기록하지 않는다.
+- Service에는 단순 메서드 진입/작업 시작 로그를 기록하지 않는다.
+- Service는 생성/수정/삭제, 알림, 추천 계산 등 의미 있는 작업 성공 시 INFO 로그를 기록한다.
+- 단순 조회 성공 로그는 기본적으로 생략하거나 DEBUG로 기록한다.
+- Service는 비즈니스 실패 원인을 판단한 지점에서 예외 발생 직전 WARN 로그를 기록한다.
+- GlobalExceptionHandler는 예상 가능한 비즈니스 예외를 중복 WARN/ERROR로 기록하지 않는다.
+- 예상하지 못한 시스템 예외는 GlobalExceptionHandler에서 ERROR 로그를 기록한다.
+- 동일한 요청 정보를 Controller와 Service 양쪽에서 중복 기록하지 않는다.
+- 로그에는 requestId 또는 traceId를 포함해 요청 흐름을 추적할 수 있게 한다.
+- 개발 편의를 위해 로컬/개발 환경의 MyBatis SQL 로그는 DEBUG 레벨로 유지한다.
+- 운영 환경에서는 MyBatis SQL 로그를 INFO 이상으로 조정한다.
 
 ---
 
