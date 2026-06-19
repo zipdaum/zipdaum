@@ -208,17 +208,17 @@ function getFavoriteDealSummaries(item) {
     {
       type: "매매",
       price: formatPrice(item.salePrice),
-      count: `최근 매매 ${formatDealCount(item.yearlyDealCounts.sale)}`,
+      count: formatDealCount(item.yearlyDealCounts.sale),
     },
     {
       type: "전세",
       price: formatPrice(item.jeonseDeposit),
-      count: `최근 전세 ${formatDealCount(item.yearlyDealCounts.jeonse)}`,
+      count: formatDealCount(item.yearlyDealCounts.jeonse),
     },
     {
       type: "월세",
       price: formatMonthlyRent(item.monthlyRentDeposit, item.monthlyRent),
-      count: `최근 월세 ${formatDealCount(item.yearlyDealCounts.monthlyRent)}`,
+      count: formatDealCount(item.yearlyDealCounts.monthlyRent),
     },
   ];
 }
