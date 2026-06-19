@@ -44,7 +44,8 @@ class PropertyApiClientTest {
     assertThatThrownBy(() -> propertyApiClient.fetch(
         DealApiType.APARTMENT_SALE,
         "26350",
-        "202501"
+        "202501",
+            1
     ))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.REAL_ESTATE_API_TIMEOUT)

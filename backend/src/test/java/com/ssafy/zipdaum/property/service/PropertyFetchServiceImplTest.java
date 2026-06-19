@@ -51,7 +51,7 @@ class PropertyFetchServiceImplTest {
   void fetchAndSaveProperties_이미_좌표가_있는_매물은_카카오_API를_호출하지_않고_거래만_저장한다() {
     PropertySaveCommand savedProperty = property("APARTMENT", "26350", "우동", "1484", "테스트아파트", 2020,
         new BigDecimal("35.1"), new BigDecimal("129.1"), 10L);
-    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501"))
+    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501", 1))
         .willReturn(List.of(saleDeal("우동", "1484", "테스트아파트", LocalDate.of(2025, 1, 10))));
     given(propertyMapper.findProperty(any(PropertySaveCommand.class))).willReturn(savedProperty);
     given(propertyMapper.insertSaleDeal(any(SaleDealSaveCommand.class))).willReturn(1);
@@ -74,7 +74,7 @@ class PropertyFetchServiceImplTest {
   void fetchAndSaveProperties_새로운_같은_주소가_반복되면_카카오_API를_한_번만_호출한다() {
     PropertySaveCommand savedProperty = property("APARTMENT", "26350", "우동", "1484", "테스트아파트", 2020,
         new BigDecimal("35.1"), new BigDecimal("129.1"), 1L);
-    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501"))
+    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501", 1))
         .willReturn(List.of(
             saleDeal("우동", "1484", "테스트아파트", LocalDate.of(2025, 1, 10)),
             saleDeal("우동", "1484", "테스트아파트", LocalDate.of(2025, 1, 20))
@@ -131,7 +131,7 @@ class PropertyFetchServiceImplTest {
 
   @Test
   void fetchAndSaveProperties_공공데이터_API_응답이_없으면_타임아웃_예외가_발생하고_저장하지_않는다() {
-    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501"))
+    given(propertyApiClient.fetch(DealApiType.APARTMENT_SALE, "26350", "202501", 1))
         .willThrow(new BusinessException(ErrorCode.REAL_ESTATE_API_TIMEOUT));
 
     assertThatThrownBy(() -> service.fetchAndSaveProperties(
