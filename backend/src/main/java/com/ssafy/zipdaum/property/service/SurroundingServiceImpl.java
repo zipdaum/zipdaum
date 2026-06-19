@@ -25,6 +25,11 @@ public class SurroundingServiceImpl implements SurroundingService {
   private static final int DEFAULT_RADIUS_METERS = 1000;
   private static final int MAX_RADIUS_METERS = 3000;
   private static final int MAX_FACILITY_COUNT = 80;
+  private static final int BUS_RECOMMENDATION_RADIUS_METERS = 500;
+  private static final int SUBWAY_RECOMMENDATION_RADIUS_METERS = 1000;
+  private static final int HOSPITAL_RECOMMENDATION_RADIUS_METERS = 1500;
+  private static final int CCTV_RECOMMENDATION_RADIUS_METERS = 500;
+  private static final int PARK_RECOMMENDATION_RADIUS_METERS = 1000;
 
   private final PropertyMapper propertyMapper;
   private final FacilitySourceLoader facilitySourceLoader;
@@ -115,6 +120,62 @@ public class SurroundingServiceImpl implements SurroundingService {
         case HOSPITAL -> hospitalCount++;
         case CCTV -> cctvCount++;
         case PARK -> parkCount++;
+      }
+    }
+
+    return new SurroundingSummaryResponse(
+        busCount,
+        subwayCount,
+        hospitalCount,
+        cctvCount,
+        parkCount
+    );
+  }
+
+  @Override
+  public SurroundingSummaryResponse findRecommendationSurroundingSummary(
+      BigDecimal latitude,
+      BigDecimal longitude) {
+    validateCoordinate(latitude, longitude);
+
+    double centerLat = latitude.doubleValue();
+    double centerLng = longitude.doubleValue();
+    int busCount = 0;
+    int subwayCount = 0;
+    int hospitalCount = 0;
+    int cctvCount = 0;
+    int parkCount = 0;
+
+    for (FacilitySource facility : localFacilities) {
+      int distance = calculateDistanceMeters(centerLat, centerLng,
+          facility.getLatitude().doubleValue(), facility.getLongitude().doubleValue());
+
+      switch (facility.getType()) {
+        case BUS -> {
+          if (distance <= BUS_RECOMMENDATION_RADIUS_METERS) {
+            busCount++;
+          }
+        }
+        case SUBWAY -> {
+          if (distance <= SUBWAY_RECOMMENDATION_RADIUS_METERS) {
+            subwayCount++;
+          }
+        }
+        case HOSPITAL -> {
+          if (distance <= HOSPITAL_RECOMMENDATION_RADIUS_METERS) {
+            hospitalCount++;
+          }
+        }
+        case CCTV -> {
+          if (distance <= CCTV_RECOMMENDATION_RADIUS_METERS) {
+            cctvCount++;
+          }
+        }
+        case PARK -> {
+          if (distance <= PARK_RECOMMENDATION_RADIUS_METERS) {
+            parkCount++;
+          }
+        }
       }
     }
 

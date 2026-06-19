@@ -52,10 +52,9 @@ class RecommendationServiceImplTest {
 
     given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(surroundingService.findSurroundingSummary(
+    given(surroundingService.findRecommendationSurroundingSummary(
         BigDecimal.valueOf(35.1),
-        BigDecimal.valueOf(129.1),
-        1000
+        BigDecimal.valueOf(129.1)
     )).willReturn(summary);
     given(recommendationScoreService.calculateMatchScore(property, preferences, summary))
         .willReturn(score);
@@ -211,15 +210,13 @@ class RecommendationServiceImplTest {
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
         .willReturn(List.of(fewSubwayProperty, manySubwayProperty));
-    given(surroundingService.findSurroundingSummary(
+    given(surroundingService.findRecommendationSurroundingSummary(
         BigDecimal.valueOf(35.1),
-        BigDecimal.valueOf(129.1),
-        1000
+        BigDecimal.valueOf(129.1)
     )).willReturn(new SurroundingSummaryResponse(0, 1, 0, 0, 0));
-    given(surroundingService.findSurroundingSummary(
+    given(surroundingService.findRecommendationSurroundingSummary(
         BigDecimal.valueOf(35.2),
-        BigDecimal.valueOf(129.2),
-        1000
+        BigDecimal.valueOf(129.2)
     )).willReturn(new SurroundingSummaryResponse(0, 3, 0, 0, 0));
 
     List<PropertyRecommendationResponse> result =

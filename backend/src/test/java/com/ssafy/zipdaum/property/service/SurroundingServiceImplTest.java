@@ -112,6 +112,37 @@ class SurroundingServiceImplTest {
   }
 
   @Test
+  void findRecommendationSurroundingSummary_시설별_추천_반경으로_시설개수를_반환한다() {
+    service.loadFacilities();
+
+    var recommendationSummary = service.findRecommendationSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307")
+    );
+    var busCctvRadiusSummary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        500
+    );
+    var subwayParkRadiusSummary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        1000
+    );
+    var hospitalRadiusSummary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        1500
+    );
+
+    assertThat(recommendationSummary.getBusCount()).isEqualTo(busCctvRadiusSummary.getBusCount());
+    assertThat(recommendationSummary.getCctvCount()).isEqualTo(busCctvRadiusSummary.getCctvCount());
+    assertThat(recommendationSummary.getSubwayCount()).isEqualTo(subwayParkRadiusSummary.getSubwayCount());
+    assertThat(recommendationSummary.getParkCount()).isEqualTo(subwayParkRadiusSummary.getParkCount());
+    assertThat(recommendationSummary.getHospitalCount()).isEqualTo(hospitalRadiusSummary.getHospitalCount());
+  }
+
+  @Test
   void findSurroundings_좌표가_없으면_예외가_발생한다() {
     assertThatThrownBy(() -> service.findSurroundings(null, new BigDecimal("129.1"), 1000))
         .isInstanceOf(BusinessException.class);

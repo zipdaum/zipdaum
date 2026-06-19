@@ -33,7 +33,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RecommendationServiceImpl implements RecommendationService {
 
-  private static final int RECOMMENDATION_SURROUNDING_RADIUS_METERS = 1000;
   private static final int DEFAULT_RECOMMENDATION_SIZE = 20;
   private static final int RECENT_PROPERTY_SCORE_BONUS = 5;
   private static final int MAX_RECENT_PROPERTY_SCORE_BONUS = 15;
@@ -265,10 +264,9 @@ public class RecommendationServiceImpl implements RecommendationService {
       return null;
     }
 
-    return surroundingService.findSurroundingSummary(
+    return surroundingService.findRecommendationSurroundingSummary(
         property.getLatitude(),
-        property.getLongitude(),
-        RECOMMENDATION_SURROUNDING_RADIUS_METERS
+        property.getLongitude()
     );
   }
 

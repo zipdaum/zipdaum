@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
@@ -27,16 +27,43 @@ const preferenceTypeLabels = {
   RECENT_PROPERTY: "최근 본 주택",
 };
 
+const facilityRecommendationRadiusMeters = {
+  BUS: 500,
+  SUBWAY: 1000,
+  HOSPITAL: 1500,
+  CCTV: 500,
+  PARK: 1000,
+};
+
 const property = ref(null);
 const recommendationScore = ref(null);
 const surroundings = ref(null);
 const histories = ref(null);
 const isLoading = ref(false);
 const errorMessage = ref("");
+const allowHomeNavigation = ref(false);
+const conditionPage = ref(1);
+const conditionPageSize = 3;
 
 const propertyId = computed(() => Number(route.params.propertyId));
 const recommendationConditions = computed(
-  () => recommendationScore.value?.conditions || [],
+  () => sortConditionsByPriority(recommendationScore.value?.conditions || []),
+);
+const paginatedRecommendationConditions = computed(() => {
+  const startIndex = (conditionPage.value - 1) * conditionPageSize;
+  return recommendationConditions.value.slice(
+    startIndex,
+    startIndex + conditionPageSize,
+  );
+});
+const conditionTotalPages = computed(() =>
+  Math.max(
+    Math.ceil(recommendationConditions.value.length / conditionPageSize),
+    1,
+  ),
+);
+const conditionPageLabel = computed(
+  () => `${conditionPage.value} / ${conditionTotalPages.value}`,
 );
 const recommendationScoreValue = computed(
   () => recommendationScore.value?.score ?? 0,
@@ -53,6 +80,34 @@ const latestDealArea = computed(() => {
 });
 
 onMounted(loadRecommendationScoreDetail);
+
+watch(recommendationConditions, () => {
+  conditionPage.value = 1;
+});
+
+watch(conditionTotalPages, (totalPages) => {
+  if (conditionPage.value > totalPages) {
+    conditionPage.value = totalPages;
+  }
+});
+
+onBeforeRouteLeave((to) => {
+  if (allowHomeNavigation.value || to.name !== "home") {
+    return true;
+  }
+
+  if (to.query?.view === "detail" && to.query?.propertyId) {
+    return true;
+  }
+
+  return {
+    name: "home",
+    query: {
+      view: "detail",
+      propertyId: String(propertyId.value),
+    },
+  };
+});
 
 async function loadRecommendationScoreDetail() {
   if (!Number.isInteger(propertyId.value) || propertyId.value <= 0) {
@@ -87,7 +142,7 @@ async function loadRecommendationScoreDetail() {
 async function loadSurroundings() {
   try {
     surroundings.value = await fetchSurroundings(propertyId.value, {
-      radiusMeters: 1000,
+      radiusMeters: 1500,
     });
   } catch (error) {
     surroundings.value = null;
@@ -109,6 +164,7 @@ async function loadHistories() {
 }
 
 function goHome() {
+  allowHomeNavigation.value = true;
   router.push({ name: "home" });
 }
 
@@ -185,6 +241,30 @@ function getRecommendationSummaryText() {
 
 function getPreferenceTypeLabel(code) {
   return preferenceTypeLabels[code] || code || "조건";
+}
+
+function sortConditionsByPriority(conditions) {
+  return [...conditions].sort((left, right) => {
+    const leftPriority = Number.isFinite(Number(left.priority))
+      ? Number(left.priority)
+      : Number.MAX_SAFE_INTEGER;
+    const rightPriority = Number.isFinite(Number(right.priority))
+      ? Number(right.priority)
+      : Number.MAX_SAFE_INTEGER;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return String(left.code || "").localeCompare(String(right.code || ""));
+  });
+}
+
+function setConditionPage(page) {
+  conditionPage.value = Math.min(
+    Math.max(page, 1),
+    conditionTotalPages.value,
+  );
 }
 
 function getConditionTitle(condition) {
@@ -278,21 +358,18 @@ function getConditionCurrentValue(condition) {
 }
 
 function getFacilityConditionCurrentValue(code) {
-  if (!surroundings.value?.summary) {
+  if (!surroundings.value?.facilities) {
     return "주변시설 정보 없음";
   }
 
-  const countMap = {
-    BUS: surroundings.value.summary.busCount,
-    SUBWAY: surroundings.value.summary.subwayCount,
-    HOSPITAL: surroundings.value.summary.hospitalCount,
-    CCTV: surroundings.value.summary.cctvCount,
-    PARK: surroundings.value.summary.parkCount,
-  };
-  const count = countMap[code] ?? 0;
+  const radiusMeters = facilityRecommendationRadiusMeters[code] || 1000;
+  const count = surroundings.value.facilities.filter(
+    (facility) =>
+      facility.type === code && facility.distanceMeters <= radiusMeters,
+  ).length;
   const label = getPreferenceTypeLabel(code);
 
-  return `반경 1km 내 ${label} ${count.toLocaleString()}곳`;
+  return `${formatDistance(radiusMeters)} 이내 ${label} ${count.toLocaleString()}곳`;
 }
 
 function getConditionDescription(condition) {
@@ -379,6 +456,14 @@ function formatArea(area) {
   }
 
   return `${Number(area).toLocaleString()}㎡`;
+}
+
+function formatDistance(distanceMeters) {
+  if (distanceMeters >= 1000) {
+    return `${Number((distanceMeters / 1000).toFixed(1))}km`;
+  }
+
+  return `${distanceMeters.toLocaleString()}m`;
 }
 </script>
 
@@ -467,7 +552,7 @@ function formatArea(area) {
 
           <div v-else class="recommendation-detail-list">
             <article
-              v-for="condition in recommendationConditions"
+              v-for="condition in paginatedRecommendationConditions"
               :key="`${condition.code}-${condition.priority}`"
               :class="[
                 'recommendation-detail-item',
@@ -496,6 +581,30 @@ function formatArea(area) {
               </dl>
 
             </article>
+          </div>
+
+          <div
+            v-if="recommendationConditions.length > 0"
+            class="condition-pagination"
+            aria-label="맞춤 조건 페이지"
+          >
+            <button
+              type="button"
+              :disabled="conditionPage === 1"
+              aria-label="이전 조건 보기"
+              @click="setConditionPage(conditionPage - 1)"
+            >
+              이전
+            </button>
+            <span>{{ conditionPageLabel }}</span>
+            <button
+              type="button"
+              :disabled="conditionPage === conditionTotalPages"
+              aria-label="다음 조건 보기"
+              @click="setConditionPage(conditionPage + 1)"
+            >
+              다음
+            </button>
           </div>
         </article>
 

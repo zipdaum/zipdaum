@@ -14,4 +14,8 @@ public interface SurroundingService {
       BigDecimal latitude,
       BigDecimal longitude,
       Integer radiusMeters);
+
+  SurroundingSummaryResponse findRecommendationSurroundingSummary(
+      BigDecimal latitude,
+      BigDecimal longitude);
 }

@@ -1527,11 +1527,14 @@ a {
 
 .recommendation-detail-list {
   display: grid;
+  grid-template-rows: repeat(3, minmax(144px, 1fr));
   gap: 12px;
+  min-height: 456px;
 }
 
 .recommendation-detail-item {
   display: grid;
+  align-content: center;
   gap: 14px;
   border: 1px solid #e2ebfb;
   border-radius: 8px;
@@ -1631,6 +1634,47 @@ a {
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.condition-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #edf2fb;
+}
+
+.condition-pagination span {
+  min-width: 42px;
+  color: #71809d;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.condition-pagination button {
+  min-height: 30px;
+  border: 1px solid #d8e4fb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #2f63d8;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.condition-pagination button:hover:not(:disabled) {
+  border-color: #9ebafe;
+  background: #f5f8ff;
+}
+
+.condition-pagination button:disabled {
+  background: #f7f9fd;
+  color: #a8b5cc;
+  cursor: default;
 }
 
 .history-summary-panel .panel-title-row {
@@ -2188,6 +2232,11 @@ a {
 
   .recommendation-detail-item dl {
     grid-template-columns: 1fr;
+  }
+
+  .recommendation-detail-list {
+    grid-template-rows: repeat(3, minmax(204px, 1fr));
+    min-height: 636px;
   }
 
   .recommendation-header-score {

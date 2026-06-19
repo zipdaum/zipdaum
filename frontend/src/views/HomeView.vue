@@ -978,12 +978,29 @@ function getRecommendationScoreLevelClass(score = recommendationScore.value?.sco
 }
 
 function getRecommendationConditions() {
-  return recommendationScore.value?.conditions || [];
+  return sortConditionsByPriority(recommendationScore.value?.conditions || []);
 }
 
 function getVisibleRecommendationConditions() {
   const conditions = getRecommendationConditions();
   return conditions.slice(0, 4);
+}
+
+function sortConditionsByPriority(conditions) {
+  return [...conditions].sort((left, right) => {
+    const leftPriority = Number.isFinite(Number(left.priority))
+      ? Number(left.priority)
+      : Number.MAX_SAFE_INTEGER;
+    const rightPriority = Number.isFinite(Number(right.priority))
+      ? Number(right.priority)
+      : Number.MAX_SAFE_INTEGER;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return String(left.code || "").localeCompare(String(right.code || ""));
+  });
 }
 
 function getPreferenceTypeLabel(code) {
