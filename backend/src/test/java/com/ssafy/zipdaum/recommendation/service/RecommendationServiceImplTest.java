@@ -193,6 +193,38 @@ class RecommendationServiceImplTest {
   }
 
   @Test
+  void findPropertyRecommendations_최종점수가_높은_주택을_먼저_반환한다() {
+    RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
+        recommendationMapper,
+        recentPropertyMapper,
+        userPreferenceService,
+        surroundingService,
+        new RecommendationScoreServiceImpl()
+    );
+    PropertyRecommendationCandidate lowerScoreProperty = property(1L, 80_000_000L);
+    PropertyRecommendationCandidate higherScoreProperty = property(2L, 100_000_000L);
+    lowerScoreProperty.setLatestSalePrice(109_000_000L);
+    lowerScoreProperty.setExclusiveArea(new BigDecimal("70.0"));
+    higherScoreProperty.setLatestSalePrice(100_000_000L);
+    higherScoreProperty.setExclusiveArea(new BigDecimal("84.5"));
+    List<UserPreferenceResponse> preferences = List.of(
+        preference("SALE_PRICE", "100000000"),
+        preference("AREA", "84.5", 2)
+    );
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
+        .willReturn(List.of(lowerScoreProperty, higherScoreProperty));
+
+    List<PropertyRecommendationResponse> result =
+        serviceWithRealScore.findPropertyRecommendations(1L);
+
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getId)
+        .containsExactly(2L, 1L);
+  }
+
+  @Test
   void findPropertyRecommendations_시설조건은_실제_주변시설_개수가_많은_주택을_먼저_반환한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,

@@ -315,6 +315,11 @@ public class RecommendationServiceImpl implements RecommendationService {
         .toList();
 
     return (left, right) -> {
+      int scoreCompared = Integer.compare(scoreValue(right.score()), scoreValue(left.score()));
+      if (scoreCompared != 0) {
+        return scoreCompared;
+      }
+
       for (UserPreferenceResponse preference : sortedPreferences) {
         BigDecimal leftValue = calculateSortValue(left, preference, sortedPreferences);
         BigDecimal rightValue = calculateSortValue(right, preference, sortedPreferences);
@@ -324,10 +329,6 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
       }
 
-      int scoreCompared = Integer.compare(scoreValue(right.score()), scoreValue(left.score()));
-      if (scoreCompared != 0) {
-        return scoreCompared;
-      }
       return Long.compare(right.candidate().getId(), left.candidate().getId());
     };
   }

@@ -5,6 +5,11 @@ export async function searchProperties(params) {
   return response.data
 }
 
+export async function getPropertyRecommendations() {
+  const response = await client.get('/properties/recommendations')
+  return response.data
+}
+
 export async function getPropertyDetail(propertyId) {
   const response = await client.get(`/properties/${propertyId}`)
   return response.data
