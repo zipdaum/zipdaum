@@ -9,6 +9,11 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface FavoriteRegionMapper {
 
+  List<FavoriteRegionCandidateResponse> selectFavoriteRegionCandidates(
+      @Param("sggCds") List<String> sggCds,
+      @Param("umdKeyword") String umdKeyword
+  );
+
   List<FavoriteRegionResponse> selectFavoriteRegions(
       @Param("userId") Long userId,
       @Param("oneYearAgo") LocalDate oneYearAgo

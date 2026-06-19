@@ -54,6 +54,8 @@ public class GlobalExceptionHandler {
   protected ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e){
     ErrorCode errorCode = e.getErrorCode();
 
+    log.warn("BusinessException 발생 | 코드: {}, 메시지: {}", errorCode.name(), errorCode.getMessage());
+
     ErrorResponse response = new ErrorResponse(errorCode);
     return new ResponseEntity<>(response, errorCode.getStatus());
   }
