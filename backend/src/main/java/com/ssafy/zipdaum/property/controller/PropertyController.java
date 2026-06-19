@@ -8,9 +8,11 @@ import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaveResult;
 import com.ssafy.zipdaum.property.dto.SurroundingRequest;
 import com.ssafy.zipdaum.property.dto.SurroundingResponse;
+import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import com.ssafy.zipdaum.property.service.PropertyFetchService;
 import com.ssafy.zipdaum.property.service.PropertyService;
 import com.ssafy.zipdaum.property.service.SurroundingService;
+import com.ssafy.zipdaum.recent.service.RecentPropertyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -25,6 +27,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -45,6 +48,7 @@ public class PropertyController {
   private final PropertyFetchService fetchService;
   private final PropertyService propertyService;
   private final SurroundingService surroundingService;
+  private final RecentPropertyService recentPropertyService;
 
   @GetMapping
   @Operation(
@@ -85,10 +89,15 @@ public class PropertyController {
   })
   public ResponseEntity<PropertyDetailResponse> getPropertyDetail(
       @Parameter(description = "주택 ID", example = "1", required = true)
-      @PathVariable @Positive Long propertyId
+      @PathVariable @Positive Long propertyId,
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
     log.info("GET /properties/{} 요청", propertyId);
-    return ResponseEntity.ok(propertyService.findPropertyDetail(propertyId));
+    PropertyDetailResponse detail = propertyService.findPropertyDetail(propertyId);
+    if (authenticatedUser != null) {
+      recentPropertyService.recordRecentProperty(authenticatedUser.getId(), propertyId);
+    }
+    return ResponseEntity.ok(detail);
   }
 
   @GetMapping("/{propertyId}/histories")
