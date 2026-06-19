@@ -49,7 +49,7 @@ public class PropertyFetchServiceImpl implements PropertyFetchService {
 
   private List<PropertyItem> fetchDeals(DealApiType apiType, String lawdCd, String dealYmd) {
     validateFetchRequest(lawdCd, dealYmd);
-    return propertyApiClient.fetch(apiType, lawdCd, dealYmd);
+    return propertyApiClient.fetch(apiType, lawdCd, dealYmd, 1);
   }
 
   private void validateFetchRequest(String lawdCd, String dealYmd) {
