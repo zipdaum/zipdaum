@@ -687,6 +687,13 @@ a {
   padding: 0 12px;
 }
 
+.sort-control select:disabled {
+  opacity: 1;
+  background: #f8fbff;
+  color: #14213d;
+  cursor: default;
+}
+
 .compact-sort-control select {
   min-width: 120px;
   min-height: 34px;

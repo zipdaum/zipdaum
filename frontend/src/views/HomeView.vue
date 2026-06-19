@@ -1677,7 +1677,7 @@ function formatPrice(price) {
               <span>{{ personalizedRecommendations.length }}건</span>
               <label class="sort-control compact-sort-control">
                 <span>정렬</span>
-                <select aria-label="맞춤 추천 정렬">
+                <select aria-label="맞춤 추천 정렬" disabled>
                   <option>추천순</option>
                 </select>
               </label>
