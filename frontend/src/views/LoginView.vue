@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '../api/auth'
 import { saveAuth } from '../stores/auth'
@@ -11,6 +11,12 @@ const email = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
+
+const noticeMessage = computed(() =>
+  route.query.reason === 'login-required'
+    ? '로그인이 필요한 서비스입니다. 로그인 후 관심 목록을 확인할 수 있습니다.'
+    : ''
+)
 
 async function handleLogin() {
   isLoading.value = true
@@ -52,6 +58,10 @@ function getRedirectPath() {
         <h1 id="login-title">로그인</h1>
         <p>관심 지역과 맞춤 주거 정보를 확인하세요.</p>
       </div>
+
+      <p v-if="noticeMessage" class="form-message info-message" role="status">
+        {{ noticeMessage }}
+      </p>
 
       <form class="login-form" @submit.prevent="handleLogin">
         <label>

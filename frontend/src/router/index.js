@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
+import FavoriteView from '../views/FavoriteView.vue'
 import { isLoggedIn } from '../stores/auth'
 
 const router = createRouter({
@@ -15,6 +16,12 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView
+    },
+    {
+      path: '/favorites',
+      name: 'favorites',
+      component: FavoriteView,
+      meta: { requiresAuth: true }
     }
   ]
 })
@@ -23,7 +30,10 @@ router.beforeEach((to) => {
   if (to.meta.requiresAuth && !isLoggedIn.value) {
     return {
       name: 'login',
-      query: { redirect: to.fullPath }
+      query: {
+        redirect: to.fullPath,
+        reason: 'login-required'
+      }
     }
   }
 
