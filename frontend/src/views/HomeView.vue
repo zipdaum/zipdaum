@@ -169,13 +169,6 @@ onUnmounted(() => {
   window.removeEventListener("popstate", handleBrowserBack);
 });
 
-const userSummary = [
-  { label: "예산", value: "3억 - 5억" },
-  { label: "전용면적", value: "50㎡ - 84㎡" },
-  { label: "거래유형", value: "매매, 전세" },
-  { label: "생활편의", value: "교통, 학교" },
-];
-
 const recommendedHomes = [
   {
     rank: 1,
@@ -1640,25 +1633,6 @@ function formatPrice(price) {
           {{ errorMessage }}
         </p>
       </form>
-
-      <section class="summary-card" aria-labelledby="summary-title">
-        <div class="section-heading">
-          <p>내 맞춤 요약</p>
-          <h2 id="summary-title">
-            설정한 조건에 가까운 거래를 우선 확인하세요
-          </h2>
-        </div>
-        <div class="summary-list">
-          <article
-            v-for="item in userSummary"
-            :key="item.label"
-            class="summary-item"
-          >
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-          </article>
-        </div>
-      </section>
 
       <section class="content-grid">
         <article
