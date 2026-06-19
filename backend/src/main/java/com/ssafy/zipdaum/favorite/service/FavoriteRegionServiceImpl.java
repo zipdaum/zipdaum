@@ -155,16 +155,24 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
 
   private RegionSearchCondition buildRegionSearchCondition(String keyword) {
     String compactKeyword = removeBlank(keyword);
-    List<RegionMatch> matches = findRegionMatches(compactKeyword);
 
-    if (matches.isEmpty()) {
+    List<RegionMatch> sggOnlyMatches = findSggOnlyMatches(compactKeyword);
+
+    if (!sggOnlyMatches.isEmpty()) {
+      return new RegionSearchCondition(toDistinctSggCds(sggOnlyMatches), null);
+    }
+
+    List<RegionMatch> sggUmdCompositeMatches = findSggUmdCompositeMatches(compactKeyword);
+
+    if (sggUmdCompositeMatches.isEmpty()) {
       return new RegionSearchCondition(List.of(), escapeLikeKeyword(compactKeyword));
     }
 
-    RegionMatch longestMatch = matches.getFirst();
+    RegionMatch longestMatch = sggUmdCompositeMatches.getFirst();
     String remainingKeyword = compactKeyword.replace(longestMatch.keyword(), "");
     String umdKeyword = remainingKeyword.isBlank() ? null : escapeLikeKeyword(remainingKeyword);
-    List<String> sggCds = matches.stream()
+    List<String> sggCds = sggUmdCompositeMatches.stream()
+        .filter(match -> match.keyword().length() == longestMatch.keyword().length())
         .map(RegionMatch::sggCd)
         .distinct()
         .toList();
@@ -172,12 +180,23 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
     return new RegionSearchCondition(sggCds, umdKeyword);
   }
 
-  private List<RegionMatch> findRegionMatches(String keyword) {
+  private List<RegionMatch> findSggOnlyMatches(String keyword) {
+    return findRegionMatches(keyword, true);
+  }
+
+  private List<RegionMatch> findSggUmdCompositeMatches(String keyword) {
+    return findRegionMatches(keyword, false);
+  }
+
+  private List<RegionMatch> findRegionMatches(String keyword, boolean sggOnlySearch) {
     List<RegionMatch> matches = new ArrayList<>();
 
     for (RegionCode regionCode : RegionCode.values()) {
       for (String regionKeyword : createRegionKeywords(regionCode.getName())) {
-        if (keyword.contains(regionKeyword)) {
+        boolean matched = sggOnlySearch
+            ? regionKeyword.contains(keyword)
+            : keyword.contains(regionKeyword);
+        if (matched) {
           matches.add(new RegionMatch(regionCode.getLawdCd(), regionKeyword));
         }
       }
@@ -185,6 +204,13 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
 
     return matches.stream()
         .sorted(Comparator.comparingInt((RegionMatch match) -> match.keyword().length()).reversed())
+        .toList();
+  }
+
+  private List<String> toDistinctSggCds(List<RegionMatch> matches) {
+    return matches.stream()
+        .map(RegionMatch::sggCd)
+        .distinct()
         .toList();
   }
 

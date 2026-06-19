@@ -17,8 +17,10 @@ import com.ssafy.zipdaum.property.domain.RegionCode;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 
+@SuppressWarnings("unchecked")
 class FavoriteRegionServiceImplTest {
 
   private final FavoriteRegionMapper favoriteRegionMapper = mock(FavoriteRegionMapper.class);
@@ -74,6 +76,36 @@ class FavoriteRegionServiceImplTest {
     assertThat(result.getFirst().getDisplayName()).isEqualTo("부산 해운대구 우동");
     then(favoriteRegionMapper).should()
         .selectFavoriteRegionCandidates(List.of(), "우동");
+  }
+
+  @Test
+  void findFavoriteRegionCandidates_서구_검색어는_서구와_강서구를_함께_조회한다() {
+    given(favoriteRegionMapper.selectFavoriteRegionCandidates(
+        org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.isNull()
+    )).willReturn(List.of());
+
+    service.findFavoriteRegionCandidates("서구");
+
+    ArgumentCaptor<List<String>> sggCdsCaptor = ArgumentCaptor.forClass(List.class);
+    then(favoriteRegionMapper).should()
+        .selectFavoriteRegionCandidates(sggCdsCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
+    assertThat(sggCdsCaptor.getValue()).contains("26140", "26440");
+  }
+
+  @Test
+  void findFavoriteRegionCandidates_강서구_검색어는_서구를_제외하고_강서구만_조회한다() {
+    given(favoriteRegionMapper.selectFavoriteRegionCandidates(
+        org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.isNull()
+    )).willReturn(List.of());
+
+    service.findFavoriteRegionCandidates("강서구");
+
+    ArgumentCaptor<List<String>> sggCdsCaptor = ArgumentCaptor.forClass(List.class);
+    then(favoriteRegionMapper).should()
+        .selectFavoriteRegionCandidates(sggCdsCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
+    assertThat(sggCdsCaptor.getValue()).containsExactly("26440");
   }
 
   @Test
