@@ -814,7 +814,7 @@ a {
 }
 
 .detail-hero {
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
   align-items: stretch;
   border: 1px solid #dbe7ff;
   border-radius: 8px;
@@ -1136,18 +1136,52 @@ a {
   align-content: start;
 }
 
-.guest-fit-panel {
+.guest-fit-panel,
+.fit-score-panel {
   display: grid;
-  gap: 8px;
+  gap: 18px;
+  min-width: 0;
   align-content: start;
   border: 1px solid #e2ebfb;
   border-radius: 8px;
-  background: #f8fbff;
-  padding: 14px 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(39, 83, 150, 0.07);
+  padding: 22px 24px;
 }
 
-.guest-fit-panel .panel-title-row {
+.guest-fit-panel .panel-title-row,
+.fit-score-panel .panel-title-row {
   margin-bottom: 2px;
+}
+
+.fit-score-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.fit-score-title-row h2 {
+  margin: 0;
+  color: #17233f;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.fit-detail-button {
+  min-height: 42px;
+  border: 1px solid #d8e4fb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #315fd6;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.fit-detail-button:hover {
+  border-color: #91adf4;
+  background: #f6f9ff;
 }
 
 .fit-login-content p {
@@ -1164,6 +1198,134 @@ a {
 
 .fit-login-content .secondary-button {
   justify-self: start;
+}
+
+.fit-score-content {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.56fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.fit-score-summary {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #53617c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.fit-score-circle {
+  display: grid;
+  width: 138px;
+  height: 138px;
+  place-items: center;
+  align-content: center;
+  justify-self: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, #effaf3 0 58%, transparent 59%),
+    conic-gradient(
+      #1fad63 0 var(--score-progress),
+      #e7f2eb var(--score-progress) 100%
+    ),
+    #effaf3;
+  color: #1fad63;
+}
+
+.fit-score-circle strong {
+  display: block;
+  color: #1fad63;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.fit-score-circle span {
+  color: #1fad63;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.fit-score-circle.muted {
+  background: #eef2f7;
+}
+
+.fit-score-circle.muted strong,
+.fit-score-circle.muted span {
+  color: #8b98ad;
+}
+
+.fit-condition-list {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-height: 260px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fit-condition-list li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) minmax(44px, auto);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+  color: #53617c;
+}
+
+.fit-condition-list li > div {
+  min-width: 0;
+}
+
+.fit-condition-icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dbe3ee;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.fit-condition-list li.matched .fit-condition-icon {
+  background: #1fad63;
+}
+
+.fit-condition-list strong {
+  display: block;
+  overflow: hidden;
+  color: #3b465b;
+  font-size: 14px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fit-condition-list em {
+  color: #61c98a;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fit-condition-value {
+  min-width: 0;
+  overflow: hidden;
+  color: #71809d;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-summary-panel {
@@ -1645,6 +1807,15 @@ a {
     align-content: start;
   }
 
+  .fit-score-content {
+    grid-template-columns: 1fr;
+  }
+
+  .fit-score-circle {
+    width: 132px;
+    height: 132px;
+  }
+
 }
 
 @media (max-width: 640px) {
@@ -1698,5 +1869,18 @@ a {
 
   .home-card em {
     justify-self: start;
+  }
+
+  .fit-score-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fit-detail-button {
+    width: 100%;
+  }
+
+  .fit-condition-list li {
+    grid-template-columns: 24px minmax(0, 1fr) 48px;
   }
 }

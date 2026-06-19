@@ -1,12 +1,17 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
   getPropertyDetail as fetchPropertyDetail,
+  getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
   searchProperties,
 } from "../api/property";
+import { isLoggedIn } from "../stores/auth";
+
+const router = useRouter();
 
 const dealTypes = [
   { label: "전체", value: "" },
@@ -77,6 +82,21 @@ const facilityTypeLabels = {
   PARK: "공원",
 };
 
+const preferenceTypeLabels = {
+  SALE_PRICE: "매매 예산",
+  DEPOSIT: "전월세 보증금",
+  MONTHLY_RENT: "월세",
+  AREA: "면적",
+  BUILD_YEAR: "건축연도",
+  REGION: "선호 지역",
+  BUS: "버스",
+  SUBWAY: "지하철역",
+  HOSPITAL: "병원",
+  CCTV: "CCTV",
+  PARK: "공원",
+  RECENT_PROPERTY: "최근 본 주택",
+};
+
 const searchForm = ref({
   sggCd: "26350",
   umdNm: "",
@@ -106,6 +126,10 @@ const activeRentHistoryType = ref("JEONSE");
 const surroundings = ref(null);
 const isSurroundingsLoading = ref(false);
 const surroundingsErrorMessage = ref("");
+const recommendationScore = ref(null);
+const isRecommendationScoreLoading = ref(false);
+const recommendationScoreErrorMessage = ref("");
+const isRecommendationDetailExpanded = ref(false);
 const mapZoom = ref(1);
 const mapPan = ref({ x: 0, y: 0 });
 const isMapDragging = ref(false);
@@ -385,6 +409,9 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   activeRentHistoryType.value = "JEONSE";
   surroundings.value = null;
   surroundingsErrorMessage.value = "";
+  recommendationScore.value = null;
+  recommendationScoreErrorMessage.value = "";
+  isRecommendationDetailExpanded.value = false;
   resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
@@ -408,6 +435,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
         rentDealType: "JEONSE",
       }),
       loadSurroundings(selectedPropertyDetail.value),
+      loadRecommendationScore(selectedPropertyDetail.value.id),
     ]);
 
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
@@ -443,6 +471,41 @@ function createPropertyDetailState(detail) {
     rentMetaByType: createEmptyRentMetaByType(),
     ...emptyHistoryMeta,
   };
+}
+
+async function loadRecommendationScore(propertyId) {
+  recommendationScore.value = null;
+  recommendationScoreErrorMessage.value = "";
+
+  if (!isLoggedIn.value) {
+    return;
+  }
+
+  isRecommendationScoreLoading.value = true;
+
+  try {
+    recommendationScore.value = await fetchPropertyRecommendationScore(
+      propertyId,
+    );
+  } catch (error) {
+    const status = error.response?.status;
+    recommendationScoreErrorMessage.value =
+      status === 404
+        ? "등록된 맞춤 조건이 없어 적합도를 계산하지 못했습니다."
+        : "맞춤 적합도 정보를 불러오지 못했습니다.";
+  } finally {
+    isRecommendationScoreLoading.value = false;
+  }
+}
+
+function goToLoginForRecommendation() {
+  router.push({
+    name: "login",
+    query: {
+      redirect: `${window.location.pathname}${window.location.search}`,
+      reason: "login-required",
+    },
+  });
 }
 
 async function loadHistories(propertyId, options = {}) {
@@ -868,6 +931,94 @@ function getPropertyDetail(property) {
   const buildYear = getBuildYearLabel(property.buildYear);
 
   return `${type} · ${buildYear}`;
+}
+
+function getRecommendationScoreValue() {
+  return recommendationScore.value?.score ?? 0;
+}
+
+function getRecommendationScoreStyle() {
+  return {
+    "--score-progress": `${Math.min(
+      Math.max(getRecommendationScoreValue(), 0),
+      100,
+    )}%`,
+  };
+}
+
+function getRecommendationGrade(score = recommendationScore.value?.score) {
+  if (score === null || score === undefined) {
+    return "평가 대기";
+  }
+
+  if (score >= 85) {
+    return "매우 적합";
+  }
+
+  if (score >= 70) {
+    return "적합";
+  }
+
+  if (score >= 40) {
+    return "부분 적합";
+  }
+
+  return "낮은 적합도";
+}
+
+function getRecommendationSummaryText() {
+  if (
+    recommendationScore.value?.recommendationStatus ===
+    "NO_EVALUABLE_CONDITION"
+  ) {
+    return "평가 가능한 맞춤 조건이 없어 점수를 계산하지 않았습니다.";
+  }
+
+  const score = recommendationScore.value?.score;
+  if (score === null || score === undefined) {
+    return "맞춤 조건을 확인한 뒤 적합도를 표시합니다.";
+  }
+
+  if (score >= 85) {
+    return "등록한 조건과 이 주택의 정보가 전반적으로 잘 맞습니다.";
+  }
+
+  if (score >= 70) {
+    return "중요 조건 대부분이 맞아 우선 검토할 만합니다.";
+  }
+
+  if (score >= 40) {
+    return "일부 조건은 맞지만 가격, 지역, 생활시설을 함께 확인해보세요.";
+  }
+
+  return "현재 등록한 맞춤 조건과는 거리가 있습니다.";
+}
+
+function getRecommendationConditions() {
+  return recommendationScore.value?.conditions || [];
+}
+
+function getVisibleRecommendationConditions() {
+  const conditions = getRecommendationConditions();
+  return isRecommendationDetailExpanded.value
+    ? conditions
+    : conditions.slice(0, 4);
+}
+
+function getPreferenceTypeLabel(code) {
+  return preferenceTypeLabels[code] || code || "조건";
+}
+
+function getConditionScoreLabel(condition) {
+  return `${condition.score ?? 0}점`;
+}
+
+function getConditionValueLabel(condition) {
+  return condition.value ? `(${condition.value})` : "";
+}
+
+function toggleRecommendationDetail() {
+  isRecommendationDetailExpanded.value = !isRecommendationDetailExpanded.value;
 }
 
 function getPropertyAddress(property) {
@@ -1925,18 +2076,97 @@ function formatPrice(price) {
               </div>
             </div>
 
-            <aside class="guest-fit-panel" aria-label="비회원 조건 적합도 안내">
-              <div class="panel-title-row">
+            <aside class="fit-score-panel" aria-label="사용자 맞춤 조건 적합도">
+              <div class="fit-score-title-row">
                 <h2>내 조건 적합도</h2>
+                <button
+                  v-if="isLoggedIn && recommendationScore"
+                  class="fit-detail-button"
+                  type="button"
+                  @click="toggleRecommendationDetail"
+                >
+                  {{
+                    isRecommendationDetailExpanded
+                      ? "요약 보기"
+                      : "적합도 상세 보기"
+                  }}
+                </button>
               </div>
-              <div class="fit-login-content">
+
+              <div v-if="!isLoggedIn" class="fit-login-content">
                 <p>
                   로그인하면 예산, 선호 지역, 생활 편의 조건을 기준으로 이
                   거래가 내 조건에 맞는지 확인할 수 있습니다.
                 </p>
-                <button class="secondary-button" type="button">
+                <button
+                  class="secondary-button"
+                  type="button"
+                  @click="goToLoginForRecommendation"
+                >
                   로그인하러가기
                 </button>
+              </div>
+
+              <p
+                v-else-if="isRecommendationScoreLoading"
+                class="compact-empty-message"
+              >
+                맞춤 적합도를 계산하고 있습니다.
+              </p>
+
+              <p
+                v-else-if="recommendationScoreErrorMessage"
+                class="form-message"
+                role="alert"
+              >
+                {{ recommendationScoreErrorMessage }}
+              </p>
+
+              <div v-else-if="recommendationScore" class="fit-score-content">
+                <div
+                  :class="[
+                    'fit-score-circle',
+                    {
+                      muted:
+                        recommendationScore.recommendationStatus ===
+                        'NO_EVALUABLE_CONDITION',
+                    },
+                  ]"
+                  :style="getRecommendationScoreStyle()"
+                >
+                  <strong>{{
+                    recommendationScore.score === null
+                      ? "-"
+                      : recommendationScore.score
+                  }}</strong>
+                  <span>점</span>
+                </div>
+
+                <ul
+                  v-if="getRecommendationConditions().length > 0"
+                  class="fit-condition-list"
+                >
+                  <li
+                    v-for="condition in getVisibleRecommendationConditions()"
+                    :key="`${condition.code}-${condition.priority}`"
+                    :class="{ matched: condition.matched }"
+                  >
+                    <span class="fit-condition-icon" aria-hidden="true">
+                      {{ condition.matched ? "✓" : "!" }}
+                    </span>
+                    <div>
+                      <strong>{{
+                        getPreferenceTypeLabel(condition.code)
+                      }}</strong>
+                    </div>
+                    <em>{{ getConditionScoreLabel(condition) }}</em>
+                  </li>
+                </ul>
+
+                <p class="fit-score-summary">
+                  {{ getRecommendationGrade() }} ·
+                  {{ getRecommendationSummaryText() }}
+                </p>
               </div>
             </aside>
           </section>

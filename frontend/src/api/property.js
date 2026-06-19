@@ -19,3 +19,8 @@ export async function getSurroundings(propertyId, params) {
   const response = await client.get(`/properties/${propertyId}/surroundings`, { params })
   return response.data
 }
+
+export async function getPropertyRecommendationScore(propertyId) {
+  const response = await client.get(`/properties/${propertyId}/recommendation-score`)
+  return response.data
+}
