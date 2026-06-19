@@ -129,7 +129,6 @@ const surroundingsErrorMessage = ref("");
 const recommendationScore = ref(null);
 const isRecommendationScoreLoading = ref(false);
 const recommendationScoreErrorMessage = ref("");
-const isRecommendationDetailExpanded = ref(false);
 const mapZoom = ref(1);
 const mapPan = ref({ x: 0, y: 0 });
 const isMapDragging = ref(false);
@@ -411,7 +410,6 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   surroundingsErrorMessage.value = "";
   recommendationScore.value = null;
   recommendationScoreErrorMessage.value = "";
-  isRecommendationDetailExpanded.value = false;
   resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
@@ -504,6 +502,19 @@ function goToLoginForRecommendation() {
     query: {
       redirect: `${window.location.pathname}${window.location.search}`,
       reason: "login-required",
+    },
+  });
+}
+
+function openRecommendationScoreDetail() {
+  if (!selectedPropertyDetail.value?.id) {
+    return;
+  }
+
+  router.push({
+    name: "property-recommendation-score",
+    params: {
+      propertyId: selectedPropertyDetail.value.id,
     },
   });
 }
@@ -946,52 +957,24 @@ function getRecommendationScoreStyle() {
   };
 }
 
-function getRecommendationGrade(score = recommendationScore.value?.score) {
+function getRecommendationScoreLevelClass(score = recommendationScore.value?.score) {
   if (score === null || score === undefined) {
-    return "평가 대기";
+    return "score-muted";
   }
 
   if (score >= 85) {
-    return "매우 적합";
+    return "score-excellent";
   }
 
   if (score >= 70) {
-    return "적합";
+    return "score-good";
   }
 
   if (score >= 40) {
-    return "부분 적합";
+    return "score-partial";
   }
 
-  return "낮은 적합도";
-}
-
-function getRecommendationSummaryText() {
-  if (
-    recommendationScore.value?.recommendationStatus ===
-    "NO_EVALUABLE_CONDITION"
-  ) {
-    return "평가 가능한 맞춤 조건이 없어 점수를 계산하지 않았습니다.";
-  }
-
-  const score = recommendationScore.value?.score;
-  if (score === null || score === undefined) {
-    return "맞춤 조건을 확인한 뒤 적합도를 표시합니다.";
-  }
-
-  if (score >= 85) {
-    return "등록한 조건과 이 주택의 정보가 전반적으로 잘 맞습니다.";
-  }
-
-  if (score >= 70) {
-    return "중요 조건 대부분이 맞아 우선 검토할 만합니다.";
-  }
-
-  if (score >= 40) {
-    return "일부 조건은 맞지만 가격, 지역, 생활시설을 함께 확인해보세요.";
-  }
-
-  return "현재 등록한 맞춤 조건과는 거리가 있습니다.";
+  return "score-low";
 }
 
 function getRecommendationConditions() {
@@ -1000,25 +983,91 @@ function getRecommendationConditions() {
 
 function getVisibleRecommendationConditions() {
   const conditions = getRecommendationConditions();
-  return isRecommendationDetailExpanded.value
-    ? conditions
-    : conditions.slice(0, 4);
+  return conditions.slice(0, 4);
 }
 
 function getPreferenceTypeLabel(code) {
   return preferenceTypeLabels[code] || code || "조건";
 }
 
-function getConditionScoreLabel(condition) {
-  return `${condition.score ?? 0}점`;
+function getRecommendationConditionTitle(condition) {
+  return condition.name || getPreferenceTypeLabel(condition.code);
+}
+
+function getConditionStatusIcon(condition) {
+  if (condition.score >= 100) {
+    return "✓";
+  }
+
+  if (condition.score >= 70) {
+    return "?";
+  }
+
+  return "!";
+}
+
+function getConditionStatusClass(condition) {
+  if (condition.score >= 100) {
+    return "fit";
+  }
+
+  if (condition.score >= 70) {
+    return "uncertain";
+  }
+
+  return "unfit";
 }
 
 function getConditionValueLabel(condition) {
-  return condition.value ? `(${condition.value})` : "";
+  const label = formatPreferenceValue(condition);
+  return label ? `(${label})` : "";
 }
 
-function toggleRecommendationDetail() {
-  isRecommendationDetailExpanded.value = !isRecommendationDetailExpanded.value;
+function formatPreferenceValue(condition) {
+  const value = condition.value;
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  switch (condition.code) {
+    case "SALE_PRICE":
+    case "DEPOSIT":
+      return `${formatStoredMoneyValue(value)} 이하`;
+    case "MONTHLY_RENT":
+      return `${formatMonthlyRentValue(value)} 이하`;
+    case "AREA":
+      return `${Number(value).toLocaleString()}㎡ 이상`;
+    case "BUILD_YEAR":
+      return `${value}년 이후`;
+    case "BUS":
+    case "SUBWAY":
+    case "HOSPITAL":
+    case "CCTV":
+    case "PARK":
+      return value === "true" ? "필요" : "제외";
+    default:
+      return value;
+  }
+}
+
+function formatStoredMoneyValue(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return value;
+  }
+
+  const priceInManwon = amount >= 1000000 ? amount / 10000 : amount;
+  return formatPrice(priceInManwon);
+}
+
+function formatMonthlyRentValue(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return value;
+  }
+
+  const rentInManwon = amount >= 10000 ? amount / 10000 : amount;
+  return `${rentInManwon.toLocaleString()}만원`;
 }
 
 function getPropertyAddress(property) {
@@ -2083,13 +2132,9 @@ function formatPrice(price) {
                   v-if="isLoggedIn && recommendationScore"
                   class="fit-detail-button"
                   type="button"
-                  @click="toggleRecommendationDetail"
+                  @click="openRecommendationScoreDetail"
                 >
-                  {{
-                    isRecommendationDetailExpanded
-                      ? "요약 보기"
-                      : "적합도 상세 보기"
-                  }}
+                  적합도 상세 보기
                 </button>
               </div>
 
@@ -2126,6 +2171,7 @@ function formatPrice(price) {
                 <div
                   :class="[
                     'fit-score-circle',
+                    getRecommendationScoreLevelClass(),
                     {
                       muted:
                         recommendationScore.recommendationStatus ===
@@ -2149,24 +2195,22 @@ function formatPrice(price) {
                   <li
                     v-for="condition in getVisibleRecommendationConditions()"
                     :key="`${condition.code}-${condition.priority}`"
-                    :class="{ matched: condition.matched }"
+                    :class="getConditionStatusClass(condition)"
                   >
                     <span class="fit-condition-icon" aria-hidden="true">
-                      {{ condition.matched ? "✓" : "!" }}
+                      {{ getConditionStatusIcon(condition) }}
                     </span>
                     <div>
                       <strong>{{
-                        getPreferenceTypeLabel(condition.code)
+                        getRecommendationConditionTitle(condition)
                       }}</strong>
                     </div>
-                    <em>{{ getConditionScoreLabel(condition) }}</em>
+                    <small class="fit-condition-preference">{{
+                      getConditionValueLabel(condition)
+                    }}</small>
                   </li>
                 </ul>
 
-                <p class="fit-score-summary">
-                  {{ getRecommendationGrade() }} ·
-                  {{ getRecommendationSummaryText() }}
-                </p>
               </div>
             </aside>
           </section>
