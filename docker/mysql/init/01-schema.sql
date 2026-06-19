@@ -170,18 +170,3 @@ CREATE TABLE user_preference (
     ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE notification (
-  id BIGINT NOT NULL AUTO_INCREMENT,
-  user_id BIGINT NOT NULL,
-  type VARCHAR(30) NOT NULL,
-  content VARCHAR(255) NOT NULL,
-  is_read BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_notification_user_id (user_id),
-  KEY idx_notification_is_read (is_read),
-  CONSTRAINT fk_notification_user
-    FOREIGN KEY (user_id) REFERENCES users (id)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
