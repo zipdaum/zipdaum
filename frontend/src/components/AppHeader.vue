@@ -34,7 +34,6 @@ function handleLogout() {
       <RouterLink :to="{ name: 'favorites' }" active-class="active">
         관심목록
       </RouterLink>
-      <a href="#">알림</a>
       <a href="#">마이페이지</a>
     </nav>
 
