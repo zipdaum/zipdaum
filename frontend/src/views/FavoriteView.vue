@@ -13,7 +13,8 @@ const router = useRouter();
 
 const favoriteRegions = ref([]);
 const favoriteProperties = ref([]);
-const isLoading = ref(false);
+const isLoading = ref(true);
+const hasLoadedFavorites = ref(false);
 const errorMessage = ref("");
 const regionMessage = ref("");
 const propertyMessage = ref("");
@@ -51,8 +52,13 @@ async function loadFavorites() {
 
     favoriteRegions.value = regions.map(mapFavoriteRegion);
     favoriteProperties.value = properties.map(mapFavoriteProperty);
+    hasLoadedFavorites.value = true;
     clampFavoritePages();
   } catch (error) {
+    if (error.response?.status !== 401) {
+      hasLoadedFavorites.value = true;
+    }
+
     errorMessage.value = getErrorMessage(
       error,
       "관심 목록을 불러오지 못했습니다.",
@@ -264,6 +270,11 @@ function getErrorMessage(error, fallbackMessage) {
 
 <template>
   <main class="app-shell favorite-page">
+    <p v-if="!hasLoadedFavorites" class="empty-message">
+      관심 목록을 불러오는 중입니다.
+    </p>
+
+    <template v-else>
     <AppHeader @home="goHome" />
 
     <section class="favorite-header" aria-labelledby="favorite-title">
@@ -513,6 +524,7 @@ function getErrorMessage(error, fallbackMessage) {
         ></div>
       </article>
     </section>
+    </template>
   </main>
 </template>
 
