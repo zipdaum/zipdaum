@@ -36,6 +36,50 @@
     <result property="longitude" column="longitude"/>
   </resultMap>
 
+  <resultMap id="propertyDetailResponseResultMap"
+             type="com.ssafy.zipdaum.property.dto.PropertyDetailResponse">
+    <id property="id" column="id"/>
+    <result property="propertyType" column="property_type"/>
+    <result property="name" column="name"/>
+    <result property="sggCd" column="sgg_cd"/>
+    <result property="umdNm" column="umd_nm"/>
+    <result property="jibun" column="jibun"/>
+    <result property="buildYear" column="build_year"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
+    <result property="latestSalePrice" column="latest_sale_price"/>
+    <result property="latestDeposit" column="latest_deposit"/>
+    <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+  </resultMap>
+
+  <resultMap id="propertySaleDealResponseResultMap"
+             type="com.ssafy.zipdaum.property.dto.PropertySaleDealResponse">
+    <id property="id" column="id"/>
+    <result property="exclusiveArea" column="exclusive_area"/>
+    <result property="landArea" column="land_area"/>
+    <result property="dealAmount" column="deal_amount"/>
+    <result property="floor" column="floor"/>
+    <result property="dealDate" column="deal_date"/>
+    <result property="buyerGbn" column="buyer_gbn"/>
+    <result property="sellerGbn" column="seller_gbn"/>
+  </resultMap>
+
+  <resultMap id="propertyRentDealResponseResultMap"
+             type="com.ssafy.zipdaum.property.dto.PropertyRentDealResponse">
+    <id property="id" column="id"/>
+    <result property="exclusiveArea" column="exclusive_area"/>
+    <result property="landArea" column="land_area"/>
+    <result property="deposit" column="deposit"/>
+    <result property="monthlyRent" column="monthly_rent"/>
+    <result property="floor" column="floor"/>
+    <result property="contractTerm" column="contract_term"/>
+    <result property="contractType" column="contract_type"/>
+    <result property="useRrRight" column="use_rr_right"/>
+    <result property="preDeposit" column="pre_deposit"/>
+    <result property="preMonthlyRent" column="pre_monthly_rent"/>
+    <result property="dealDate" column="deal_date"/>
+  </resultMap>
+
   <select id="selectProperties"
           parameterType="com.ssafy.zipdaum.property.dto.PropertySearchRequest"
           resultMap="propertySearchResponseResultMap">
@@ -140,6 +184,97 @@
       </otherwise>
     </choose>
     , id DESC
+  </select>
+
+  <select id="selectPropertyById"
+          parameterType="long"
+          resultMap="propertyDetailResponseResultMap">
+    SELECT
+      id,
+      property_type,
+      name,
+      sgg_cd,
+      umd_nm,
+      jibun,
+      build_year,
+      latitude,
+      longitude,
+      latest_sale_price,
+      latest_deposit,
+      latest_monthly_rent
+    FROM property
+    WHERE id = #{propertyId}
+  </select>
+
+  <select id="selectSaleDealsByPropertyId"
+          resultMap="propertySaleDealResponseResultMap">
+    SELECT
+      id,
+      exclusive_area,
+      land_area,
+      deal_amount,
+      floor,
+      deal_date,
+      buyer_gbn,
+      seller_gbn
+    FROM sale_deal
+    WHERE property_id = #{propertyId}
+    ORDER BY deal_date DESC, id DESC
+    LIMIT #{limit}
+    OFFSET #{offset}
+  </select>
+
+  <select id="selectRentDealsByPropertyId"
+          resultMap="propertyRentDealResponseResultMap">
+    SELECT
+      id,
+      exclusive_area,
+      land_area,
+      deposit,
+      monthly_rent,
+      floor,
+      contract_term,
+      contract_type,
+      use_rr_right,
+      pre_deposit,
+      pre_monthly_rent,
+      deal_date
+    FROM rent_deal
+    WHERE property_id = #{propertyId}
+      <choose>
+        <when test="rentDealType == 'MONTHLY_RENT'">
+          AND monthly_rent &gt; 0
+        </when>
+        <otherwise>
+          AND monthly_rent = 0
+        </otherwise>
+      </choose>
+    ORDER BY deal_date DESC, id DESC
+    LIMIT #{limit}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countSaleDealsByPropertyId"
+          parameterType="long"
+          resultType="long">
+    SELECT COUNT(*)
+    FROM sale_deal
+    WHERE property_id = #{propertyId}
+  </select>
+
+  <select id="countRentDealsByPropertyId"
+          resultType="long">
+    SELECT COUNT(*)
+    FROM rent_deal
+    WHERE property_id = #{propertyId}
+      <choose>
+        <when test="rentDealType == 'MONTHLY_RENT'">
+          AND monthly_rent &gt; 0
+        </when>
+        <otherwise>
+          AND monthly_rent = 0
+        </otherwise>
+      </choose>
   </select>
 
   <select id="findProperty"

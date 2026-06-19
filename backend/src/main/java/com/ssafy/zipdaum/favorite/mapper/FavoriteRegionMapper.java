@@ -1,6 +1,5 @@
 package com.ssafy.zipdaum.favorite.mapper;
 
-import com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse;
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import java.time.LocalDate;
 import java.util.List;

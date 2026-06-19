@@ -1,5 +1,7 @@
 package com.ssafy.zipdaum.property.api;
 
+import com.ssafy.zipdaum.global.error.ErrorCode;
+import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.config.PropertyApiProperties;
 import com.ssafy.zipdaum.property.domain.DealApiType;
 import com.ssafy.zipdaum.property.dto.PropertyItem;
@@ -12,13 +14,17 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class PropertyApiClient {
 
   private static final int NUM_OF_ROWS = 1000;
@@ -27,15 +33,26 @@ public class PropertyApiClient {
   private final PropertyApiProperties properties;
 
   public List<PropertyItem> fetch(DealApiType apiType, String lawdCd, String dealYmd) {
-    String response = restClient.get()
-        .uri(URI.create(apiType.getUrl()
-            + "?serviceKey=" + properties.getServiceKey()
-            + "&LAWD_CD=" + lawdCd
-            + "&DEAL_YMD=" + dealYmd
-            + "&numOfRows=" + NUM_OF_ROWS
-            + "&pageNo=1"))
-        .retrieve()
-        .body(String.class);
+    String response;
+    try {
+      response = restClient.get()
+          .uri(URI.create(apiType.getUrl()
+              + "?serviceKey=" + properties.getServiceKey()
+              + "&LAWD_CD=" + lawdCd
+              + "&DEAL_YMD=" + dealYmd
+              + "&numOfRows=" + NUM_OF_ROWS
+              + "&pageNo=1"))
+          .retrieve()
+          .body(String.class);
+    } catch (ResourceAccessException e) {
+      log.warn("공공데이터 API 응답 지연 또는 연결 실패 type={}, lawdCd={}, dealYmd={}",
+          apiType, lawdCd, dealYmd);
+      throw new BusinessException(ErrorCode.REAL_ESTATE_API_TIMEOUT);
+    } catch (RestClientException e) {
+      log.warn("공공데이터 API 호출 실패 type={}, lawdCd={}, dealYmd={}",
+          apiType, lawdCd, dealYmd);
+      throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+    }
 
     return parse(apiType, lawdCd, response);
   }

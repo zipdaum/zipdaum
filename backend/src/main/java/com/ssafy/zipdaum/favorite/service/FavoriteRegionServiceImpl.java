@@ -59,7 +59,7 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
         region.setRegionName(RegionCode.nameOf(region.getSggCd()))
     );
 
-    log.info("관심 지역 조회 완료 userId={}, regionCount={}", userId, favoriteRegions.size());
+    log.debug("관심 지역 조회 완료 userId={}, regionCount={}", userId, favoriteRegions.size());
 
     return favoriteRegions;
   }
