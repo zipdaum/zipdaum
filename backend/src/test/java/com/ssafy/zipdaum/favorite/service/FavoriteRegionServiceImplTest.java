@@ -2,25 +2,23 @@ package com.ssafy.zipdaum.favorite.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse;
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import com.ssafy.zipdaum.favorite.mapper.FavoriteRegionMapper;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
-import com.ssafy.zipdaum.property.domain.RegionCode;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 
-@SuppressWarnings("unchecked")
 class FavoriteRegionServiceImplTest {
 
   private final FavoriteRegionMapper favoriteRegionMapper = mock(FavoriteRegionMapper.class);
@@ -28,84 +26,31 @@ class FavoriteRegionServiceImplTest {
       new FavoriteRegionServiceImpl(favoriteRegionMapper);
 
   @Test
-  void findFavoriteRegionCandidates_구와_동_검색어로_관심_지역_등록_후보를_조회한다() {
+  void findFavoriteRegionCandidates_검색어_공백을_제거한_키워드로_지역_후보를_조회한다() {
     FavoriteRegionCandidateResponse candidate = new FavoriteRegionCandidateResponse();
     candidate.setSggCd("26350");
     candidate.setUmdNm("우동");
-    given(favoriteRegionMapper.selectFavoriteRegionCandidates(List.of("26350"), "우동"))
+    candidate.setDisplayName("부산광역시 해운대구 우동");
+    given(favoriteRegionMapper.selectFavoriteRegionCandidates("해운대우동"))
         .willReturn(List.of(candidate));
 
     List<FavoriteRegionCandidateResponse> result =
-        service.findFavoriteRegionCandidates("해운대우동");
+        service.findFavoriteRegionCandidates(" 해운대 우동 ");
 
     assertThat(result).containsExactly(candidate);
-    assertThat(result.getFirst().getDisplayName()).isEqualTo("부산 해운대구 우동");
-    then(favoriteRegionMapper).should()
-        .selectFavoriteRegionCandidates(List.of("26350"), "우동");
+    then(favoriteRegionMapper).should().selectFavoriteRegionCandidates("해운대우동");
   }
 
   @Test
-  void findFavoriteRegionCandidates_구_검색어로_관심_지역_등록_후보를_조회한다() {
-    FavoriteRegionCandidateResponse candidate = new FavoriteRegionCandidateResponse();
-    candidate.setSggCd("26350");
-    candidate.setUmdNm("우동");
-    given(favoriteRegionMapper.selectFavoriteRegionCandidates(List.of("26350"), null))
-        .willReturn(List.of(candidate));
+  void findFavoriteRegionCandidates_LIKE_특수문자를_이스케이프해서_조회한다() {
+    given(favoriteRegionMapper.selectFavoriteRegionCandidates("\\%우\\_동"))
+        .willReturn(List.of());
 
     List<FavoriteRegionCandidateResponse> result =
-        service.findFavoriteRegionCandidates(" 부산 해운대 ");
+        service.findFavoriteRegionCandidates("%우_동");
 
-    assertThat(result).containsExactly(candidate);
-    assertThat(result.getFirst().getDisplayName()).isEqualTo("부산 해운대구 우동");
-    then(favoriteRegionMapper).should()
-        .selectFavoriteRegionCandidates(List.of("26350"), null);
-  }
-
-  @Test
-  void findFavoriteRegionCandidates_동_검색어로_관심_지역_등록_후보를_조회한다() {
-    FavoriteRegionCandidateResponse candidate = new FavoriteRegionCandidateResponse();
-    candidate.setSggCd("26350");
-    candidate.setUmdNm("우동");
-    given(favoriteRegionMapper.selectFavoriteRegionCandidates(List.of(), "우동"))
-        .willReturn(List.of(candidate));
-
-    List<FavoriteRegionCandidateResponse> result =
-        service.findFavoriteRegionCandidates("우동");
-
-    assertThat(result).containsExactly(candidate);
-    assertThat(result.getFirst().getDisplayName()).isEqualTo("부산 해운대구 우동");
-    then(favoriteRegionMapper).should()
-        .selectFavoriteRegionCandidates(List.of(), "우동");
-  }
-
-  @Test
-  void findFavoriteRegionCandidates_서구_검색어는_서구와_강서구를_함께_조회한다() {
-    given(favoriteRegionMapper.selectFavoriteRegionCandidates(
-        org.mockito.ArgumentMatchers.anyList(),
-        org.mockito.ArgumentMatchers.isNull()
-    )).willReturn(List.of());
-
-    service.findFavoriteRegionCandidates("서구");
-
-    ArgumentCaptor<List<String>> sggCdsCaptor = ArgumentCaptor.forClass(List.class);
-    then(favoriteRegionMapper).should()
-        .selectFavoriteRegionCandidates(sggCdsCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
-    assertThat(sggCdsCaptor.getValue()).contains("26140", "26440");
-  }
-
-  @Test
-  void findFavoriteRegionCandidates_강서구_검색어는_서구를_제외하고_강서구만_조회한다() {
-    given(favoriteRegionMapper.selectFavoriteRegionCandidates(
-        org.mockito.ArgumentMatchers.anyList(),
-        org.mockito.ArgumentMatchers.isNull()
-    )).willReturn(List.of());
-
-    service.findFavoriteRegionCandidates("강서구");
-
-    ArgumentCaptor<List<String>> sggCdsCaptor = ArgumentCaptor.forClass(List.class);
-    then(favoriteRegionMapper).should()
-        .selectFavoriteRegionCandidates(sggCdsCaptor.capture(), org.mockito.ArgumentMatchers.isNull());
-    assertThat(sggCdsCaptor.getValue()).containsExactly("26440");
+    assertThat(result).isEmpty();
+    then(favoriteRegionMapper).should().selectFavoriteRegionCandidates("\\%우\\_동");
   }
 
   @Test
@@ -141,9 +86,11 @@ class FavoriteRegionServiceImplTest {
   }
 
   @Test
-  void findFavoriteRegions_관심_지역에_지역명을_설정하여_반환한다() {
+  void findFavoriteRegions_관심_지역_목록을_조회한다() {
     FavoriteRegionResponse favoriteRegion = new FavoriteRegionResponse();
     favoriteRegion.setSggCd("26350");
+    favoriteRegion.setRegionName("부산광역시 해운대구");
+    favoriteRegion.setUmdNm("우동");
     given(favoriteRegionMapper.selectFavoriteRegions(
         org.mockito.ArgumentMatchers.eq(1L),
         any(LocalDate.class)
@@ -152,7 +99,6 @@ class FavoriteRegionServiceImplTest {
     List<FavoriteRegionResponse> result = service.findFavoriteRegions(1L);
 
     assertThat(result).containsExactly(favoriteRegion);
-    assertThat(result.getFirst().getRegionName()).isEqualTo(RegionCode.nameOf("26350"));
     then(favoriteRegionMapper).should()
         .selectFavoriteRegions(org.mockito.ArgumentMatchers.eq(1L), any(LocalDate.class));
   }
@@ -171,23 +117,31 @@ class FavoriteRegionServiceImplTest {
 
   @Test
   void saveFavoriteRegion_존재하는_지역이면_관심_지역으로_등록한다() {
+    given(favoriteRegionMapper.existsRegion("26350", "우동")).willReturn(true);
+
     service.saveFavoriteRegion(1L, "26350", "우동");
 
+    then(favoriteRegionMapper).should().existsRegion("26350", "우동");
     then(favoriteRegionMapper).should().insertFavoriteRegion(1L, "26350", "우동");
   }
 
   @Test
   void saveFavoriteRegion_존재하지_않는_지역이면_INVALID_REGION_CODE_예외가_발생한다() {
+    given(favoriteRegionMapper.existsRegion("99999", "없는동")).willReturn(false);
+
     assertThatThrownBy(() -> service.saveFavoriteRegion(1L, "99999", "없는동"))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_REGION_CODE)
         );
 
-    then(favoriteRegionMapper).shouldHaveNoInteractions();
+    then(favoriteRegionMapper).should().existsRegion("99999", "없는동");
+    then(favoriteRegionMapper).should(never())
+        .insertFavoriteRegion(any(Long.class), any(String.class), any(String.class));
   }
 
   @Test
   void saveFavoriteRegion_이미_등록된_관심_지역이면_FAVORITE_ALREADY_EXISTS_예외가_발생한다() {
+    given(favoriteRegionMapper.existsRegion("26350", "우동")).willReturn(true);
     willThrow(new DuplicateKeyException("중복 관심 지역"))
         .given(favoriteRegionMapper).insertFavoriteRegion(1L, "26350", "우동");
 

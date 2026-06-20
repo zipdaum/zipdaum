@@ -5,13 +5,8 @@ import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import com.ssafy.zipdaum.favorite.mapper.FavoriteRegionMapper;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
-import com.ssafy.zipdaum.property.domain.RegionCode;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -31,18 +26,10 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
   @Transactional(readOnly = true)
   public List<FavoriteRegionCandidateResponse> findFavoriteRegionCandidates(String keyword) {
     String normalizedKeyword = normalizeSearchKeyword(keyword);
-    RegionSearchCondition condition = buildRegionSearchCondition(normalizedKeyword);
+    String searchKeyword = escapeLikeKeyword(removeBlank(normalizedKeyword));
 
     List<FavoriteRegionCandidateResponse> candidates =
-        favoriteRegionMapper.selectFavoriteRegionCandidates(
-            condition.sggCds(),
-            condition.umdKeyword()
-        );
-
-    candidates.forEach(candidate -> {
-      String regionName = RegionCode.nameOf(candidate.getSggCd());
-      candidate.setDisplayName(regionName + " " + candidate.getUmdNm());
-    });
+        favoriteRegionMapper.selectFavoriteRegionCandidates(searchKeyword);
 
     log.debug("관심 지역 등록 후보 검색 완료 candidateCount={}", candidates.size());
 
@@ -55,10 +42,6 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
     List<FavoriteRegionResponse> favoriteRegions =
         favoriteRegionMapper.selectFavoriteRegions(userId, LocalDate.now().minusYears(1));
 
-    favoriteRegions.forEach(region ->
-        region.setRegionName(RegionCode.nameOf(region.getSggCd()))
-    );
-
     log.debug("관심 지역 조회 완료 userId={}, regionCount={}", userId, favoriteRegions.size());
 
     return favoriteRegions;
@@ -70,8 +53,8 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
     String normalizedSggCd = sggCd.trim();
     String normalizedUmdNm = umdNm.trim();
 
-    if (!RegionCode.isValid(normalizedSggCd)) {
-      log.warn("존재하지 않는 지역 코드 sggCd={}", normalizedSggCd);
+    if (!favoriteRegionMapper.existsRegion(normalizedSggCd, normalizedUmdNm)) {
+      log.warn("존재하지 않는 지역 sggCd={}, umdNm={}", normalizedSggCd, normalizedUmdNm);
       throw new BusinessException(ErrorCode.INVALID_REGION_CODE);
     }
 
@@ -153,103 +136,7 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
         .replace("_", "\\_");
   }
 
-  private RegionSearchCondition buildRegionSearchCondition(String keyword) {
-    String compactKeyword = removeBlank(keyword);
-
-    List<RegionMatch> sggOnlyMatches = findSggOnlyMatches(compactKeyword);
-
-    if (!sggOnlyMatches.isEmpty()) {
-      return new RegionSearchCondition(toDistinctSggCds(sggOnlyMatches), null);
-    }
-
-    List<RegionMatch> sggUmdCompositeMatches = findSggUmdCompositeMatches(compactKeyword);
-
-    if (sggUmdCompositeMatches.isEmpty()) {
-      return new RegionSearchCondition(List.of(), escapeLikeKeyword(compactKeyword));
-    }
-
-    RegionMatch longestMatch = sggUmdCompositeMatches.getFirst();
-    String remainingKeyword = compactKeyword.replace(longestMatch.keyword(), "");
-    String umdKeyword = remainingKeyword.isBlank() ? null : escapeLikeKeyword(remainingKeyword);
-    List<String> sggCds = sggUmdCompositeMatches.stream()
-        .filter(match -> match.keyword().length() == longestMatch.keyword().length())
-        .map(RegionMatch::sggCd)
-        .distinct()
-        .toList();
-
-    return new RegionSearchCondition(sggCds, umdKeyword);
-  }
-
-  private List<RegionMatch> findSggOnlyMatches(String keyword) {
-    return findRegionMatches(keyword, true);
-  }
-
-  private List<RegionMatch> findSggUmdCompositeMatches(String keyword) {
-    return findRegionMatches(keyword, false);
-  }
-
-  private List<RegionMatch> findRegionMatches(String keyword, boolean sggOnlySearch) {
-    List<RegionMatch> matches = new ArrayList<>();
-
-    for (RegionCode regionCode : RegionCode.values()) {
-      for (String regionKeyword : createRegionKeywords(regionCode.getName())) {
-        boolean matched = sggOnlySearch
-            ? regionKeyword.contains(keyword)
-            : keyword.contains(regionKeyword);
-        if (matched) {
-          matches.add(new RegionMatch(regionCode.getLawdCd(), regionKeyword));
-        }
-      }
-    }
-
-    return matches.stream()
-        .sorted(Comparator.comparingInt((RegionMatch match) -> match.keyword().length()).reversed())
-        .toList();
-  }
-
-  private List<String> toDistinctSggCds(List<RegionMatch> matches) {
-    return matches.stream()
-        .map(RegionMatch::sggCd)
-        .distinct()
-        .toList();
-  }
-
-  private Set<String> createRegionKeywords(String regionName) {
-    String compactRegionName = removeBlank(regionName);
-    String withoutBusan = compactRegionName.replace("부산", "");
-    String withFullBusan = compactRegionName.replace("부산", "부산광역시");
-
-    Set<String> keywords = new LinkedHashSet<>();
-    addRegionKeyword(keywords, compactRegionName);
-    addRegionKeyword(keywords, withoutBusan);
-    addRegionKeyword(keywords, withFullBusan);
-    addRegionKeyword(keywords, removeRegionSuffix(compactRegionName));
-    addRegionKeyword(keywords, removeRegionSuffix(withoutBusan));
-    addRegionKeyword(keywords, removeRegionSuffix(withFullBusan));
-
-    return keywords;
-  }
-
-  private void addRegionKeyword(Set<String> keywords, String keyword) {
-    if (keyword != null && keyword.length() >= 2) {
-      keywords.add(keyword);
-    }
-  }
-
-  private String removeRegionSuffix(String keyword) {
-    if (keyword.endsWith("구") || keyword.endsWith("군")) {
-      return keyword.substring(0, keyword.length() - 1);
-    }
-    return keyword;
-  }
-
   private String removeBlank(String value) {
     return value.replaceAll("\\s+", "");
-  }
-
-  private record RegionSearchCondition(List<String> sggCds, String umdKeyword) {
-  }
-
-  private record RegionMatch(String sggCd, String keyword) {
   }
 }
