@@ -10,8 +10,10 @@ import lombok.Setter;
 public class FavoriteRegionResponse {
 
   private String sggCd;
-  private String regionName;
+  private String sggNm;
+  private String umdCd;
   private String umdNm;
+  private String displayName;
   private Long latestSalePrice;
   private Long latestJeonseDeposit;
   private Long latestMonthlyRentDeposit;

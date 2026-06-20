@@ -130,11 +130,14 @@ async function handleDeleteProperty(property) {
 
 function mapFavoriteRegion(region) {
   return {
-    id: `${region.sggCd}-${region.umdNm}`,
+    id: region.umdCd || `${region.sggCd}-${region.umdNm}`,
     sggCd: region.sggCd,
+    sggNm: region.sggNm,
+    umdCd: region.umdCd,
     umdNm: region.umdNm,
-    regionName:
-      region.regionName ||
+    displayName:
+      region.displayName ||
+      [region.sggNm, region.umdNm].filter(Boolean).join(" ") ||
       [region.sggCd, region.umdNm].filter(Boolean).join(" "),
     salePrice: region.latestSalePrice,
     jeonseDeposit: region.latestJeonseDeposit,
@@ -330,7 +333,7 @@ function getErrorMessage(error, fallbackMessage) {
             >
               <div class="favorite-row-header">
                 <div class="favorite-main">
-                  <strong>{{ region.regionName }}</strong>
+                  <strong>{{ region.displayName }}</strong>
                   <span>최근 거래 기준 요약</span>
                 </div>
 

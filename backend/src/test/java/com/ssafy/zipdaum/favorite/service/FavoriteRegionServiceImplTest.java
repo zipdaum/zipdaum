@@ -89,8 +89,10 @@ class FavoriteRegionServiceImplTest {
   void findFavoriteRegions_관심_지역_목록을_조회한다() {
     FavoriteRegionResponse favoriteRegion = new FavoriteRegionResponse();
     favoriteRegion.setSggCd("26350");
-    favoriteRegion.setRegionName("부산광역시 해운대구");
+    favoriteRegion.setSggNm("부산광역시 해운대구");
+    favoriteRegion.setUmdCd("2635010500");
     favoriteRegion.setUmdNm("우동");
+    favoriteRegion.setDisplayName("부산광역시 해운대구 우동");
     given(favoriteRegionMapper.selectFavoriteRegions(
         org.mockito.ArgumentMatchers.eq(1L),
         any(LocalDate.class)
