@@ -6,8 +6,10 @@
   <resultMap id="favoriteRegionResponseResultMap"
              type="com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse">
     <id property="sggCd" column="sgg_cd"/>
+    <id property="umdCd" column="umd_cd"/>
     <id property="umdNm" column="umd_nm"/>
-    <result property="regionName" column="region_name"/>
+    <result property="sggNm" column="sgg_nm"/>
+    <result property="displayName" column="display_name"/>
     <result property="latestSalePrice" column="latest_sale_price"/>
     <result property="latestJeonseDeposit" column="latest_jeonse_deposit"/>
     <result property="latestMonthlyRentDeposit" column="latest_monthly_rent_deposit"/>
@@ -20,7 +22,9 @@
   <resultMap id="favoriteRegionCandidateResponseResultMap"
              type="com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse">
     <id property="sggCd" column="sgg_cd"/>
+    <id property="umdCd" column="umd_cd"/>
     <id property="umdNm" column="umd_nm"/>
+    <result property="sggNm" column="sgg_nm"/>
     <result property="displayName" column="display_name"/>
   </resultMap>
 
@@ -28,6 +32,8 @@
           resultMap="favoriteRegionCandidateResponseResultMap">
     SELECT
       r.sgg_cd,
+      r.sgg_nm,
+      r.umd_cd,
       r.umd_nm,
       CONCAT(r.sgg_nm, ' ', r.umd_nm) AS display_name
     FROM region r
@@ -53,8 +59,10 @@
   <select id="selectFavoriteRegions" resultMap="favoriteRegionResponseResultMap">
     SELECT
       fr.sgg_cd,
-      r.sgg_nm AS region_name,
+      r.sgg_nm,
+      r.umd_cd,
       fr.umd_nm,
+      CONCAT_WS(' ', r.sgg_nm, NULLIF(r.umd_nm, '')) AS display_name,
       (
         SELECT sd.deal_amount
         FROM sale_deal sd

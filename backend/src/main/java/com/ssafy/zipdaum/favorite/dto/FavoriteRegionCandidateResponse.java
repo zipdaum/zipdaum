@@ -10,6 +10,8 @@ import lombok.Setter;
 public class FavoriteRegionCandidateResponse {
 
   private String sggCd;
+  private String sggNm;
+  private String umdCd;
   private String umdNm;
   private String displayName;
 }
