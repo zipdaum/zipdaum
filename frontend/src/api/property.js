@@ -29,3 +29,7 @@ export async function getPropertyRecommendationScore(propertyId) {
   const response = await client.get(`/properties/${propertyId}/recommendation-score`)
   return response.data
 }
+
+export async function savePropertyInteraction(propertyId, payload) {
+  await client.post(`/properties/${propertyId}/interactions`, payload)
+}
