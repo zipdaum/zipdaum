@@ -591,20 +591,43 @@ function goToLoginForRecommendation() {
   });
 }
 
-function openRecommendationScoreDetail() {
-  const propertyId = normalizePropertyId(selectedPropertyDetail.value?.id);
+async function openRecommendationScoreDetail() {
+  const propertyId = getActiveDetailPropertyId();
 
   if (!propertyId) {
     return;
   }
 
   markRecommendationDetailClicked();
-  router.push({
+  saveDetailInteraction();
+  const target = {
     name: "property-recommendation-score",
     params: {
       propertyId,
     },
-  });
+  };
+  const targetUrl = router.resolve(target).href;
+
+  try {
+    await router.push(target);
+  } catch (error) {
+    window.location.assign(targetUrl);
+    return;
+  }
+
+  if (!window.location.pathname.startsWith("/recommendation-score/properties/")) {
+    window.location.assign(targetUrl);
+  }
+}
+
+function getActiveDetailPropertyId() {
+  return (
+    normalizePropertyId(selectedPropertyDetail.value?.id) ||
+    normalizePropertyId(detailInteraction.value?.propertyId) ||
+    normalizePropertyId(
+      new URLSearchParams(window.location.search).get("propertyId"),
+    )
+  );
 }
 
 async function loadHistories(propertyId, options = {}) {
