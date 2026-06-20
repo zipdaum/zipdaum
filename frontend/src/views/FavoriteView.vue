@@ -23,6 +23,8 @@ const errorMessage = ref("");
 const regionMessage = ref("");
 const propertyMessage = ref("");
 const toastMessage = ref("");
+const toastVariant = ref("success");
+const toastKey = ref(0);
 const regionSearchKeyword = ref("");
 const regionCandidates = ref([]);
 const isSearchingRegions = ref(false);
@@ -52,6 +54,9 @@ const paginatedFavoriteRegions = computed(() =>
 );
 const paginatedFavoriteProperties = computed(() =>
   getPaginatedItems(favoriteProperties.value, propertyPage.value),
+);
+const toastLabel = computed(() =>
+  toastVariant.value === "notice" ? "안내" : "완료",
 );
 
 onMounted(() => {
@@ -146,7 +151,7 @@ async function handleSearchRegionCandidates() {
       mapRegionCandidate,
     );
     if (regionCandidates.value.length === 0) {
-      regionMessage.value = "검색 결과가 없습니다.";
+      showToast("검색 결과가 없습니다.", "notice");
     }
   } catch (error) {
     regionMessage.value = getErrorMessage(
@@ -182,10 +187,16 @@ async function handleAddRegion(candidate) {
     );
     await loadFavoriteRegions();
   } catch (error) {
-    regionMessage.value = getErrorMessage(
+    const message = getErrorMessage(
       error,
       "관심 지역을 등록하지 못했습니다.",
     );
+    if (isFavoriteAlreadyExistsError(error, message)) {
+      showToast(message, "notice");
+      return;
+    }
+
+    regionMessage.value = message;
   }
 }
 
@@ -212,7 +223,7 @@ async function handleSearchPropertyCandidates() {
       .slice(0, 20);
 
     if (propertyCandidates.value.length === 0) {
-      propertyMessage.value = "검색 결과가 없습니다.";
+      showToast("검색 결과가 없습니다.", "notice");
     }
   } catch (error) {
     propertyMessage.value = getErrorMessage(
@@ -236,10 +247,16 @@ async function handleAddProperty(candidate) {
     );
     await loadFavoriteProperties();
   } catch (error) {
-    propertyMessage.value = getErrorMessage(
+    const message = getErrorMessage(
       error,
       "관심 주택을 등록하지 못했습니다.",
     );
+    if (isFavoriteAlreadyExistsError(error, message)) {
+      showToast(message, "notice");
+      return;
+    }
+
+    propertyMessage.value = message;
   }
 }
 
@@ -274,8 +291,10 @@ function containsTarget(target, ...elements) {
   return elements.some((element) => element?.contains(target));
 }
 
-function showToast(message) {
+function showToast(message, variant = "success") {
   toastMessage.value = message;
+  toastVariant.value = variant;
+  toastKey.value += 1;
 
   if (toastTimer) {
     clearTimeout(toastTimer);
@@ -487,6 +506,13 @@ function clampFavoritePages() {
 function getErrorMessage(error, fallbackMessage) {
   return (
     error.response?.data?.message || error.response?.data || fallbackMessage
+  );
+}
+
+function isFavoriteAlreadyExistsError(error, message) {
+  return (
+    error.response?.data?.code === "F002" ||
+    String(message).includes("이미 관심 목록")
   );
 }
 </script>
@@ -839,11 +865,13 @@ function getErrorMessage(error, fallbackMessage) {
 
     <div
       v-if="toastMessage"
+      :key="toastKey"
       class="favorite-toast"
+      :class="`favorite-toast-${toastVariant}`"
       role="status"
       aria-live="polite"
     >
-      <strong>완료</strong>
+      <strong>{{ toastLabel }}</strong>
       <span>{{ toastMessage }}</span>
     </div>
   </main>

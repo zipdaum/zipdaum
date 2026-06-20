@@ -319,6 +319,20 @@
   line-height: 1.35;
 }
 
+.favorite-toast-notice {
+  border-color: #bfdbfe;
+  border-left-color: #2563eb;
+}
+
+.favorite-toast-notice::before {
+  background: #2563eb;
+  content: "!";
+}
+
+.favorite-toast-notice strong {
+  color: #1d4ed8;
+}
+
 @keyframes favorite-toast-enter {
   from {
     opacity: 0;
