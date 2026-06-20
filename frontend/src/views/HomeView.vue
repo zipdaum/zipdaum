@@ -483,7 +483,10 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       selectedPropertyDetail.value.id !== normalizedPropertyId
     ) {
       const detail = await fetchPropertyDetail(normalizedPropertyId);
-      selectedPropertyDetail.value = createPropertyDetailState(detail);
+      selectedPropertyDetail.value = createPropertyDetailState(
+        detail,
+        normalizedPropertyId,
+      );
     }
 
     isDetailLoading.value = false;
@@ -494,7 +497,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
         rentDealType: "JEONSE",
       }),
       loadSurroundings(selectedPropertyDetail.value),
-      loadRecommendationScore(selectedPropertyDetail.value.id),
+      loadRecommendationScore(normalizedPropertyId),
     ]);
 
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
@@ -521,9 +524,10 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   }
 }
 
-function createPropertyDetailState(detail) {
+function createPropertyDetailState(detail, propertyId) {
   return {
     ...detail,
+    id: normalizePropertyId(detail?.id) || propertyId,
     saleDeals: [],
     rentDeals: [],
     rentDealsByType: createEmptyRentDealsByType(),
@@ -568,14 +572,16 @@ function goToLoginForRecommendation() {
 }
 
 function openRecommendationScoreDetail() {
-  if (!selectedPropertyDetail.value?.id) {
+  const propertyId = normalizePropertyId(selectedPropertyDetail.value?.id);
+
+  if (!propertyId) {
     return;
   }
 
   router.push({
     name: "property-recommendation-score",
     params: {
-      propertyId: selectedPropertyDetail.value.id,
+      propertyId,
     },
   });
 }
