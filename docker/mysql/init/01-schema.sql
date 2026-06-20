@@ -33,6 +33,20 @@ CREATE TABLE property (
   UNIQUE KEY uk_property_public_source (property_type, sgg_cd, umd_nm, jibun, name, build_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE region (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  sgg_cd VARCHAR(10) NOT NULL,
+  sgg_nm VARCHAR(50) NOT NULL,
+  umd_cd VARCHAR(10) NOT NULL,
+  umd_nm VARCHAR(50) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_region_umd_cd (umd_cd),
+  UNIQUE KEY uk_region_sgg_umd (sgg_cd, umd_nm),
+  KEY idx_region_umd_nm (umd_nm)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE sale_deal (
   id BIGINT NOT NULL AUTO_INCREMENT,
   property_id BIGINT NOT NULL,
@@ -154,20 +168,4 @@ CREATE TABLE user_preference (
   CONSTRAINT fk_user_preference_preference_type
     FOREIGN KEY (preference_type_id) REFERENCES preference_type (id)
     ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE notification (
-  id BIGINT NOT NULL AUTO_INCREMENT,
-  user_id BIGINT NOT NULL,
-  type VARCHAR(30) NOT NULL,
-  content VARCHAR(255) NOT NULL,
-  is_read BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_notification_user_id (user_id),
-  KEY idx_notification_is_read (is_read),
-  CONSTRAINT fk_notification_user
-    FOREIGN KEY (user_id) REFERENCES users (id)
-    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
