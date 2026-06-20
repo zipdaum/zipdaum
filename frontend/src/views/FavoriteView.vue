@@ -17,8 +17,8 @@ const router = useRouter();
 
 const favoriteRegions = ref([]);
 const favoriteProperties = ref([]);
-const isLoading = ref(true);
-const hasLoadedFavorites = ref(false);
+const isLoadingRegions = ref(true);
+const isLoadingProperties = ref(true);
 const errorMessage = ref("");
 const regionMessage = ref("");
 const propertyMessage = ref("");
@@ -53,7 +53,7 @@ const paginatedFavoriteProperties = computed(() =>
 );
 
 onMounted(() => {
-  loadFavorites();
+  Promise.all([loadFavoriteRegions(), loadFavoriteProperties()]);
   document.addEventListener("click", handleFavoriteSearchOutsideClick);
 });
 
@@ -61,31 +61,39 @@ onBeforeUnmount(() => {
   document.removeEventListener("click", handleFavoriteSearchOutsideClick);
 });
 
-async function loadFavorites() {
-  isLoading.value = true;
+async function loadFavoriteRegions() {
+  isLoadingRegions.value = true;
   errorMessage.value = "";
 
   try {
-    const [regions, properties] = await Promise.all([
-      getFavoriteRegions(),
-      getFavoriteProperties(),
-    ]);
-
+    const regions = await getFavoriteRegions();
     favoriteRegions.value = regions.map(mapFavoriteRegion);
-    favoriteProperties.value = properties.map(mapFavoriteProperty);
-    hasLoadedFavorites.value = true;
     clampFavoritePages();
   } catch (error) {
-    if (error.response?.status !== 401) {
-      hasLoadedFavorites.value = true;
-    }
-
     errorMessage.value = getErrorMessage(
       error,
-      "관심 목록을 불러오지 못했습니다.",
+      "관심 지역 목록을 불러오지 못했습니다.",
     );
   } finally {
-    isLoading.value = false;
+    isLoadingRegions.value = false;
+  }
+}
+
+async function loadFavoriteProperties() {
+  isLoadingProperties.value = true;
+  errorMessage.value = "";
+
+  try {
+    const properties = await getFavoriteProperties();
+    favoriteProperties.value = properties.map(mapFavoriteProperty);
+    clampFavoritePages();
+  } catch (error) {
+    errorMessage.value = getErrorMessage(
+      error,
+      "관심 주택 목록을 불러오지 못했습니다.",
+    );
+  } finally {
+    isLoadingProperties.value = false;
   }
 }
 
@@ -156,7 +164,7 @@ async function handleAddRegion(candidate) {
     regionMessage.value = "관심 지역을 등록했습니다.";
     regionSearchKeyword.value = "";
     regionCandidates.value = [];
-    await loadFavorites();
+    await loadFavoriteRegions();
   } catch (error) {
     regionMessage.value = getErrorMessage(
       error,
@@ -209,7 +217,7 @@ async function handleAddProperty(candidate) {
     propertyMessage.value = "관심 주택을 등록했습니다.";
     propertySearchKeyword.value = "";
     propertyCandidates.value = [];
-    await loadFavorites();
+    await loadFavoriteProperties();
   } catch (error) {
     propertyMessage.value = getErrorMessage(
       error,
@@ -250,7 +258,7 @@ async function handleDeleteRegion(region) {
       umdNm: region.umdNm,
     });
     regionMessage.value = "관심 지역을 해제했습니다.";
-    await loadFavorites();
+    await loadFavoriteRegions();
   } catch (error) {
     regionMessage.value = getErrorMessage(
       error,
@@ -266,7 +274,7 @@ async function handleDeleteProperty(property) {
   try {
     await deleteFavoriteProperty(property.propertyId);
     propertyMessage.value = "관심 주택을 해제했습니다.";
-    await loadFavorites();
+    await loadFavoriteProperties();
   } catch (error) {
     propertyMessage.value = getErrorMessage(
       error,
@@ -446,11 +454,6 @@ function getErrorMessage(error, fallbackMessage) {
 
 <template>
   <main class="app-shell favorite-page">
-    <p v-if="!hasLoadedFavorites" class="empty-message">
-      관심 목록을 불러오는 중입니다.
-    </p>
-
-    <template v-else>
     <AppHeader @home="goHome" />
 
     <section class="favorite-header" aria-labelledby="favorite-title">
@@ -525,7 +528,7 @@ function getErrorMessage(error, fallbackMessage) {
           {{ regionMessage }}
         </p>
 
-        <p v-if="isLoading" class="empty-message">
+        <p v-if="isLoadingRegions" class="empty-message">
           관심 지역을 불러오는 중입니다.
         </p>
 
@@ -613,7 +616,11 @@ function getErrorMessage(error, fallbackMessage) {
           </div>
         </template>
         <div
-          v-if="isLoading || favoriteRegions.length === 0 || regionPageCount <= 1"
+          v-if="
+            isLoadingRegions ||
+            favoriteRegions.length === 0 ||
+            regionPageCount <= 1
+          "
           class="favorite-pagination favorite-pagination-placeholder"
           aria-hidden="true"
         ></div>
@@ -681,7 +688,7 @@ function getErrorMessage(error, fallbackMessage) {
           {{ propertyMessage }}
         </p>
 
-        <p v-if="isLoading" class="empty-message">
+        <p v-if="isLoadingProperties" class="empty-message">
           관심 주택을 불러오는 중입니다.
         </p>
 
@@ -773,14 +780,15 @@ function getErrorMessage(error, fallbackMessage) {
         </template>
         <div
           v-if="
-            isLoading || favoriteProperties.length === 0 || propertyPageCount <= 1
+            isLoadingProperties ||
+            favoriteProperties.length === 0 ||
+            propertyPageCount <= 1
           "
           class="favorite-pagination favorite-pagination-placeholder"
           aria-hidden="true"
         ></div>
       </article>
     </section>
-    </template>
   </main>
 </template>
 
