@@ -28,14 +28,28 @@
     <result property="displayName" column="display_name"/>
   </resultMap>
 
+  <sql id="normalizedRegionName">
+    REPLACE(
+      REPLACE(
+        REPLACE(
+          REPLACE(${alias}, '&#xD2B9;&#xBCC4;&#xC790;&#xCE58;&#xC2DC;', ''),
+          '&#xD2B9;&#xBCC4;&#xC790;&#xCE58;&#xB3C4;', ''
+        ),
+        '&#xD2B9;&#xBCC4;&#xC2DC;', ''
+      ),
+      '&#xAD11;&#xC5ED;&#xC2DC;', ''
+    )
+  </sql>
+
   <select id="selectFavoriteRegionCandidates"
           resultMap="favoriteRegionCandidateResponseResultMap">
-    SELECT
+    SELECT DISTINCT
       candidate.sgg_cd,
       candidate.sgg_nm,
       candidate.umd_cd,
       candidate.umd_nm,
-      candidate.display_name
+      candidate.display_name,
+      candidate.sort_order
     FROM (
       SELECT
         s.sgg_cd,
@@ -52,9 +66,11 @@
         GROUP BY r.sgg_cd
       ) s
       WHERE REPLACE(s.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(<include refid="normalizedRegionName"><property name="alias" value="s.sgg_nm"/></include>, ' ', '')
+          LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
         OR REPLACE(
           CASE
-            WHEN RIGHT(s.sgg_nm, 1) IN ('구', '군')
+            WHEN RIGHT(s.sgg_nm, 1) IN ('&#xAD70;', '&#xAD6C;')
               THEN LEFT(s.sgg_nm, CHAR_LENGTH(s.sgg_nm) - 1)
             ELSE s.sgg_nm
           END,
@@ -75,8 +91,16 @@
       WHERE REPLACE(CONCAT(r.sgg_nm, r.umd_nm), ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
         OR REPLACE(
           CONCAT(
+            <include refid="normalizedRegionName"><property name="alias" value="r.sgg_nm"/></include>,
+            r.umd_nm
+          ),
+          ' ',
+          ''
+        ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(
+          CONCAT(
             CASE
-              WHEN RIGHT(r.sgg_nm, 1) IN ('구', '군')
+              WHEN RIGHT(r.sgg_nm, 1) IN ('&#xAD70;', '&#xAD6C;')
                 THEN LEFT(r.sgg_nm, CHAR_LENGTH(r.sgg_nm) - 1)
               ELSE r.sgg_nm
             END,
