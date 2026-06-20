@@ -13,7 +13,7 @@ import lombok.Setter;
 @Schema(description = "사용자 맞춤 조건 항목 요청")
 public class UserPreferenceItemRequest {
 
-  @Schema(description = "조건 코드", example = "BUDGET")
+  @Schema(description = "조건 코드", example = "SALE_PRICE")
   @NotBlank
   private String code;
 

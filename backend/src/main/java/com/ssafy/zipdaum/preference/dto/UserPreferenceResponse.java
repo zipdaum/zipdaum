@@ -9,10 +9,10 @@ import lombok.Setter;
 @Schema(description = "사용자 맞춤 조건 응답")
 public class UserPreferenceResponse {
 
-  @Schema(description = "조건 코드", example = "BUDGET")
+  @Schema(description = "조건 코드", example = "SALE_PRICE")
   private String code;
 
-  @Schema(description = "조건명", example = "예산")
+  @Schema(description = "조건명", example = "매매가")
   private String name;
 
   @Schema(description = "조건값", example = "500000000")

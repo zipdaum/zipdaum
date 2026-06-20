@@ -90,6 +90,59 @@ class SurroundingServiceImplTest {
   }
 
   @Test
+  void findSurroundingSummary_상세목록없이_반경내_시설개수만_반환한다() {
+    service.loadFacilities();
+
+    var detailResult = service.findSurroundings(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        3000
+    );
+    var summary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        3000
+    );
+
+    assertThat(summary.getBusCount()).isEqualTo(detailResult.getSummary().getBusCount());
+    assertThat(summary.getSubwayCount()).isEqualTo(detailResult.getSummary().getSubwayCount());
+    assertThat(summary.getHospitalCount()).isEqualTo(detailResult.getSummary().getHospitalCount());
+    assertThat(summary.getCctvCount()).isEqualTo(detailResult.getSummary().getCctvCount());
+    assertThat(summary.getParkCount()).isEqualTo(detailResult.getSummary().getParkCount());
+  }
+
+  @Test
+  void findRecommendationSurroundingSummary_시설별_추천_반경으로_시설개수를_반환한다() {
+    service.loadFacilities();
+
+    var recommendationSummary = service.findRecommendationSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307")
+    );
+    var busCctvRadiusSummary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        500
+    );
+    var subwayParkRadiusSummary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        1000
+    );
+    var hospitalRadiusSummary = service.findSurroundingSummary(
+        new BigDecimal("35.1709598"),
+        new BigDecimal("129.125307"),
+        1500
+    );
+
+    assertThat(recommendationSummary.getBusCount()).isEqualTo(busCctvRadiusSummary.getBusCount());
+    assertThat(recommendationSummary.getCctvCount()).isEqualTo(busCctvRadiusSummary.getCctvCount());
+    assertThat(recommendationSummary.getSubwayCount()).isEqualTo(subwayParkRadiusSummary.getSubwayCount());
+    assertThat(recommendationSummary.getParkCount()).isEqualTo(subwayParkRadiusSummary.getParkCount());
+    assertThat(recommendationSummary.getHospitalCount()).isEqualTo(hospitalRadiusSummary.getHospitalCount());
+  }
+
+  @Test
   void findSurroundings_좌표가_없으면_예외가_발생한다() {
     assertThatThrownBy(() -> service.findSurroundings(null, new BigDecimal("129.1"), 1000))
         .isInstanceOf(BusinessException.class);

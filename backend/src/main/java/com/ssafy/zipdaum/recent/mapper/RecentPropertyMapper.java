@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.recent.mapper;
 
 import com.ssafy.zipdaum.recent.dto.RecentPropertyResponse;
+import com.ssafy.zipdaum.recent.dto.RecentPropertyScoreFactor;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -9,6 +10,8 @@ import org.apache.ibatis.annotations.Param;
 public interface RecentPropertyMapper {
 
   List<RecentPropertyResponse> selectRecentProperties(@Param("userId") Long userId);
+
+  List<RecentPropertyScoreFactor> selectRecentPropertyScoreFactors(@Param("userId") Long userId);
 
   void upsertRecentProperty(
       @Param("userId") Long userId,
