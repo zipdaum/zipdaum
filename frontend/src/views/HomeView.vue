@@ -9,6 +9,7 @@ import {
   getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
   savePropertyInteraction,
+  savePropertyInteractionKeepalive,
   searchProperties,
 } from "../api/property";
 import { isLoggedIn } from "../stores/auth";
@@ -190,6 +191,7 @@ function createEmptyRentMetaByType() {
 
 onMounted(async () => {
   await Promise.all([restoreViewFromUrl(), loadPropertyRecommendations()]);
+  window.addEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.addEventListener("popstate", handleBrowserBack);
 });
 
@@ -208,6 +210,7 @@ onUnmounted(() => {
   clearResultHighlightTimer();
   stopMapDrag();
   window.removeEventListener("scroll", updateDetailScrollDepth);
+  window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.removeEventListener("popstate", handleBrowserBack);
 });
 
@@ -980,10 +983,28 @@ function startDetailInteraction(propertyId) {
 }
 
 function saveDetailInteraction() {
+  const interaction = consumeDetailInteraction();
+  if (!interaction) {
+    return;
+  }
+
+  savePropertyInteraction(interaction.propertyId, interaction.payload).catch(() => {});
+}
+
+function saveDetailInteractionOnPageHide() {
+  const interaction = consumeDetailInteraction();
+  if (!interaction) {
+    return;
+  }
+
+  savePropertyInteractionKeepalive(interaction.propertyId, interaction.payload);
+}
+
+function consumeDetailInteraction() {
   if (!detailInteraction.value || !isLoggedIn.value) {
     detailInteraction.value = null;
     window.removeEventListener("scroll", updateDetailScrollDepth);
-    return;
+    return null;
   }
 
   updateDetailScrollDepth();
@@ -991,12 +1012,15 @@ function saveDetailInteraction() {
   detailInteraction.value = null;
   window.removeEventListener("scroll", updateDetailScrollDepth);
 
-  savePropertyInteraction(interaction.propertyId, {
-    dwellTimeMillis: Math.max(Date.now() - interaction.startedAt, 0),
-    maxScrollDepthPercent: interaction.maxScrollDepthPercent,
-    recommendationDetailClicked: interaction.recommendationDetailClicked,
-    dealHistoryClicked: interaction.dealHistoryClicked,
-  }).catch(() => {});
+  return {
+    propertyId: interaction.propertyId,
+    payload: {
+      dwellTimeMillis: Math.max(Date.now() - interaction.startedAt, 0),
+      maxScrollDepthPercent: interaction.maxScrollDepthPercent,
+      recommendationDetailClicked: interaction.recommendationDetailClicked,
+      dealHistoryClicked: interaction.dealHistoryClicked,
+    },
+  };
 }
 
 function updateDetailScrollDepth() {
