@@ -231,8 +231,9 @@ async function handleAddProperty(candidate) {
   try {
     await addFavoriteProperty(candidate.propertyId);
     showToast("관심 주택을 등록했습니다.");
-    propertySearchKeyword.value = "";
-    propertyCandidates.value = [];
+    propertyCandidates.value = propertyCandidates.value.filter(
+      (propertyCandidate) => propertyCandidate.id !== candidate.id,
+    );
     await loadFavoriteProperties();
   } catch (error) {
     propertyMessage.value = getErrorMessage(
