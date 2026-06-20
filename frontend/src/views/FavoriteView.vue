@@ -158,6 +158,15 @@ async function handleSearchRegionCandidates() {
   }
 }
 
+function handleRegionSearchInput(event) {
+  if (event.target.value.trim()) {
+    return;
+  }
+
+  regionCandidates.value = [];
+  regionMessage.value = "";
+}
+
 async function handleAddRegion(candidate) {
   regionMessage.value = "";
   errorMessage.value = "";
@@ -230,6 +239,15 @@ async function handleAddProperty(candidate) {
       "관심 주택을 등록하지 못했습니다.",
     );
   }
+}
+
+function handlePropertySearchInput(event) {
+  if (event.target.value.trim()) {
+    return;
+  }
+
+  propertyCandidates.value = [];
+  propertyMessage.value = "";
 }
 
 function handleFavoriteSearchOutsideClick(event) {
@@ -511,6 +529,8 @@ function getErrorMessage(error, fallbackMessage) {
             type="search"
             placeholder="지역명으로 검색"
             autocomplete="off"
+            @input="handleRegionSearchInput"
+            @search="handleRegionSearchInput"
           />
           <button
             class="primary-button"
@@ -668,6 +688,8 @@ function getErrorMessage(error, fallbackMessage) {
             type="search"
             placeholder="주택명으로 검색"
             autocomplete="off"
+            @input="handlePropertySearchInput"
+            @search="handlePropertySearchInput"
           />
           <button
             class="primary-button"
