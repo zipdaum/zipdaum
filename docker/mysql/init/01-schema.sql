@@ -169,4 +169,3 @@ CREATE TABLE user_preference (
     FOREIGN KEY (preference_type_id) REFERENCES preference_type (id)
     ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
