@@ -31,44 +31,86 @@
   <select id="selectFavoriteRegionCandidates"
           resultMap="favoriteRegionCandidateResponseResultMap">
     SELECT
-      r.sgg_cd,
-      r.sgg_nm,
-      r.umd_cd,
-      r.umd_nm,
-      CONCAT(r.sgg_nm, ' ', r.umd_nm) AS display_name
-    FROM region r
-    WHERE REPLACE(CONCAT(r.sgg_nm, r.umd_nm), ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
-      OR REPLACE(
-        CONCAT(
+      candidate.sgg_cd,
+      candidate.sgg_nm,
+      candidate.umd_cd,
+      candidate.umd_nm,
+      candidate.display_name
+    FROM (
+      SELECT
+        s.sgg_cd,
+        s.sgg_nm,
+        NULL AS umd_cd,
+        '' AS umd_nm,
+        s.sgg_nm AS display_name,
+        0 AS sort_order
+      FROM (
+        SELECT
+          r.sgg_cd,
+          MIN(r.sgg_nm) AS sgg_nm
+        FROM region r
+        GROUP BY r.sgg_cd
+      ) s
+      WHERE REPLACE(s.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(
           CASE
-            WHEN RIGHT(r.sgg_nm, 1) IN ('구', '군')
-              THEN LEFT(r.sgg_nm, CHAR_LENGTH(r.sgg_nm) - 1)
-            ELSE r.sgg_nm
+            WHEN RIGHT(s.sgg_nm, 1) IN ('구', '군')
+              THEN LEFT(s.sgg_nm, CHAR_LENGTH(s.sgg_nm) - 1)
+            ELSE s.sgg_nm
           END,
-          r.umd_nm
-        ),
-        ' ',
-        ''
-      ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
-      OR REPLACE(r.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
-      OR REPLACE(r.umd_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
-    ORDER BY r.sgg_cd ASC, r.umd_nm ASC
+          ' ',
+          ''
+        ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+
+      UNION ALL
+
+      SELECT
+        r.sgg_cd,
+        r.sgg_nm,
+        r.umd_cd,
+        r.umd_nm,
+        CONCAT(r.sgg_nm, ' ', r.umd_nm) AS display_name,
+        1 AS sort_order
+      FROM region r
+      WHERE REPLACE(CONCAT(r.sgg_nm, r.umd_nm), ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(
+          CONCAT(
+            CASE
+              WHEN RIGHT(r.sgg_nm, 1) IN ('구', '군')
+                THEN LEFT(r.sgg_nm, CHAR_LENGTH(r.sgg_nm) - 1)
+              ELSE r.sgg_nm
+            END,
+            r.umd_nm
+          ),
+          ' ',
+          ''
+        ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(r.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(r.umd_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+    ) candidate
+    ORDER BY candidate.sort_order ASC, candidate.sgg_cd ASC, candidate.umd_nm ASC
     LIMIT 100
   </select>
 
   <select id="selectFavoriteRegions" resultMap="favoriteRegionResponseResultMap">
     SELECT
       fr.sgg_cd,
-      r.sgg_nm,
-      r.umd_cd,
+      COALESCE(r.sgg_nm, rs.sgg_nm) AS sgg_nm,
+      CASE
+        WHEN fr.umd_nm = '' THEN NULL
+        ELSE r.umd_cd
+      END AS umd_cd,
       fr.umd_nm,
-      CONCAT_WS(' ', r.sgg_nm, NULLIF(r.umd_nm, '')) AS display_name,
+      CASE
+        WHEN fr.umd_nm = '' THEN rs.sgg_nm
+        ELSE CONCAT_WS(' ', r.sgg_nm, NULLIF(r.umd_nm, ''))
+      END AS display_name,
       (
         SELECT sd.deal_amount
         FROM sale_deal sd
         JOIN property p ON p.id = sd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
         ORDER BY sd.deal_date DESC, sd.id DESC
         LIMIT 1
       ) AS latest_sale_price,
@@ -77,7 +119,7 @@
         FROM rent_deal rd
         JOIN property p ON p.id = rd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND rd.monthly_rent = 0
         ORDER BY rd.deal_date DESC, rd.id DESC
         LIMIT 1
@@ -87,7 +129,7 @@
         FROM rent_deal rd
         JOIN property p ON p.id = rd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND rd.monthly_rent &gt; 0
         ORDER BY rd.deal_date DESC, rd.id DESC
         LIMIT 1
@@ -97,7 +139,7 @@
         FROM rent_deal rd
         JOIN property p ON p.id = rd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND rd.monthly_rent &gt; 0
         ORDER BY rd.deal_date DESC, rd.id DESC
         LIMIT 1
@@ -107,7 +149,7 @@
         FROM sale_deal sd
         JOIN property p ON p.id = sd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND sd.deal_date &gt;= #{oneYearAgo}
       ) AS sale_deal_count,
       (
@@ -115,7 +157,7 @@
         FROM rent_deal rd
         JOIN property p ON p.id = rd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND rd.monthly_rent = 0
           AND rd.deal_date &gt;= #{oneYearAgo}
       ) AS jeonse_deal_count,
@@ -124,11 +166,19 @@
         FROM rent_deal rd
         JOIN property p ON p.id = rd.property_id
         WHERE p.sgg_cd = fr.sgg_cd
-          AND p.umd_nm = fr.umd_nm
+          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND rd.monthly_rent &gt; 0
           AND rd.deal_date &gt;= #{oneYearAgo}
       ) AS monthly_rent_deal_count
     FROM favorite_region fr
+    LEFT JOIN (
+      SELECT
+        sgg_cd,
+        MIN(sgg_nm) AS sgg_nm
+      FROM region
+      GROUP BY sgg_cd
+    ) rs
+      ON rs.sgg_cd = fr.sgg_cd
     LEFT JOIN region r
       ON r.sgg_cd = fr.sgg_cd
       AND r.umd_nm = fr.umd_nm
@@ -141,7 +191,7 @@
       SELECT 1
       FROM region
       WHERE sgg_cd = #{sggCd}
-        AND umd_nm = #{umdNm}
+        AND (#{umdNm} = '' OR umd_nm = #{umdNm})
     )
   </select>
 
