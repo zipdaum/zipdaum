@@ -109,7 +109,7 @@ const searchForm = ref({
 });
 
 const currentView = ref("home");
-const homeResultTab = ref("recommendation");
+const homeResultTab = ref("search");
 const searchResults = ref([]);
 const recommendationResults = ref([]);
 const hasSearched = ref(false);
@@ -208,8 +208,8 @@ onUnmounted(() => {
 });
 
 const homeResultTabs = [
-  { label: "맞춤 추천", value: "recommendation" },
   { label: "실거래가 결과", value: "search" },
+  { label: "맞춤 추천", value: "recommendation" },
 ];
 
 const recommendationCards = computed(() =>
