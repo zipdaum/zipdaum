@@ -22,6 +22,7 @@ const isLoadingProperties = ref(true);
 const errorMessage = ref("");
 const regionMessage = ref("");
 const propertyMessage = ref("");
+const toastMessage = ref("");
 const regionSearchKeyword = ref("");
 const regionCandidates = ref([]);
 const isSearchingRegions = ref(false);
@@ -35,6 +36,7 @@ const propertyCandidateList = ref(null);
 const favoritePageSize = 3;
 const regionPage = ref(1);
 const propertyPage = ref(1);
+let toastTimer = null;
 
 const totalFavoriteCount = computed(
   () => favoriteRegions.value.length + favoriteProperties.value.length,
@@ -59,6 +61,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("click", handleFavoriteSearchOutsideClick);
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
 });
 
 async function loadFavoriteRegions() {
@@ -161,7 +167,7 @@ async function handleAddRegion(candidate) {
       sggCd: candidate.sggCd,
       umdNm: candidate.umdNm,
     });
-    regionMessage.value = "관심 지역을 등록했습니다.";
+    showToast("관심 지역을 등록했습니다.");
     regionSearchKeyword.value = "";
     regionCandidates.value = [];
     await loadFavoriteRegions();
@@ -214,7 +220,7 @@ async function handleAddProperty(candidate) {
 
   try {
     await addFavoriteProperty(candidate.propertyId);
-    propertyMessage.value = "관심 주택을 등록했습니다.";
+    showToast("관심 주택을 등록했습니다.");
     propertySearchKeyword.value = "";
     propertyCandidates.value = [];
     await loadFavoriteProperties();
@@ -248,6 +254,19 @@ function containsTarget(target, ...elements) {
   return elements.some((element) => element?.contains(target));
 }
 
+function showToast(message) {
+  toastMessage.value = message;
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+
+  toastTimer = window.setTimeout(() => {
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 2500);
+}
+
 async function handleDeleteRegion(region) {
   regionMessage.value = "";
   errorMessage.value = "";
@@ -257,7 +276,7 @@ async function handleDeleteRegion(region) {
       sggCd: region.sggCd,
       umdNm: region.umdNm,
     });
-    regionMessage.value = "관심 지역을 해제했습니다.";
+    showToast("관심 지역을 해제했습니다.");
     await loadFavoriteRegions();
   } catch (error) {
     regionMessage.value = getErrorMessage(
@@ -273,7 +292,7 @@ async function handleDeleteProperty(property) {
 
   try {
     await deleteFavoriteProperty(property.propertyId);
-    propertyMessage.value = "관심 주택을 해제했습니다.";
+    showToast("관심 주택을 해제했습니다.");
     await loadFavoriteProperties();
   } catch (error) {
     propertyMessage.value = getErrorMessage(
@@ -789,6 +808,16 @@ function getErrorMessage(error, fallbackMessage) {
         ></div>
       </article>
     </section>
+
+    <div
+      v-if="toastMessage"
+      class="favorite-toast"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>완료</strong>
+      <span>{{ toastMessage }}</span>
+    </div>
   </main>
 </template>
 
