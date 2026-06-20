@@ -108,12 +108,16 @@
   white-space: nowrap;
 }
 
+.favorite-search-area {
+  position: relative;
+  margin: -4px 0 12px;
+}
+
 .favorite-region-search,
 .favorite-property-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  margin: -4px 0 12px;
   border: 1px solid #e2ebfb;
   border-radius: 8px;
   background: #f8fbff;
@@ -156,14 +160,20 @@
 
 .region-candidate-list,
 .property-candidate-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
   display: grid;
   gap: 6px;
   max-height: 190px;
-  margin: -4px 0 12px;
+  margin: 0;
   overflow-y: auto;
   border: 1px solid #dbe7ff;
   border-radius: 8px;
   background: #ffffff;
+  box-shadow: 0 14px 30px rgba(20, 33, 61, 0.14);
   padding: 8px;
 }
 
