@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.favorite.mapper;
 
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
+import com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse;
 import java.time.LocalDate;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -10,13 +11,17 @@ import org.apache.ibatis.annotations.Param;
 public interface FavoriteRegionMapper {
 
   List<FavoriteRegionCandidateResponse> selectFavoriteRegionCandidates(
-      @Param("sggCds") List<String> sggCds,
-      @Param("umdKeyword") String umdKeyword
+      @Param("keyword") String keyword
   );
 
   List<FavoriteRegionResponse> selectFavoriteRegions(
       @Param("userId") Long userId,
       @Param("oneYearAgo") LocalDate oneYearAgo
+  );
+
+  boolean existsRegion(
+      @Param("sggCd") String sggCd,
+      @Param("umdNm") String umdNm
   );
 
   void insertFavoriteRegion(

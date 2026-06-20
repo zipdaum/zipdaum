@@ -7,6 +7,7 @@
              type="com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse">
     <id property="sggCd" column="sgg_cd"/>
     <id property="umdNm" column="umd_nm"/>
+    <result property="regionName" column="region_name"/>
     <result property="latestSalePrice" column="latest_sale_price"/>
     <result property="latestJeonseDeposit" column="latest_jeonse_deposit"/>
     <result property="latestMonthlyRentDeposit" column="latest_monthly_rent_deposit"/>
@@ -20,41 +21,39 @@
              type="com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse">
     <id property="sggCd" column="sgg_cd"/>
     <id property="umdNm" column="umd_nm"/>
+    <result property="displayName" column="display_name"/>
   </resultMap>
 
   <select id="selectFavoriteRegionCandidates"
           resultMap="favoriteRegionCandidateResponseResultMap">
-    SELECT DISTINCT
-      p.sgg_cd,
-      p.umd_nm
-    FROM property p
-    <where>
-      <choose>
-        <when test="sggCds != null and sggCds.size() > 0 and umdKeyword != null">
-          p.sgg_cd IN
-          <foreach collection="sggCds" item="sggCd" open="(" separator="," close=")">
-            #{sggCd}
-          </foreach>
-          AND p.umd_nm LIKE CONCAT('%', #{umdKeyword}, '%') ESCAPE '\\'
-        </when>
-        <when test="sggCds != null and sggCds.size() > 0">
-          p.sgg_cd IN
-          <foreach collection="sggCds" item="sggCd" open="(" separator="," close=")">
-            #{sggCd}
-          </foreach>
-        </when>
-        <otherwise>
-          p.umd_nm LIKE CONCAT('%', #{umdKeyword}, '%') ESCAPE '\\'
-        </otherwise>
-      </choose>
-    </where>
-    ORDER BY p.sgg_cd ASC, p.umd_nm ASC
-    LIMIT 20
+    SELECT
+      r.sgg_cd,
+      r.umd_nm,
+      CONCAT(r.sgg_nm, ' ', r.umd_nm) AS display_name
+    FROM region r
+    WHERE REPLACE(CONCAT(r.sgg_nm, r.umd_nm), ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+      OR REPLACE(
+        CONCAT(
+          CASE
+            WHEN RIGHT(r.sgg_nm, 1) IN ('구', '군')
+              THEN LEFT(r.sgg_nm, CHAR_LENGTH(r.sgg_nm) - 1)
+            ELSE r.sgg_nm
+          END,
+          r.umd_nm
+        ),
+        ' ',
+        ''
+      ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+      OR REPLACE(r.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+      OR REPLACE(r.umd_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+    ORDER BY r.sgg_cd ASC, r.umd_nm ASC
+    LIMIT 100
   </select>
 
   <select id="selectFavoriteRegions" resultMap="favoriteRegionResponseResultMap">
     SELECT
       fr.sgg_cd,
+      r.sgg_nm AS region_name,
       fr.umd_nm,
       (
         SELECT sd.deal_amount
@@ -122,8 +121,20 @@
           AND rd.deal_date &gt;= #{oneYearAgo}
       ) AS monthly_rent_deal_count
     FROM favorite_region fr
+    LEFT JOIN region r
+      ON r.sgg_cd = fr.sgg_cd
+      AND r.umd_nm = fr.umd_nm
     WHERE fr.user_id = #{userId}
     ORDER BY fr.created_at DESC, fr.id DESC
+  </select>
+
+  <select id="existsRegion" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM region
+      WHERE sgg_cd = #{sggCd}
+        AND umd_nm = #{umdNm}
+    )
   </select>
 
   <insert id="insertFavoriteRegion">
