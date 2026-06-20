@@ -177,8 +177,9 @@ async function handleAddRegion(candidate) {
       umdNm: candidate.umdNm,
     });
     showToast("관심 지역을 등록했습니다.");
-    regionSearchKeyword.value = "";
-    regionCandidates.value = [];
+    regionCandidates.value = regionCandidates.value.filter(
+      (regionCandidate) => regionCandidate.id !== candidate.id,
+    );
     await loadFavoriteRegions();
   } catch (error) {
     regionMessage.value = getErrorMessage(
