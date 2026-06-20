@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
 import FavoriteView from '../views/FavoriteView.vue'
+import RecommendationScoreView from '../views/RecommendationScoreView.vue'
 import { isLoggedIn } from '../stores/auth'
 
 const router = createRouter({
@@ -21,6 +22,12 @@ const router = createRouter({
       path: '/favorites',
       name: 'favorites',
       component: FavoriteView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/recommendation-score/properties/:propertyId',
+      name: 'property-recommendation-score',
+      component: RecommendationScoreView,
       meta: { requiresAuth: true }
     }
   ]

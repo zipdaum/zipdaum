@@ -6,6 +6,8 @@ import com.ssafy.zipdaum.preference.service.UserPreferenceService;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +16,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,7 +52,10 @@ public class UserPreferenceController {
   }
 
   @PutMapping
-  @Operation(summary = "사용자 맞춤 조건 등록 및 수정", description = "현재 로그인한 사용자의 맞춤 조건을 등록하거나 수정합니다.")
+  @Operation(
+      summary = "사용자 맞춤 조건 전체 저장",
+      description = "현재 로그인한 사용자의 맞춤 조건 목록 전체를 저장합니다. 기존 맞춤 조건이 있으면 요청 본문 기준으로 교체합니다."
+  )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "맞춤 조건 저장 성공", content = @Content),
       @ApiResponse(responseCode = "400", description = "입력값 오류", content = @Content),
@@ -58,6 +64,43 @@ public class UserPreferenceController {
   @SecurityRequirement(name = "bearerAuth")
   public ResponseEntity<String> savePreferences(
       @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          required = true,
+          description = "저장할 사용자 맞춤 조건 목록",
+          content = @Content(
+              mediaType = MediaType.APPLICATION_JSON_VALUE,
+              schema = @Schema(implementation = UserPreferenceRequest.class),
+              examples = @ExampleObject(
+                  name = "사용자 맞춤 조건 저장 요청",
+                  value = """
+                      {
+                        "preferences": [
+                          {
+                            "code": "SALE_PRICE",
+                            "value": "500000000",
+                            "priority": 1
+                          },
+                          {
+                            "code": "AREA",
+                            "value": "84.5",
+                            "priority": 2
+                          },
+                          {
+                            "code": "REGION",
+                            "value": "해운대구 우동",
+                            "priority": 3
+                          },
+                          {
+                            "code": "SUBWAY",
+                            "value": "true",
+                            "priority": 4
+                          }
+                        ]
+                      }
+                      """
+              )
+          )
+      )
       @Valid @RequestBody UserPreferenceRequest request
   ) {
     log.info("PUT /users/info/preferences 요청");
