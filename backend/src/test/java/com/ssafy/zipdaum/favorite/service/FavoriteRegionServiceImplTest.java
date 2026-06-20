@@ -128,6 +128,16 @@ class FavoriteRegionServiceImplTest {
   }
 
   @Test
+  void saveFavoriteRegion_읍면동이_빈값이면_시군구_전체_관심_지역으로_등록한다() {
+    given(favoriteRegionMapper.existsRegion("26350", "")).willReturn(true);
+
+    service.saveFavoriteRegion(1L, "26350", "");
+
+    then(favoriteRegionMapper).should().existsRegion("26350", "");
+    then(favoriteRegionMapper).should().insertFavoriteRegion(1L, "26350", "");
+  }
+
+  @Test
   void saveFavoriteRegion_존재하지_않는_지역이면_INVALID_REGION_CODE_예외가_발생한다() {
     given(favoriteRegionMapper.existsRegion("99999", "없는동")).willReturn(false);
 
