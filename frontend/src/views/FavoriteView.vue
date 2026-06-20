@@ -518,45 +518,47 @@ function getErrorMessage(error, fallbackMessage) {
           <span>{{ favoriteRegions.length.toLocaleString() }}개</span>
         </div>
 
-        <form
-          ref="regionSearchForm"
-          class="favorite-region-search"
-          @submit.prevent="handleSearchRegionCandidates"
-        >
-          <label class="sr-only" for="favorite-region-keyword">관심 지역 검색어</label>
-          <input
-            id="favorite-region-keyword"
-            v-model.trim="regionSearchKeyword"
-            type="search"
-            placeholder="지역명으로 검색"
-            autocomplete="off"
-            @input="handleRegionSearchInput"
-            @search="handleRegionSearchInput"
-          />
-          <button
-            class="primary-button"
-            type="submit"
-            :disabled="isSearchingRegions"
+        <div class="favorite-search-area">
+          <form
+            ref="regionSearchForm"
+            class="favorite-region-search"
+            @submit.prevent="handleSearchRegionCandidates"
           >
-            {{ isSearchingRegions ? "검색 중" : "지역 추가" }}
-          </button>
-        </form>
+            <label class="sr-only" for="favorite-region-keyword">관심 지역 검색어</label>
+            <input
+              id="favorite-region-keyword"
+              v-model.trim="regionSearchKeyword"
+              type="search"
+              placeholder="지역명으로 검색"
+              autocomplete="off"
+              @input="handleRegionSearchInput"
+              @search="handleRegionSearchInput"
+            />
+            <button
+              class="primary-button"
+              type="submit"
+              :disabled="isSearchingRegions"
+            >
+              {{ isSearchingRegions ? "검색 중" : "지역 추가" }}
+            </button>
+          </form>
 
-        <div
-          v-if="regionCandidates.length > 0"
-          ref="regionCandidateList"
-          class="region-candidate-list"
-        >
-          <button
-            v-for="candidate in regionCandidates"
-            :key="candidate.id"
-            class="region-candidate-button"
-            type="button"
-            @click="handleAddRegion(candidate)"
+          <div
+            v-if="regionCandidates.length > 0"
+            ref="regionCandidateList"
+            class="region-candidate-list"
           >
-            <span>{{ candidate.displayName }}</span>
-            <strong>추가</strong>
-          </button>
+            <button
+              v-for="candidate in regionCandidates"
+              :key="candidate.id"
+              class="region-candidate-button"
+              type="button"
+              @click="handleAddRegion(candidate)"
+            >
+              <span>{{ candidate.displayName }}</span>
+              <strong>추가</strong>
+            </button>
+          </div>
         </div>
 
         <p
@@ -677,48 +679,50 @@ function getErrorMessage(error, fallbackMessage) {
           </div>
         </div>
 
-        <form
-          ref="propertySearchForm"
-          class="favorite-property-search"
-          @submit.prevent="handleSearchPropertyCandidates"
-        >
-          <label class="sr-only" for="favorite-property-keyword">관심 주택 검색어</label>
-          <input
-            id="favorite-property-keyword"
-            v-model.trim="propertySearchKeyword"
-            type="search"
-            placeholder="주택명으로 검색"
-            autocomplete="off"
-            @input="handlePropertySearchInput"
-            @search="handlePropertySearchInput"
-          />
-          <button
-            class="primary-button"
-            type="submit"
-            :disabled="isSearchingProperties"
+        <div class="favorite-search-area">
+          <form
+            ref="propertySearchForm"
+            class="favorite-property-search"
+            @submit.prevent="handleSearchPropertyCandidates"
           >
-            {{ isSearchingProperties ? "검색 중" : "주택 추가" }}
-          </button>
-        </form>
+            <label class="sr-only" for="favorite-property-keyword">관심 주택 검색어</label>
+            <input
+              id="favorite-property-keyword"
+              v-model.trim="propertySearchKeyword"
+              type="search"
+              placeholder="주택명으로 검색"
+              autocomplete="off"
+              @input="handlePropertySearchInput"
+              @search="handlePropertySearchInput"
+            />
+            <button
+              class="primary-button"
+              type="submit"
+              :disabled="isSearchingProperties"
+            >
+              {{ isSearchingProperties ? "검색 중" : "주택 추가" }}
+            </button>
+          </form>
 
-        <div
-          v-if="propertyCandidates.length > 0"
-          ref="propertyCandidateList"
-          class="property-candidate-list"
-        >
-          <button
-            v-for="candidate in propertyCandidates"
-            :key="candidate.id"
-            class="property-candidate-button"
-            type="button"
-            @click="handleAddProperty(candidate)"
+          <div
+            v-if="propertyCandidates.length > 0"
+            ref="propertyCandidateList"
+            class="property-candidate-list"
           >
-            <span>
-              <strong>{{ candidate.propertyName }}</strong>
-              <em>{{ getPropertyTypeLabel(candidate.propertyType) }} · {{ candidate.regionName }}</em>
-            </span>
-            <b>추가</b>
-          </button>
+            <button
+              v-for="candidate in propertyCandidates"
+              :key="candidate.id"
+              class="property-candidate-button"
+              type="button"
+              @click="handleAddProperty(candidate)"
+            >
+              <span>
+                <strong>{{ candidate.propertyName }}</strong>
+                <em>{{ getPropertyTypeLabel(candidate.propertyType) }} · {{ candidate.regionName }}</em>
+              </span>
+              <b>추가</b>
+            </button>
+          </div>
         </div>
 
         <p
