@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
+import SignupView from '../views/SignupView.vue'
 import FavoriteView from '../views/FavoriteView.vue'
 import MyPageView from '../views/MyPageView.vue'
 import PreferenceSettingView from '../views/PreferenceSettingView.vue'
@@ -19,6 +20,11 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: LoginView
+    },
+    {
+      path: '/signup',
+      name: 'signup',
+      component: SignupView
     },
     {
       path: '/favorites',
@@ -58,7 +64,7 @@ router.beforeEach((to) => {
     }
   }
 
-  if (to.name === 'login' && isLoggedIn.value) {
+  if ((to.name === 'login' || to.name === 'signup') && isLoggedIn.value) {
     return { name: 'home' }
   }
 })
