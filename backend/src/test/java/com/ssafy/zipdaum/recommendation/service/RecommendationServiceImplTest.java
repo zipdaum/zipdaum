@@ -20,8 +20,6 @@ import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.dto.RecommendationStatus;
 import com.ssafy.zipdaum.recommendation.mapper.RecommendationMapper;
-import com.ssafy.zipdaum.recent.dto.RecentPropertyScoreFactor;
-import com.ssafy.zipdaum.recent.mapper.RecentPropertyMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -30,14 +28,12 @@ import org.mockito.ArgumentCaptor;
 class RecommendationServiceImplTest {
 
   private final RecommendationMapper recommendationMapper = mock(RecommendationMapper.class);
-  private final RecentPropertyMapper recentPropertyMapper = mock(RecentPropertyMapper.class);
   private final UserPreferenceService userPreferenceService = mock(UserPreferenceService.class);
   private final SurroundingService surroundingService = mock(SurroundingService.class);
   private final RecommendationScoreService recommendationScoreService =
       mock(RecommendationScoreService.class);
   private final RecommendationServiceImpl service = new RecommendationServiceImpl(
       recommendationMapper,
-      recentPropertyMapper,
       userPreferenceService,
       surroundingService,
       recommendationScoreService
@@ -50,7 +46,7 @@ class RecommendationServiceImplTest {
     SurroundingSummaryResponse summary = new SurroundingSummaryResponse(1, 2, 0, 0, 0);
     PropertyRecommendationScore score = new PropertyRecommendationScore(100, List.of());
 
-    given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
+    given(recommendationMapper.selectPropertyRecommendationCandidate(1L, 10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(surroundingService.findRecommendationSurroundingSummary(
         BigDecimal.valueOf(35.1),
@@ -58,7 +54,6 @@ class RecommendationServiceImplTest {
     )).willReturn(summary);
     given(recommendationScoreService.calculateMatchScore(property, preferences, summary))
         .willReturn(score);
-    given(recentPropertyMapper.selectRecentPropertyScoreFactors(1L)).willReturn(List.of());
 
     PropertyRecommendationScore result = service.findPropertyRecommendationScore(1L, 10L);
 
@@ -66,31 +61,29 @@ class RecommendationServiceImplTest {
   }
 
   @Test
-  void findPropertyRecommendationScore_최근_본_주택이어도_평가불가_상태를_유지한다() {
+  void findPropertyRecommendationScore_행동로그가_있어도_평가불가_상태를_유지한다() {
     PropertyRecommendationCandidate property = property();
+    property.setInteractionViewCount(3);
     List<UserPreferenceResponse> preferences = List.of(preference("SUBWAY", "false"));
     PropertyRecommendationScore score = new PropertyRecommendationScore(
         RecommendationStatus.NO_EVALUABLE_CONDITION,
         null,
         List.of()
     );
-    RecentPropertyScoreFactor factor = recentPropertyScoreFactor(10L, 2);
 
-    given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
+    given(recommendationMapper.selectPropertyRecommendationCandidate(1L, 10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationScoreService.calculateMatchScore(property, preferences, null))
         .willReturn(score);
-    given(recentPropertyMapper.selectRecentPropertyScoreFactors(1L)).willReturn(List.of(factor));
 
     PropertyRecommendationScore result = service.findPropertyRecommendationScore(1L, 10L);
 
     assertThat(result).isSameAs(score);
-    then(recentPropertyMapper).shouldHaveNoInteractions();
   }
 
   @Test
   void findPropertyRecommendationScore_주택이_없으면_PROPERTY_NOT_FOUND_예외가_발생한다() {
-    given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(null);
+    given(recommendationMapper.selectPropertyRecommendationCandidate(1L, 10L)).willReturn(null);
 
     assertThatThrownBy(() -> service.findPropertyRecommendationScore(1L, 10L))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -104,7 +97,7 @@ class RecommendationServiceImplTest {
     List<UserPreferenceResponse> preferences = List.of(preference("DEPOSIT", "300000000"));
     PropertyRecommendationScore score = new PropertyRecommendationScore(100, List.of());
 
-    given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
+    given(recommendationMapper.selectPropertyRecommendationCandidate(1L, 10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationScoreService.calculateMatchScore(property, preferences, null))
         .willReturn(score);
@@ -123,7 +116,7 @@ class RecommendationServiceImplTest {
     List<UserPreferenceResponse> preferences = List.of(preference("PARK", "true"));
     PropertyRecommendationScore score = new PropertyRecommendationScore(0, List.of());
 
-    given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
+    given(recommendationMapper.selectPropertyRecommendationCandidate(1L, 10L)).willReturn(property);
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationScoreService.calculateMatchScore(property, preferences, null))
         .willReturn(score);
@@ -137,7 +130,6 @@ class RecommendationServiceImplTest {
   void findPropertyRecommendations_우선순위가_높은_매매가조건의_여유금액이_큰_주택을_먼저_반환한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
-        recentPropertyMapper,
         userPreferenceService,
         surroundingService,
         new RecommendationScoreServiceImpl()
@@ -164,7 +156,6 @@ class RecommendationServiceImplTest {
   void findPropertyRecommendations_월세조건이_있으면_월세거래_보증금_여유금액으로_정렬한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
-        recentPropertyMapper,
         userPreferenceService,
         surroundingService,
         new RecommendationScoreServiceImpl()
@@ -196,7 +187,6 @@ class RecommendationServiceImplTest {
   void findPropertyRecommendations_최종점수가_높은_주택을_먼저_반환한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
-        recentPropertyMapper,
         userPreferenceService,
         surroundingService,
         new RecommendationScoreServiceImpl()
@@ -228,7 +218,6 @@ class RecommendationServiceImplTest {
   void findPropertyRecommendations_시설조건은_실제_주변시설_개수가_많은_주택을_먼저_반환한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
-        recentPropertyMapper,
         userPreferenceService,
         surroundingService,
         new RecommendationScoreServiceImpl()
@@ -260,33 +249,32 @@ class RecommendationServiceImplTest {
   }
 
   @Test
-  void findPropertyRecommendations_평가가능한_조건과_최근본주택이_없으면_후보를_조회하지_않는다() {
+  void findPropertyRecommendations_평가가능한_조건과_추천_이력이_없으면_빈_목록을_반환한다() {
     List<UserPreferenceResponse> preferences = List.of(
         preference("SUBWAY", "false"),
         preference("PARK", "false", 2)
     );
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recentPropertyMapper.selectRecentPropertyScoreFactors(1L)).willReturn(List.of());
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any())).willReturn(List.of());
 
     List<PropertyRecommendationResponse> result = service.findPropertyRecommendations(1L);
 
     assertThat(result).isEmpty();
-    then(recommendationMapper).shouldHaveNoInteractions();
-    then(recentPropertyMapper).should().selectRecentPropertyScoreFactors(1L);
+    then(recommendationMapper).should().selectPropertyRecommendationCandidates(any());
     then(surroundingService).shouldHaveNoInteractions();
     then(recommendationScoreService).shouldHaveNoInteractions();
   }
 
   @Test
-  void findPropertyRecommendations_평가가능한_조건이_없어도_최근_본_주택으로_추천한다() {
+  void findPropertyRecommendations_평가가능한_조건이_없어도_행동로그_조회횟수로_추천한다() {
     List<UserPreferenceResponse> preferences = List.of(preference("SUBWAY", "false"));
-    RecentPropertyScoreFactor factor = recentPropertyScoreFactor(10L, 3);
     PropertyRecommendationCandidate property = property();
+    property.setInteractionViewCount(3);
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
-    given(recentPropertyMapper.selectRecentPropertyScoreFactors(1L)).willReturn(List.of(factor));
-    given(recommendationMapper.selectPropertyRecommendationCandidate(10L)).willReturn(property);
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
+        .willReturn(List.of(property));
 
     List<PropertyRecommendationResponse> result = service.findPropertyRecommendations(1L);
 
@@ -301,7 +289,6 @@ class RecommendationServiceImplTest {
   void findPropertyRecommendations_맞춤조건을_SQL_후보필터로_전달한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
-        recentPropertyMapper,
         userPreferenceService,
         surroundingService,
         new RecommendationScoreServiceImpl()
@@ -325,6 +312,7 @@ class RecommendationServiceImplTest {
     then(recommendationMapper).should().selectPropertyRecommendationCandidates(captor.capture());
     PropertyRecommendationCandidateFilter filter = captor.getValue();
     assertThat(filter.getRegion()).isEqualTo("부산광역시 해운대구 우동");
+    assertThat(filter.getUserId()).isEqualTo(1L);
     assertThat(filter.getSalePriceMax()).isEqualTo(110_000_000L);
     assertThat(filter.getDepositMax()).isEqualTo(44_000_000L);
     assertThat(filter.getMonthlyRentMax()).isEqualTo(880_000L);
@@ -333,25 +321,23 @@ class RecommendationServiceImplTest {
   }
 
   @Test
-  void findPropertyRecommendations_최근_본_주택_가산점을_추천목록_정렬에_반영한다() {
+  void findPropertyRecommendations_행동로그_조회횟수_가산점을_추천목록_정렬에_반영한다() {
     RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
         recommendationMapper,
-        recentPropertyMapper,
         userPreferenceService,
         surroundingService,
         new RecommendationScoreServiceImpl()
     );
-    PropertyRecommendationCandidate recentProperty = property(1L, 100_000_000L);
+    PropertyRecommendationCandidate viewedProperty = property(1L, 100_000_000L);
     PropertyRecommendationCandidate otherProperty = property(2L, 100_000_000L);
-    recentProperty.setLatestSalePrice(108_000_000L);
+    viewedProperty.setLatestSalePrice(108_000_000L);
+    viewedProperty.setInteractionViewCount(1);
     otherProperty.setLatestSalePrice(108_000_000L);
     List<UserPreferenceResponse> preferences = List.of(preference("SALE_PRICE", "100000000"));
 
     given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
     given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
-        .willReturn(List.of(otherProperty, recentProperty));
-    given(recentPropertyMapper.selectRecentPropertyScoreFactors(1L))
-        .willReturn(List.of(recentPropertyScoreFactor(1L, 1)));
+        .willReturn(List.of(otherProperty, viewedProperty));
 
     List<PropertyRecommendationResponse> result =
         serviceWithRealScore.findPropertyRecommendations(1L);
@@ -362,6 +348,61 @@ class RecommendationServiceImplTest {
     assertThat(result)
         .extracting(PropertyRecommendationResponse::getScore)
         .containsExactly(75, 70);
+  }
+
+  @Test
+  void findPropertyRecommendations_행동로그_가산점을_추천목록_정렬에_반영한다() {
+    RecommendationServiceImpl serviceWithRealScore = new RecommendationServiceImpl(
+        recommendationMapper,
+        userPreferenceService,
+        surroundingService,
+        new RecommendationScoreServiceImpl()
+    );
+    PropertyRecommendationCandidate interactedProperty = property(1L, 100_000_000L);
+    PropertyRecommendationCandidate otherProperty = property(2L, 100_000_000L);
+    interactedProperty.setLatestSalePrice(108_000_000L);
+    otherProperty.setLatestSalePrice(108_000_000L);
+    interactedProperty.setInteractionViewCount(1);
+    interactedProperty.setInteractionTotalDwellTimeMillis(30_000L);
+    interactedProperty.setInteractionMaxScrollDepthPercent(80);
+    interactedProperty.setRecommendationDetailClickCount(1);
+    interactedProperty.setDealHistoryClickCount(1);
+    List<UserPreferenceResponse> preferences = List.of(preference("SALE_PRICE", "100000000"));
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
+        .willReturn(List.of(otherProperty, interactedProperty));
+
+    List<PropertyRecommendationResponse> result =
+        serviceWithRealScore.findPropertyRecommendations(1L);
+
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getId)
+        .containsExactly(1L, 2L);
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getScore)
+        .containsExactly(95, 70);
+  }
+
+  @Test
+  void findPropertyRecommendations_평가가능한_조건이_없어도_행동로그로_추천한다() {
+    List<UserPreferenceResponse> preferences = List.of(preference("SUBWAY", "false"));
+    PropertyRecommendationCandidate interactedProperty = property();
+    interactedProperty.setInteractionViewCount(1);
+    interactedProperty.setInteractionTotalDwellTimeMillis(30_000L);
+    interactedProperty.setInteractionMaxScrollDepthPercent(80);
+
+    given(userPreferenceService.findPreferences(1L)).willReturn(preferences);
+    given(recommendationMapper.selectPropertyRecommendationCandidates(any()))
+        .willReturn(List.of(interactedProperty));
+
+    List<PropertyRecommendationResponse> result = service.findPropertyRecommendations(1L);
+
+    assertThat(result)
+        .extracting(PropertyRecommendationResponse::getId, PropertyRecommendationResponse::getScore)
+        .containsExactly(tuple(10L, 15));
+    then(recommendationScoreService).shouldHaveNoInteractions();
+    then(surroundingService).shouldHaveNoInteractions();
   }
 
   private PropertyRecommendationCandidate property() {
@@ -394,13 +435,6 @@ class RecommendationServiceImplTest {
     UserPreferenceResponse preference = preference(code, value);
     preference.setPriority(priority);
     return preference;
-  }
-
-  private RecentPropertyScoreFactor recentPropertyScoreFactor(Long propertyId, Integer viewCount) {
-    RecentPropertyScoreFactor factor = new RecentPropertyScoreFactor();
-    factor.setPropertyId(propertyId);
-    factor.setViewCount(viewCount);
-    return factor;
   }
 
 }

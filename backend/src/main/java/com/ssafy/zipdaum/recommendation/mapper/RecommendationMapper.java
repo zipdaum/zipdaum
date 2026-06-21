@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Param;
 public interface RecommendationMapper {
 
   PropertyRecommendationCandidate selectPropertyRecommendationCandidate(
+      @Param("userId") Long userId,
       @Param("propertyId") Long propertyId);
 
   List<PropertyRecommendationCandidate> selectPropertyRecommendationCandidates(

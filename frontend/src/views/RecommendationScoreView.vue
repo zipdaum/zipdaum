@@ -373,9 +373,106 @@ function getFacilityConditionCurrentValue(code) {
 }
 
 function getConditionDescription(condition) {
-  return condition.matched
-    ? "설정한 기준을 충족하거나 근접한 조건입니다."
-    : "조건과 차이가 있어 함께 확인이 필요합니다.";
+  if (condition.score >= 100) {
+    return getFullMatchDescription(condition);
+  }
+
+  if (condition.score >= 70) {
+    return getPartialMatchDescription(condition);
+  }
+
+  return getUnfitDescription(condition);
+}
+
+function getFullMatchDescription(condition) {
+  switch (condition.code) {
+    case "SALE_PRICE":
+      return "설정한 매매 예산 안에 들어옵니다.";
+    case "DEPOSIT":
+      return "설정한 보증금 기준 안에 들어옵니다.";
+    case "MONTHLY_RENT":
+      return "설정한 월세 기준 안에 들어옵니다.";
+    case "AREA":
+      return "희망 면적 기준을 충족합니다.";
+    case "BUILD_YEAR":
+      return "희망 준공연도 기준을 충족합니다.";
+    case "REGION":
+      return "선호 지역과 일치합니다.";
+    case "BUS":
+    case "SUBWAY":
+    case "HOSPITAL":
+    case "CCTV":
+    case "PARK":
+      return getFacilityExistenceDescription(condition.code, true);
+    default:
+      return "설정한 기준을 충족합니다.";
+  }
+}
+
+function getPartialMatchDescription(condition) {
+  switch (condition.code) {
+    case "SALE_PRICE":
+      return "예산보다 조금 높지만 근접한 가격입니다.";
+    case "DEPOSIT":
+      return "보증금 기준보다 조금 높지만 근접합니다.";
+    case "MONTHLY_RENT":
+      return "월세 기준보다 조금 높지만 근접합니다.";
+    case "AREA":
+      return "희망 면적보다 작지만 근접한 편입니다.";
+    case "BUILD_YEAR":
+      return "희망 준공연도보다 조금 오래됐습니다.";
+    default:
+      return "설정한 기준에 근접한 조건입니다.";
+  }
+}
+
+function getUnfitDescription(condition) {
+  switch (condition.code) {
+    case "SALE_PRICE":
+      return "설정한 매매 예산보다 높아 확인이 필요합니다.";
+    case "DEPOSIT":
+      return "설정한 보증금 기준보다 높아 확인이 필요합니다.";
+    case "MONTHLY_RENT":
+      return "설정한 월세 기준보다 높아 확인이 필요합니다.";
+    case "AREA":
+      return "희망 면적보다 작아 확인이 필요합니다.";
+    case "BUILD_YEAR":
+      return "희망 준공연도보다 오래된 주택입니다.";
+    case "REGION":
+      return "선호 지역과 다른 위치입니다.";
+    case "BUS":
+    case "SUBWAY":
+    case "HOSPITAL":
+    case "CCTV":
+    case "PARK":
+      return getFacilityExistenceDescription(condition.code, false);
+    default:
+      return "조건과 차이가 있어 함께 확인이 필요합니다.";
+  }
+}
+
+function getFacilityRecommendationRadiusMeters(code) {
+  return facilityRecommendationRadiusMeters[code] || 1000;
+}
+
+function getFacilityExistenceDescription(code, exists) {
+  const label = getPreferenceTypeLabel(code);
+  const particle = getSubjectParticle(label);
+  const status = exists ? "있습니다." : "없습니다.";
+  return `${formatDistance(getFacilityRecommendationRadiusMeters(code))} 안에 ${label}${particle} ${status}`;
+}
+
+function getSubjectParticle(value) {
+  if (!value) {
+    return "이";
+  }
+
+  const lastCharCode = value.charCodeAt(value.length - 1);
+  if (lastCharCode < 0xac00 || lastCharCode > 0xd7a3) {
+    return "가";
+  }
+
+  return (lastCharCode - 0xac00) % 28 === 0 ? "가" : "이";
 }
 
 function getPropertyAddress(item) {

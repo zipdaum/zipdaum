@@ -125,7 +125,12 @@ public class PropertyController {
     log.info("GET /properties/{} 요청", propertyId);
     PropertyDetailResponse detail = propertyService.findPropertyDetail(propertyId);
     if (authenticatedUser != null) {
-      recentPropertyService.recordRecentProperty(authenticatedUser.getId(), propertyId);
+      try {
+        recentPropertyService.recordRecentProperty(authenticatedUser.getId(), propertyId);
+      } catch (RuntimeException e) {
+        log.warn("최근 본 주택 저장 실패 - 상세 조회 응답은 유지 userId={}, propertyId={}",
+            authenticatedUser.getId(), propertyId);
+      }
     }
     return ResponseEntity.ok(detail);
   }
