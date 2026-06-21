@@ -1,26 +1,44 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
 import {
+  addFavoriteProperty,
+  addFavoriteRegion,
   deleteFavoriteProperty,
   deleteFavoriteRegion,
+  getFavoriteRegionCandidates,
   getFavoriteProperties,
   getFavoriteRegions,
 } from "../api/favorite";
+import { searchProperties } from "../api/property";
 
 const router = useRouter();
 
 const favoriteRegions = ref([]);
 const favoriteProperties = ref([]);
-const isLoading = ref(true);
-const hasLoadedFavorites = ref(false);
+const isLoadingRegions = ref(true);
+const isLoadingProperties = ref(true);
 const errorMessage = ref("");
 const regionMessage = ref("");
 const propertyMessage = ref("");
+const toastMessage = ref("");
+const toastVariant = ref("success");
+const toastKey = ref(0);
+const regionSearchKeyword = ref("");
+const regionCandidates = ref([]);
+const isSearchingRegions = ref(false);
+const regionSearchForm = ref(null);
+const regionCandidateList = ref(null);
+const propertySearchKeyword = ref("");
+const propertyCandidates = ref([]);
+const isSearchingProperties = ref(false);
+const propertySearchForm = ref(null);
+const propertyCandidateList = ref(null);
 const favoritePageSize = 3;
 const regionPage = ref(1);
 const propertyPage = ref(1);
+let toastTimer = null;
 
 const totalFavoriteCount = computed(
   () => favoriteRegions.value.length + favoriteProperties.value.length,
@@ -37,34 +55,56 @@ const paginatedFavoriteRegions = computed(() =>
 const paginatedFavoriteProperties = computed(() =>
   getPaginatedItems(favoriteProperties.value, propertyPage.value),
 );
+const toastLabel = computed(() =>
+  toastVariant.value === "notice" ? "안내" : "완료",
+);
 
-onMounted(loadFavorites);
+onMounted(() => {
+  Promise.all([loadFavoriteRegions(), loadFavoriteProperties()]);
+  document.addEventListener("click", handleFavoriteSearchOutsideClick);
+});
 
-async function loadFavorites() {
-  isLoading.value = true;
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleFavoriteSearchOutsideClick);
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+});
+
+async function loadFavoriteRegions() {
+  isLoadingRegions.value = true;
   errorMessage.value = "";
 
   try {
-    const [regions, properties] = await Promise.all([
-      getFavoriteRegions(),
-      getFavoriteProperties(),
-    ]);
-
+    const regions = await getFavoriteRegions();
     favoriteRegions.value = regions.map(mapFavoriteRegion);
-    favoriteProperties.value = properties.map(mapFavoriteProperty);
-    hasLoadedFavorites.value = true;
     clampFavoritePages();
   } catch (error) {
-    if (error.response?.status !== 401) {
-      hasLoadedFavorites.value = true;
-    }
-
     errorMessage.value = getErrorMessage(
       error,
-      "관심 목록을 불러오지 못했습니다.",
+      "관심 지역 목록을 불러오지 못했습니다.",
     );
   } finally {
-    isLoading.value = false;
+    isLoadingRegions.value = false;
+  }
+}
+
+async function loadFavoriteProperties() {
+  isLoadingProperties.value = true;
+  errorMessage.value = "";
+
+  try {
+    const properties = await getFavoriteProperties();
+    favoriteProperties.value = properties.map(mapFavoriteProperty);
+    clampFavoritePages();
+  } catch (error) {
+    errorMessage.value = getErrorMessage(
+      error,
+      "관심 주택 목록을 불러오지 못했습니다.",
+    );
+  } finally {
+    isLoadingProperties.value = false;
   }
 }
 
@@ -93,6 +133,179 @@ function openPropertyDeals(property) {
   });
 }
 
+async function handleSearchRegionCandidates() {
+  const keyword = regionSearchKeyword.value.trim();
+  regionMessage.value = "";
+  errorMessage.value = "";
+
+  if (!keyword) {
+    regionCandidates.value = [];
+    regionMessage.value = "검색어를 입력해주세요.";
+    return;
+  }
+
+  isSearchingRegions.value = true;
+
+  try {
+    regionCandidates.value = (await getFavoriteRegionCandidates(keyword)).map(
+      mapRegionCandidate,
+    );
+    if (regionCandidates.value.length === 0) {
+      showToast("검색 결과가 없습니다.", "notice");
+    }
+  } catch (error) {
+    regionMessage.value = getErrorMessage(
+      error,
+      "관심 지역 후보를 검색하지 못했습니다.",
+    );
+  } finally {
+    isSearchingRegions.value = false;
+  }
+}
+
+function handleRegionSearchInput(event) {
+  if (event.target.value.trim()) {
+    return;
+  }
+
+  regionCandidates.value = [];
+  regionMessage.value = "";
+}
+
+async function handleAddRegion(candidate) {
+  regionMessage.value = "";
+  errorMessage.value = "";
+
+  try {
+    await addFavoriteRegion({
+      sggCd: candidate.sggCd,
+      umdNm: candidate.umdNm,
+    });
+    showToast("관심 지역을 등록했습니다.");
+    regionCandidates.value = regionCandidates.value.filter(
+      (regionCandidate) => regionCandidate.id !== candidate.id,
+    );
+    await loadFavoriteRegions();
+  } catch (error) {
+    const message = getErrorMessage(
+      error,
+      "관심 지역을 등록하지 못했습니다.",
+    );
+    if (isFavoriteAlreadyExistsError(error, message)) {
+      showToast(message, "notice");
+      return;
+    }
+
+    regionMessage.value = message;
+  }
+}
+
+async function handleSearchPropertyCandidates() {
+  const keyword = propertySearchKeyword.value.trim();
+  propertyMessage.value = "";
+  errorMessage.value = "";
+
+  if (!keyword) {
+    propertyCandidates.value = [];
+    propertyMessage.value = "검색어를 입력해주세요.";
+    return;
+  }
+
+  isSearchingProperties.value = true;
+
+  try {
+    propertyCandidates.value = (await searchProperties({
+      name: keyword,
+      sortBy: "NAME",
+      sortDirection: "ASC",
+    }))
+      .map(mapPropertyCandidate)
+      .slice(0, 20);
+
+    if (propertyCandidates.value.length === 0) {
+      showToast("검색 결과가 없습니다.", "notice");
+    }
+  } catch (error) {
+    propertyMessage.value = getErrorMessage(
+      error,
+      "관심 주택 후보를 검색하지 못했습니다.",
+    );
+  } finally {
+    isSearchingProperties.value = false;
+  }
+}
+
+async function handleAddProperty(candidate) {
+  propertyMessage.value = "";
+  errorMessage.value = "";
+
+  try {
+    await addFavoriteProperty(candidate.propertyId);
+    showToast("관심 주택을 등록했습니다.");
+    propertyCandidates.value = propertyCandidates.value.filter(
+      (propertyCandidate) => propertyCandidate.id !== candidate.id,
+    );
+    await loadFavoriteProperties();
+  } catch (error) {
+    const message = getErrorMessage(
+      error,
+      "관심 주택을 등록하지 못했습니다.",
+    );
+    if (isFavoriteAlreadyExistsError(error, message)) {
+      showToast(message, "notice");
+      return;
+    }
+
+    propertyMessage.value = message;
+  }
+}
+
+function handlePropertySearchInput(event) {
+  if (event.target.value.trim()) {
+    return;
+  }
+
+  propertyCandidates.value = [];
+  propertyMessage.value = "";
+}
+
+function handleFavoriteSearchOutsideClick(event) {
+  const target = event.target;
+
+  if (
+    regionCandidates.value.length > 0 &&
+    !containsTarget(target, regionSearchForm.value, regionCandidateList.value)
+  ) {
+    regionCandidates.value = [];
+  }
+
+  if (
+    propertyCandidates.value.length > 0 &&
+    !containsTarget(target, propertySearchForm.value, propertyCandidateList.value)
+  ) {
+    propertyCandidates.value = [];
+  }
+}
+
+function containsTarget(target, ...elements) {
+  return elements.some((element) => element?.contains(target));
+}
+
+function showToast(message, variant = "success") {
+  toastMessage.value = message;
+  toastVariant.value = variant;
+  toastKey.value += 1;
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+
+  toastTimer = window.setTimeout(() => {
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 2500);
+}
+
 async function handleDeleteRegion(region) {
   regionMessage.value = "";
   errorMessage.value = "";
@@ -102,8 +315,8 @@ async function handleDeleteRegion(region) {
       sggCd: region.sggCd,
       umdNm: region.umdNm,
     });
-    regionMessage.value = "관심 지역을 해제했습니다.";
-    await loadFavorites();
+    showToast("관심 지역을 해제했습니다.");
+    await loadFavoriteRegions();
   } catch (error) {
     regionMessage.value = getErrorMessage(
       error,
@@ -118,8 +331,8 @@ async function handleDeleteProperty(property) {
 
   try {
     await deleteFavoriteProperty(property.propertyId);
-    propertyMessage.value = "관심 주택을 해제했습니다.";
-    await loadFavorites();
+    showToast("관심 주택을 해제했습니다.");
+    await loadFavoriteProperties();
   } catch (error) {
     propertyMessage.value = getErrorMessage(
       error,
@@ -130,11 +343,14 @@ async function handleDeleteProperty(property) {
 
 function mapFavoriteRegion(region) {
   return {
-    id: `${region.sggCd}-${region.umdNm}`,
+    id: region.umdCd || `${region.sggCd}-${region.umdNm}`,
     sggCd: region.sggCd,
+    sggNm: region.sggNm,
+    umdCd: region.umdCd,
     umdNm: region.umdNm,
-    regionName:
-      region.regionName ||
+    displayName:
+      region.displayName ||
+      [region.sggNm, region.umdNm].filter(Boolean).join(" ") ||
       [region.sggCd, region.umdNm].filter(Boolean).join(" "),
     salePrice: region.latestSalePrice,
     jeonseDeposit: region.latestJeonseDeposit,
@@ -145,6 +361,20 @@ function mapFavoriteRegion(region) {
       jeonse: region.jeonseDealCount,
       monthlyRent: region.monthlyRentDealCount,
     },
+  };
+}
+
+function mapRegionCandidate(region) {
+  return {
+    id: region.umdCd || `${region.sggCd}-${region.umdNm}`,
+    sggCd: region.sggCd,
+    sggNm: region.sggNm,
+    umdCd: region.umdCd,
+    umdNm: region.umdNm,
+    displayName:
+      region.displayName ||
+      [region.sggNm, region.umdNm].filter(Boolean).join(" ") ||
+      [region.sggCd, region.umdNm].filter(Boolean).join(" "),
   };
 }
 
@@ -168,6 +398,18 @@ function mapFavoriteProperty(property) {
       jeonse: property.jeonseDealCount,
       monthlyRent: property.monthlyRentDealCount,
     },
+  };
+}
+
+function mapPropertyCandidate(property) {
+  return {
+    id: property.id,
+    propertyId: property.id,
+    propertyName: property.name || "주택명 미상",
+    propertyType: property.propertyType,
+    regionName:
+      [property.umdNm, property.jibun].filter(Boolean).join(" ") ||
+      property.sggCd,
   };
 }
 
@@ -266,15 +508,17 @@ function getErrorMessage(error, fallbackMessage) {
     error.response?.data?.message || error.response?.data || fallbackMessage
   );
 }
+
+function isFavoriteAlreadyExistsError(error, message) {
+  return (
+    error.response?.data?.code === "F002" ||
+    String(message).includes("이미 관심 목록")
+  );
+}
 </script>
 
 <template>
   <main class="app-shell favorite-page">
-    <p v-if="!hasLoadedFavorites" class="empty-message">
-      관심 목록을 불러오는 중입니다.
-    </p>
-
-    <template v-else>
     <AppHeader @home="goHome" />
 
     <section class="favorite-header" aria-labelledby="favorite-title">
@@ -284,9 +528,6 @@ function getErrorMessage(error, fallbackMessage) {
       </div>
       <div class="favorite-header-actions">
         <strong>{{ totalFavoriteCount.toLocaleString() }}개</strong>
-        <button class="primary-button" type="button" @click="goHome">
-          관심 목록 더 찾아보기
-        </button>
       </div>
     </section>
 
@@ -304,6 +545,49 @@ function getErrorMessage(error, fallbackMessage) {
           <span>{{ favoriteRegions.length.toLocaleString() }}개</span>
         </div>
 
+        <div class="favorite-search-area">
+          <form
+            ref="regionSearchForm"
+            class="favorite-region-search"
+            @submit.prevent="handleSearchRegionCandidates"
+          >
+            <label class="sr-only" for="favorite-region-keyword">관심 지역 검색어</label>
+            <input
+              id="favorite-region-keyword"
+              v-model.trim="regionSearchKeyword"
+              type="search"
+              placeholder="지역명으로 검색"
+              autocomplete="off"
+              @input="handleRegionSearchInput"
+              @search="handleRegionSearchInput"
+            />
+            <button
+              class="primary-button"
+              type="submit"
+              :disabled="isSearchingRegions"
+            >
+              {{ isSearchingRegions ? "검색 중" : "지역 추가" }}
+            </button>
+          </form>
+
+          <div
+            v-if="regionCandidates.length > 0"
+            ref="regionCandidateList"
+            class="region-candidate-list"
+          >
+            <button
+              v-for="candidate in regionCandidates"
+              :key="candidate.id"
+              class="region-candidate-button"
+              type="button"
+              @click="handleAddRegion(candidate)"
+            >
+              <span>{{ candidate.displayName }}</span>
+              <strong>추가</strong>
+            </button>
+          </div>
+        </div>
+
         <p
           v-if="regionMessage"
           class="favorite-message"
@@ -313,7 +597,7 @@ function getErrorMessage(error, fallbackMessage) {
           {{ regionMessage }}
         </p>
 
-        <p v-if="isLoading" class="empty-message">
+        <p v-if="isLoadingRegions" class="empty-message">
           관심 지역을 불러오는 중입니다.
         </p>
 
@@ -330,7 +614,7 @@ function getErrorMessage(error, fallbackMessage) {
             >
               <div class="favorite-row-header">
                 <div class="favorite-main">
-                  <strong>{{ region.regionName }}</strong>
+                  <strong>{{ region.displayName }}</strong>
                   <span>최근 거래 기준 요약</span>
                 </div>
 
@@ -401,7 +685,11 @@ function getErrorMessage(error, fallbackMessage) {
           </div>
         </template>
         <div
-          v-if="isLoading || favoriteRegions.length === 0 || regionPageCount <= 1"
+          v-if="
+            isLoadingRegions ||
+            favoriteRegions.length === 0 ||
+            regionPageCount <= 1
+          "
           class="favorite-pagination favorite-pagination-placeholder"
           aria-hidden="true"
         ></div>
@@ -413,7 +701,55 @@ function getErrorMessage(error, fallbackMessage) {
             <p class="result-kicker">Favorite Properties</p>
             <h2 id="favorite-property-title">관심 주택</h2>
           </div>
-          <span>{{ favoriteProperties.length.toLocaleString() }}개</span>
+          <div class="panel-title-actions">
+            <span>{{ favoriteProperties.length.toLocaleString() }}개</span>
+          </div>
+        </div>
+
+        <div class="favorite-search-area">
+          <form
+            ref="propertySearchForm"
+            class="favorite-property-search"
+            @submit.prevent="handleSearchPropertyCandidates"
+          >
+            <label class="sr-only" for="favorite-property-keyword">관심 주택 검색어</label>
+            <input
+              id="favorite-property-keyword"
+              v-model.trim="propertySearchKeyword"
+              type="search"
+              placeholder="주택명으로 검색"
+              autocomplete="off"
+              @input="handlePropertySearchInput"
+              @search="handlePropertySearchInput"
+            />
+            <button
+              class="primary-button"
+              type="submit"
+              :disabled="isSearchingProperties"
+            >
+              {{ isSearchingProperties ? "검색 중" : "주택 추가" }}
+            </button>
+          </form>
+
+          <div
+            v-if="propertyCandidates.length > 0"
+            ref="propertyCandidateList"
+            class="property-candidate-list"
+          >
+            <button
+              v-for="candidate in propertyCandidates"
+              :key="candidate.id"
+              class="property-candidate-button"
+              type="button"
+              @click="handleAddProperty(candidate)"
+            >
+              <span>
+                <strong>{{ candidate.propertyName }}</strong>
+                <em>{{ getPropertyTypeLabel(candidate.propertyType) }} · {{ candidate.regionName }}</em>
+              </span>
+              <b>추가</b>
+            </button>
+          </div>
         </div>
 
         <p
@@ -425,7 +761,7 @@ function getErrorMessage(error, fallbackMessage) {
           {{ propertyMessage }}
         </p>
 
-        <p v-if="isLoading" class="empty-message">
+        <p v-if="isLoadingProperties" class="empty-message">
           관심 주택을 불러오는 중입니다.
         </p>
 
@@ -517,14 +853,27 @@ function getErrorMessage(error, fallbackMessage) {
         </template>
         <div
           v-if="
-            isLoading || favoriteProperties.length === 0 || propertyPageCount <= 1
+            isLoadingProperties ||
+            favoriteProperties.length === 0 ||
+            propertyPageCount <= 1
           "
           class="favorite-pagination favorite-pagination-placeholder"
           aria-hidden="true"
         ></div>
       </article>
     </section>
-    </template>
+
+    <div
+      v-if="toastMessage"
+      :key="toastKey"
+      class="favorite-toast"
+      :class="`favorite-toast-${toastVariant}`"
+      role="status"
+      aria-live="polite"
+    >
+      <strong>{{ toastLabel }}</strong>
+      <span>{{ toastMessage }}</span>
+    </div>
   </main>
 </template>
 
