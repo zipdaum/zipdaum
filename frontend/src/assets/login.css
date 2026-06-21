@@ -88,6 +88,12 @@
   box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12);
 }
 
+.login-form input:disabled {
+  background: #f5f8fd;
+  color: #71809d;
+  cursor: not-allowed;
+}
+
 .form-action-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 150px;

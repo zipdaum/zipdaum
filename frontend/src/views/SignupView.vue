@@ -28,6 +28,19 @@ const signUpErrorMessage = ref('')
 const isPasswordMatched = computed(
   () => password.value.length > 0 && password.value === passwordConfirm.value
 )
+const isPasswordMismatched = computed(
+  () =>
+    password.value.length > 0 &&
+    passwordConfirm.value.length > 0 &&
+    password.value !== passwordConfirm.value
+)
+const verificationCodeButtonText = computed(() => {
+  if (isEmailVerified.value) {
+    return '인증 완료'
+  }
+
+  return isRequestingCode.value ? '발송 중' : '인증 코드 보내기'
+})
 const canSubmit = computed(
   () =>
     isEmailVerified.value &&
@@ -188,6 +201,7 @@ function getErrorMessage(error, fallbackMessage) {
               autocomplete="email"
               maxlength="100"
               placeholder="user@example.com"
+              :disabled="isEmailVerified"
               required
             />
           </label>
@@ -195,10 +209,10 @@ function getErrorMessage(error, fallbackMessage) {
           <button
             class="sub-button"
             type="button"
-            :disabled="isRequestingCode || !email"
+            :disabled="isRequestingCode || isEmailVerified || !email"
             @click="handleRequestCode"
           >
-            {{ isRequestingCode ? '발송 중' : '인증 코드 보내기' }}
+            {{ verificationCodeButtonText }}
           </button>
         </div>
 
@@ -284,9 +298,14 @@ function getErrorMessage(error, fallbackMessage) {
             minlength="8"
             maxlength="100"
             placeholder="비밀번호를 다시 입력해주세요"
+            :aria-invalid="isPasswordMismatched"
             required
           />
         </label>
+
+        <p v-if="isPasswordMismatched" class="field-message error" role="alert">
+          비밀번호가 일치하지 않습니다.
+        </p>
 
         <p v-if="signUpErrorMessage" class="form-message error-message" role="alert">
           {{ signUpErrorMessage }}
