@@ -14,16 +14,21 @@ const form = ref(createDefaultForm());
 const isLoading = ref(true);
 const isSaving = ref(false);
 const message = ref("");
-const messageType = ref("error");
+const toastMessage = ref("");
+const toastVariant = ref("success");
+const toastKey = ref(0);
 const regionKeyword = ref("");
 const regionCandidates = ref([]);
 const isSearchingRegions = ref(false);
 const hasSearchedRegions = ref(false);
+const isComposingRegionKeyword = ref(false);
 let regionSearchSeq = 0;
 let regionSearchTimerId = null;
+let shouldSkipNextRegionInput = false;
+let toastTimer = null;
 
 const MAX_SELECTED_REGION_COUNT = 10;
-const REGION_SEARCH_DELAY_MS = 250;
+const REGION_SEARCH_DELAY_MS = 120;
 
 const selectedFacilityCount = computed(() =>
   Object.values(form.value.facilities).filter(Boolean).length,
@@ -37,9 +42,15 @@ const hasNoRegionSearchResult = computed(() =>
   regionKeyword.value.trim().length >= 2 &&
   regionCandidates.value.length === 0,
 );
+const toastLabel = computed(() =>
+  toastVariant.value === "error" ? "오류" : "완료",
+);
 
 onMounted(loadPreferences);
-onBeforeUnmount(clearRegionSearchTimer);
+onBeforeUnmount(() => {
+  clearRegionSearchTimer();
+  clearToastTimer();
+});
 
 function goHome() {
   router.push({ name: "home" });
@@ -58,7 +69,7 @@ async function loadPreferences() {
     form.value = toPreferenceForm(preferences);
   } catch (error) {
     if (error.response?.status !== 404) {
-      showMessage("맞춤 조건을 불러오지 못했습니다.", "error");
+      showMessage("맞춤 조건을 불러오지 못했습니다.");
     }
   } finally {
     isLoading.value = false;
@@ -71,7 +82,7 @@ async function handleSavePreferences() {
   const payload = toPreferencePayload();
 
   if (payload.length === 0) {
-    showMessage("저장할 맞춤 조건을 하나 이상 입력해주세요.", "error");
+    showMessage("저장할 맞춤 조건을 하나 이상 입력해주세요.");
     return;
   }
 
@@ -79,9 +90,12 @@ async function handleSavePreferences() {
 
   try {
     await saveUserPreferences(payload);
-    showMessage("맞춤 조건을 저장했습니다.", "success");
+    showToast("맞춤 조건을 저장했습니다.");
   } catch (error) {
-    showMessage(getErrorMessage(error, "맞춤 조건을 저장하지 못했습니다."), "error");
+    showToast(
+      getErrorMessage(error, "맞춤 조건을 저장하지 못했습니다."),
+      "error",
+    );
   } finally {
     isSaving.value = false;
   }
@@ -214,7 +228,24 @@ function addLoadedRegion(targetForm, value) {
   });
 }
 
-function searchRegions() {
+function handleRegionKeywordInput() {
+  if (shouldSkipNextRegionInput) {
+    shouldSkipNextRegionInput = false;
+    return;
+  }
+  if (isComposingRegionKeyword.value) {
+    return;
+  }
+  searchRegions();
+}
+
+function handleRegionKeywordCompositionEnd() {
+  isComposingRegionKeyword.value = false;
+  shouldSkipNextRegionInput = true;
+  searchRegions(0);
+}
+
+function searchRegions(delayMs = REGION_SEARCH_DELAY_MS) {
   const keyword = regionKeyword.value.trim();
 
   if (keyword.length < 2) {
@@ -230,6 +261,12 @@ function searchRegions() {
   const seq = ++regionSearchSeq;
   isSearchingRegions.value = true;
   hasSearchedRegions.value = false;
+
+  if (delayMs <= 0) {
+    fetchRegionCandidates(keyword, seq);
+    return;
+  }
+
   regionSearchTimerId = window.setTimeout(() => {
     regionSearchTimerId = null;
     fetchRegionCandidates(keyword, seq);
@@ -441,9 +478,27 @@ function clearRegionSearchTimer() {
   }
 }
 
-function showMessage(text, type) {
+function showMessage(text) {
   message.value = text;
-  messageType.value = type;
+}
+
+function showToast(text, variant = "success") {
+  toastMessage.value = text;
+  toastVariant.value = variant;
+  toastKey.value += 1;
+  clearToastTimer();
+
+  toastTimer = window.setTimeout(() => {
+    toastMessage.value = "";
+    toastTimer = null;
+  }, 2500);
+}
+
+function clearToastTimer() {
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+    toastTimer = null;
+  }
 }
 
 function getErrorMessage(error, fallbackMessage) {
@@ -541,34 +596,39 @@ function getErrorMessage(error, fallbackMessage) {
               <h2 id="region-condition-title">선호 지역</h2>
             </div>
 
-            <label class="preference-single-field">
-              <span>지역 검색</span>
-              <input
-                v-model="regionKeyword"
-                autocomplete="off"
-                placeholder="해운대구 우동"
-                type="search"
-                @input="searchRegions"
-              />
-            </label>
+            <div class="region-search-box">
+              <label class="preference-single-field">
+                <span>지역 검색</span>
+                <input
+                  v-model="regionKeyword"
+                  autocomplete="off"
+                  placeholder="해운대구 우동"
+                  type="search"
+                  @compositionstart="isComposingRegionKeyword = true"
+                  @compositionend="handleRegionKeywordCompositionEnd"
+                  @input="handleRegionKeywordInput"
+                  @keydown.enter.prevent="searchRegions(0)"
+                />
+              </label>
 
-            <div v-if="shouldShowRegionSearchPanel" class="region-search-panel">
-              <div v-if="regionCandidates.length > 0" class="region-candidate-list">
-                <button
-                  v-for="candidate in regionCandidates"
-                  :key="`${candidate.sggCd}-${candidate.umdCd || 'sgg'}-${candidate.displayName}`"
-                  type="button"
-                  @click="selectRegion(candidate)"
-                >
-                  {{ candidate.displayName }}
-                </button>
+              <div v-if="shouldShowRegionSearchPanel" class="region-search-panel">
+                <div v-if="regionCandidates.length > 0" class="region-candidate-list">
+                  <button
+                    v-for="candidate in regionCandidates"
+                    :key="`${candidate.sggCd}-${candidate.umdCd || 'sgg'}-${candidate.displayName}`"
+                    type="button"
+                    @click="selectRegion(candidate)"
+                  >
+                    {{ candidate.displayName }}
+                  </button>
+                </div>
+                <p v-else-if="isSearchingRegions" class="region-search-state">
+                  지역을 검색하는 중입니다.
+                </p>
+                <p v-else-if="hasNoRegionSearchResult" class="region-search-state">
+                  검색 결과가 없습니다.
+                </p>
               </div>
-              <p v-else-if="isSearchingRegions" class="region-search-state">
-                지역을 검색하는 중입니다.
-              </p>
-              <p v-else-if="hasNoRegionSearchResult" class="region-search-state">
-                검색 결과가 없습니다.
-              </p>
             </div>
 
             <div class="selected-region-summary">
@@ -634,8 +694,7 @@ function getErrorMessage(error, fallbackMessage) {
       <p
         v-if="message"
         class="preference-setting-message"
-        :class="{ success: messageType === 'success' }"
-        role="status"
+        role="alert"
       >
         {{ message }}
       </p>
@@ -647,6 +706,18 @@ function getErrorMessage(error, fallbackMessage) {
         <button class="primary-button" type="submit" :disabled="isSaving">
           {{ isSaving ? "저장 중" : "저장하기" }}
         </button>
+      </div>
+
+      <div
+        v-if="toastMessage"
+        :key="toastKey"
+        class="preference-toast"
+        :class="`preference-toast-${toastVariant}`"
+        role="status"
+        aria-live="polite"
+      >
+        <strong>{{ toastLabel }}</strong>
+        <span>{{ toastMessage }}</span>
       </div>
     </form>
   </main>

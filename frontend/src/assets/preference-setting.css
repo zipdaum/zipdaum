@@ -42,17 +42,24 @@
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(360px, 0.9fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .preference-side-stack {
   display: grid;
   gap: 16px;
+  height: 100%;
+  grid-template-rows: auto 1fr;
+}
+
+.preference-main-grid > .preference-setting-panel {
+  height: 100%;
 }
 
 .preference-setting-panel {
   display: grid;
   gap: 16px;
+  align-content: start;
   min-width: 0;
   padding: 20px;
 }
@@ -110,6 +117,11 @@
   min-width: 0;
 }
 
+.region-search-box {
+  position: relative;
+  min-width: 0;
+}
+
 .condition-row > span:first-child,
 .preference-single-field span {
   color: #374151;
@@ -151,6 +163,11 @@
 
 .region-search-panel {
   display: grid;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 10;
   min-height: 46px;
   max-height: 164px;
   overflow: hidden;
@@ -162,6 +179,7 @@
 
 .region-candidate-list {
   display: grid;
+  max-height: 164px;
   overflow-y: auto;
 }
 
@@ -286,20 +304,12 @@
   font-weight: 900;
 }
 
-.preference-setting-message.success {
-  border-color: #c7eed8;
-  background: #f0fff6;
-  color: #128a47;
-}
-
 .preference-setting-actions {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 10px;
-  border-top: 1px solid #e5e7eb;
-  background: #ffffff;
-  padding: 14px 0 0;
+  padding: 0;
 }
 
 .preference-setting-actions button {
@@ -310,6 +320,80 @@
 .preference-setting-actions button:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.preference-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: min(440px, calc(100vw - 32px));
+  max-width: min(440px, calc(100vw - 32px));
+  border: 1px solid #9be7b8;
+  border-left: 6px solid #16a34a;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 36px rgba(20, 33, 61, 0.22);
+  color: #14213d;
+  padding: 13px 16px 13px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  animation: preference-toast-enter 180ms ease-out;
+}
+
+.preference-toast::before {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  content: "✓";
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.preference-toast strong {
+  color: #128a47;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.preference-toast span {
+  min-width: 0;
+  color: #17233f;
+  line-height: 1.35;
+}
+
+.preference-toast-error {
+  border-color: #fecaca;
+  border-left-color: #dc2626;
+}
+
+.preference-toast-error::before {
+  background: #dc2626;
+  content: "!";
+}
+
+.preference-toast-error strong {
+  color: #b91c1c;
+}
+
+@keyframes preference-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 900px) {
@@ -357,5 +441,10 @@
 
   .preference-setting-actions button {
     flex: 1 1 140px;
+  }
+
+  .preference-toast {
+    top: 16px;
+    right: 16px;
   }
 }
