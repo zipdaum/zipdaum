@@ -15,13 +15,13 @@ const recentProperties = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
 
+const MAX_PREFERENCE_SUMMARY_ITEMS = 5;
+
 const displayedUser = computed(() => userInfo.value || currentUser.value || {});
 const preferenceSummary = computed(() =>
-  preferences.value
-    .slice()
-    .sort((left, right) => Number(left.priority || 0) - Number(right.priority || 0))
-    .map(mapPreferenceSummary),
+  createPreferenceSummary(preferences.value).slice(0, MAX_PREFERENCE_SUMMARY_ITEMS),
 );
+const preferenceCount = computed(() => preferences.value.length);
 const recentPreviewProperties = computed(() => recentProperties.value.slice(0, 6));
 
 onMounted(loadMyPage);
@@ -83,6 +83,35 @@ function openPropertyDetail(propertyId) {
   });
 }
 
+function createPreferenceSummary(items) {
+  const sortedPreferences = items
+    .slice()
+    .sort((left, right) => Number(left.priority || 0) - Number(right.priority || 0));
+  const regionValues = sortedPreferences
+    .filter((preference) => preference.code === "REGION")
+    .map((preference) => formatPreferenceValue(preference));
+  const summaries = sortedPreferences
+    .filter((preference) => preference.code !== "REGION")
+    .map(mapPreferenceSummary);
+
+  if (regionValues.length === 0) {
+    return summaries;
+  }
+
+  const firstRegionIndex = sortedPreferences.findIndex(
+    (preference) => preference.code === "REGION",
+  );
+  const regionSummary = {
+    code: "REGION",
+    label: "지역",
+    value: regionValues.join(", "),
+  };
+  const insertIndex = Math.min(firstRegionIndex, summaries.length);
+  summaries.splice(insertIndex, 0, regionSummary);
+
+  return summaries;
+}
+
 function mapPreferenceSummary(preference) {
   return {
     code: preference.code,
@@ -133,7 +162,7 @@ function formatPreferenceValue(preference) {
   }
 
   if (["BUS", "SUBWAY", "HOSPITAL", "CCTV", "PARK"].includes(preference.code)) {
-    return value === "true" ? "우선 고려" : "제외";
+    return value === "true" ? "필요" : "제외";
   }
 
   return String(value);
@@ -162,6 +191,10 @@ function getRecentPropertyPrice(property) {
   }
 
   return "최근 거래 정보 없음";
+}
+
+function formatViewCount(viewCount) {
+  return `${Number(viewCount || 1).toLocaleString()}회 조회`;
 }
 
 function formatPrice(price) {
@@ -219,13 +252,6 @@ function formatDateTime(value) {
   <main class="app-shell mypage-page">
     <AppHeader @home="goHome" />
 
-    <section class="mypage-header" aria-labelledby="mypage-title">
-      <div>
-        <p>My Page</p>
-        <h1 id="mypage-title">내 정보와 주거 활동을 확인하세요</h1>
-      </div>
-    </section>
-
     <p v-if="errorMessage" class="form-message" role="alert">
       {{ errorMessage }}
     </p>
@@ -237,14 +263,16 @@ function formatDateTime(value) {
         <article class="mypage-panel profile-panel" aria-labelledby="profile-title">
           <div class="panel-title-row">
             <div>
-              <p class="result-kicker">Profile</p>
               <h2 id="profile-title">내 정보</h2>
             </div>
           </div>
 
           <div class="profile-content">
             <div class="profile-avatar" aria-hidden="true">
-              {{ (displayedUser.name || "?").slice(0, 1) }}
+              <svg viewBox="0 0 48 48" focusable="false">
+                <circle cx="24" cy="17" r="9" />
+                <path d="M9 40c2.3-8.3 8.1-13 15-13s12.7 4.7 15 13" />
+              </svg>
             </div>
             <dl>
               <div>
@@ -262,18 +290,16 @@ function formatDateTime(value) {
         <article class="mypage-panel preference-panel" aria-labelledby="preference-title">
           <div class="panel-title-row">
             <div>
-              <p class="result-kicker">Preferences</p>
-              <h2 id="preference-title">내 맞춤 조건 요약</h2>
+              <h2 id="preference-title">맞춤 조건</h2>
             </div>
             <div class="panel-title-actions">
-              <span>{{ preferenceSummary.length.toLocaleString() }}개</span>
               <button class="secondary-button" type="button" @click="openPreferenceSettings">
-                조건 수정
+                설정 변경
               </button>
             </div>
           </div>
 
-          <p v-if="preferenceSummary.length === 0" class="empty-message compact-empty-message">
+          <p v-if="preferenceCount === 0" class="empty-message compact-empty-message">
             설정한 맞춤 조건이 없습니다.
           </p>
 
@@ -292,7 +318,6 @@ function formatDateTime(value) {
       <section class="mypage-panel recent-panel" aria-labelledby="recent-title">
         <div class="panel-title-row">
           <div>
-            <p class="result-kicker">Recently Viewed</p>
             <h2 id="recent-title">최근 본 주택</h2>
           </div>
           <span>{{ recentProperties.length.toLocaleString() }}개</span>
@@ -310,8 +335,9 @@ function formatDateTime(value) {
             type="button"
             @click="openPropertyDetail(property.propertyId)"
           >
-            <span class="home-image recent-property-image" aria-hidden="true">
-              <span>{{ property.viewCount || 1 }}</span>
+            <span class="home-image recent-property-image" aria-hidden="true"></span>
+            <span class="recent-property-visit">
+              {{ formatViewCount(property.viewCount) }}
             </span>
             <span class="recent-property-info">
               <strong>{{ property.name || "주택명 미상" }}</strong>

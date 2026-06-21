@@ -3,30 +3,11 @@
   gap: 20px;
 }
 
-.mypage-header,
 .mypage-panel {
   border: 1px solid #dbe7ff;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 10px 28px rgba(39, 83, 150, 0.08);
-}
-
-.mypage-header {
-  padding: 24px;
-}
-
-.mypage-header p {
-  margin: 0 0 8px;
-  color: #0b5cff;
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.mypage-header h1 {
-  margin: 0;
-  color: #14213d;
-  font-size: 26px;
-  line-height: 1.35;
 }
 
 .mypage-summary-grid {
@@ -38,7 +19,45 @@
 
 .mypage-panel {
   min-width: 0;
-  padding: 22px;
+  padding: 20px;
+}
+
+.mypage-panel .panel-title-row {
+  margin-bottom: 12px;
+}
+
+.preference-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.preference-panel .panel-title-row {
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.preference-panel h2 {
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.preference-panel .panel-title-actions {
+  gap: 14px;
+}
+
+.preference-panel .panel-title-actions span {
+  color: #53617c;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.preference-panel .panel-title-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
 }
 
 .profile-content {
@@ -57,8 +76,16 @@
   border-radius: 999px;
   background: #eef4ff;
   color: #0b5cff;
-  font-size: 34px;
-  font-weight: 900;
+}
+
+.profile-avatar svg {
+  width: 46px;
+  height: 46px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
 }
 
 .profile-content dl,
@@ -67,6 +94,13 @@
   gap: 12px;
   min-width: 0;
   margin: 0;
+}
+
+.preference-summary-list {
+  gap: 0;
+  border: 1px solid #edf2fb;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .profile-content dl > div,
@@ -79,10 +113,26 @@
   padding-bottom: 12px;
 }
 
+.preference-summary-list > div {
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.preference-summary-list > div:nth-child(even) {
+  background: #f8fbff;
+}
+
 .profile-content dl > div:last-child,
 .preference-summary-list > div:last-child {
   border-bottom: 0;
   padding-bottom: 0;
+}
+
+.preference-summary-list > div:last-child {
+  padding-bottom: 8px;
 }
 
 .profile-content dt,
@@ -90,6 +140,10 @@
   color: #71809d;
   font-size: 13px;
   font-weight: 900;
+}
+
+.preference-summary-list dt {
+  font-size: 12px;
 }
 
 .profile-content dd,
@@ -101,6 +155,10 @@
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.preference-summary-list dd {
+  font-size: 13px;
 }
 
 .recent-panel {
@@ -115,6 +173,7 @@
 }
 
 .recent-property-card {
+  position: relative;
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -145,6 +204,7 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+  padding-right: 72px;
 }
 
 .recent-property-info strong,
@@ -174,6 +234,19 @@
   font-weight: 900;
 }
 
+.recent-property-visit {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2563eb;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
 .recent-property-meta {
   align-self: end;
   justify-self: start;
@@ -193,10 +266,6 @@
 }
 
 @media (max-width: 640px) {
-  .mypage-header h1 {
-    font-size: 22px;
-  }
-
   .mypage-panel {
     padding: 18px;
   }

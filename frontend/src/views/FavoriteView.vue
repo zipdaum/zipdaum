@@ -40,9 +40,6 @@ const regionPage = ref(1);
 const propertyPage = ref(1);
 let toastTimer = null;
 
-const totalFavoriteCount = computed(
-  () => favoriteRegions.value.length + favoriteProperties.value.length,
-);
 const regionPageCount = computed(() =>
   calculatePageCount(favoriteRegions.value.length),
 );
@@ -521,16 +518,6 @@ function isFavoriteAlreadyExistsError(error, message) {
   <main class="app-shell favorite-page">
     <AppHeader @home="goHome" />
 
-    <section class="favorite-header" aria-labelledby="favorite-title">
-      <div>
-        <p>관심 목록</p>
-        <h1 id="favorite-title">관심 지역과 관심 주택을 한 번에 확인하세요</h1>
-      </div>
-      <div class="favorite-header-actions">
-        <strong>{{ totalFavoriteCount.toLocaleString() }}개</strong>
-      </div>
-    </section>
-
     <p v-if="errorMessage" class="form-message" role="alert">
       {{ errorMessage }}
     </p>
@@ -539,7 +526,6 @@ function isFavoriteAlreadyExistsError(error, message) {
       <article class="favorite-panel" aria-labelledby="favorite-region-title">
         <div class="panel-title-row">
           <div>
-            <p class="result-kicker">Favorite Regions</p>
             <h2 id="favorite-region-title">관심 지역</h2>
           </div>
           <span>{{ favoriteRegions.length.toLocaleString() }}개</span>
@@ -698,7 +684,6 @@ function isFavoriteAlreadyExistsError(error, message) {
       <article class="favorite-panel" aria-labelledby="favorite-property-title">
         <div class="panel-title-row">
           <div>
-            <p class="result-kicker">Favorite Properties</p>
             <h2 id="favorite-property-title">관심 주택</h2>
           </div>
           <div class="panel-title-actions">
