@@ -48,7 +48,9 @@ function handleLogout() {
       <RouterLink class="ghost-button" :to="{ name: 'login' }">
         로그인
       </RouterLink>
-      <button class="primary-button" type="button">회원가입</button>
+      <RouterLink class="primary-button" :to="{ name: 'signup' }">
+        회원가입
+      </RouterLink>
     </div>
   </header>
 </template>
