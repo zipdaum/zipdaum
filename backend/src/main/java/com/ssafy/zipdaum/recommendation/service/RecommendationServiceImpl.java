@@ -14,15 +14,11 @@ import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.dto.RecommendationStatus;
 import com.ssafy.zipdaum.recommendation.mapper.RecommendationMapper;
-import com.ssafy.zipdaum.recent.dto.RecentPropertyScoreFactor;
-import com.ssafy.zipdaum.recent.mapper.RecentPropertyMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,13 +30,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecommendationServiceImpl implements RecommendationService {
 
   private static final int DEFAULT_RECOMMENDATION_SIZE = 20;
-  private static final int RECENT_PROPERTY_SCORE_BONUS = 5;
-  private static final int MAX_RECENT_PROPERTY_SCORE_BONUS = 15;
+  private static final int INTERACTION_VIEW_SCORE_BONUS = 5;
+  private static final int MAX_INTERACTION_VIEW_SCORE_BONUS = 15;
+  private static final int INTERACTION_SCORE_BONUS = 5;
+  private static final int MAX_INTERACTION_SCORE_BONUS = 20;
+  private static final long INTERACTION_DWELL_TIME_THRESHOLD_MILLIS = 30_000L;
+  private static final int INTERACTION_SCROLL_DEPTH_THRESHOLD_PERCENT = 80;
   private static final BigDecimal PRICE_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(1.1);
   private static final BigDecimal AREA_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(0.9);
 
   private final RecommendationMapper recommendationMapper;
-  private final RecentPropertyMapper recentPropertyMapper;
   private final UserPreferenceService userPreferenceService;
   private final SurroundingService surroundingService;
   private final RecommendationScoreService recommendationScoreService;
@@ -49,7 +48,7 @@ public class RecommendationServiceImpl implements RecommendationService {
   @Transactional(readOnly = true)
   public PropertyRecommendationScore findPropertyRecommendationScore(Long userId, Long propertyId) {
     PropertyRecommendationCandidate property =
-        recommendationMapper.selectPropertyRecommendationCandidate(propertyId);
+        recommendationMapper.selectPropertyRecommendationCandidate(userId, propertyId);
 
     if (property == null) {
       log.warn("주택 맞춤 조건 적합도 조회 실패 - 존재하지 않는 주택 propertyId={}", propertyId);
@@ -74,13 +73,11 @@ public class RecommendationServiceImpl implements RecommendationService {
   @Transactional(readOnly = true)
   public List<PropertyRecommendationResponse> findPropertyRecommendations(Long userId) {
     List<UserPreferenceResponse> preferences = userPreferenceService.findPreferences(userId);
-    Map<Long, RecentPropertyScoreFactor> recentPropertyScoreFactors =
-        findRecentPropertyScoreFactors(userId);
     if (!hasEvaluablePreference(preferences)) {
-      return findRecentPropertyFallbackRecommendations(recentPropertyScoreFactors);
+      return findInteractionFallbackRecommendations(userId);
     }
 
-    PropertyRecommendationCandidateFilter filter = toCandidateFilter(preferences);
+    PropertyRecommendationCandidateFilter filter = toCandidateFilter(userId, preferences);
     List<PropertyRecommendationCandidate> candidates =
         recommendationMapper.selectPropertyRecommendationCandidates(filter);
 
@@ -92,10 +89,7 @@ public class RecommendationServiceImpl implements RecommendationService {
           preferences,
           surroundingSummary
       );
-      score = applyRecentPropertyScore(
-          score,
-          recentPropertyScoreFactors.get(candidate.getId())
-      );
+      score = applyInteractionScore(score, candidate);
       if (isPositiveScore(score)) {
         scoredProperties.add(new ScoredProperty(candidate, score, surroundingSummary));
       }
@@ -111,21 +105,23 @@ public class RecommendationServiceImpl implements RecommendationService {
     return recommendations;
   }
 
-  private List<PropertyRecommendationResponse> findRecentPropertyFallbackRecommendations(
-      Map<Long, RecentPropertyScoreFactor> recentPropertyScoreFactors) {
-    if (recentPropertyScoreFactors.isEmpty()) {
+  private List<PropertyRecommendationResponse> findInteractionFallbackRecommendations(Long userId) {
+    List<PropertyRecommendationCandidate> interactedCandidates =
+        recommendationMapper.selectPropertyRecommendationCandidates(interactedCandidateFilter(userId));
+    if (interactedCandidates == null) {
+      interactedCandidates = List.of();
+    }
+    if (interactedCandidates.isEmpty()) {
       log.debug("사용자 맞춤 주택 추천 목록 조회 완료 resultCount=0");
       return List.of();
     }
 
     List<ScoredProperty> scoredProperties = new ArrayList<>();
-    for (RecentPropertyScoreFactor factor : recentPropertyScoreFactors.values()) {
-      PropertyRecommendationCandidate candidate =
-          recommendationMapper.selectPropertyRecommendationCandidate(factor.getPropertyId());
-      if (candidate == null) {
-        continue;
+    for (PropertyRecommendationCandidate candidate : interactedCandidates) {
+      PropertyRecommendationScore score = createInteractionScore(candidate);
+      if (isPositiveScore(score)) {
+        scoredProperties.add(new ScoredProperty(candidate, score, null));
       }
-      scoredProperties.add(new ScoredProperty(candidate, createRecentPropertyScore(factor), null));
     }
 
     List<PropertyRecommendationResponse> recommendations = scoredProperties.stream()
@@ -138,68 +134,86 @@ public class RecommendationServiceImpl implements RecommendationService {
     return recommendations;
   }
 
-  private Map<Long, RecentPropertyScoreFactor> findRecentPropertyScoreFactors(Long userId) {
-    List<RecentPropertyScoreFactor> factors =
-        recentPropertyMapper.selectRecentPropertyScoreFactors(userId);
-    if (factors == null || factors.isEmpty()) {
-      return Map.of();
-    }
-    return factors.stream()
-        .collect(Collectors.toMap(
-            RecentPropertyScoreFactor::getPropertyId,
-            factor -> factor,
-            (left, right) -> left
-        ));
-  }
-
-  private PropertyRecommendationScore applyRecentPropertyScore(
+  private PropertyRecommendationScore applyInteractionScore(
       PropertyRecommendationScore score,
-      RecentPropertyScoreFactor recentPropertyScoreFactor) {
-    if (recentPropertyScoreFactor == null
-        || score.getRecommendationStatus() != RecommendationStatus.EVALUATED
+      PropertyRecommendationCandidate candidate) {
+    if (score.getRecommendationStatus() != RecommendationStatus.EVALUATED
         || score.getScore() == null) {
       return score;
     }
 
-    int bonus = calculateRecentPropertyScoreBonus(recentPropertyScoreFactor.getViewCount());
+    int bonus = calculateInteractionScoreBonus(candidate);
+    if (bonus <= 0) {
+      return score;
+    }
+
     int adjustedScore = Math.min(100, score.getScore() + bonus);
     List<PropertyRecommendationCondition> conditions = new ArrayList<>(score.getConditions());
-    conditions.add(toRecentPropertyCondition(recentPropertyScoreFactor, bonus));
+    conditions.add(toInteractionCondition(candidate, bonus));
     return new PropertyRecommendationScore(adjustedScore, conditions);
   }
 
-  private PropertyRecommendationScore createRecentPropertyScore(
-      RecentPropertyScoreFactor recentPropertyScoreFactor) {
-    int bonus = calculateRecentPropertyScoreBonus(recentPropertyScoreFactor.getViewCount());
+  private PropertyRecommendationScore createInteractionScore(
+      PropertyRecommendationCandidate candidate) {
+    int bonus = calculateInteractionScoreBonus(candidate);
     return new PropertyRecommendationScore(
         bonus,
-        List.of(toRecentPropertyCondition(recentPropertyScoreFactor, bonus))
+        List.of(toInteractionCondition(candidate, bonus))
     );
   }
 
-  private PropertyRecommendationCondition toRecentPropertyCondition(
-      RecentPropertyScoreFactor recentPropertyScoreFactor,
+  private PropertyRecommendationCondition toInteractionCondition(
+      PropertyRecommendationCandidate candidate,
       int bonus) {
     return new PropertyRecommendationCondition(
-        "RECENT_PROPERTY",
-        "최근 본 주택",
-        String.valueOf(recentPropertyScoreFactor.getViewCount()),
+        "PROPERTY_INTERACTION",
+        "주택 행동 로그",
+        String.valueOf(safeInt(candidate.getInteractionViewCount())),
         null,
-        true,
+        bonus > 0,
         bonus,
-        "최근 확인한 주택"
+        "상세 화면에서 관심 행동 발생"
     );
   }
 
-  private int calculateRecentPropertyScoreBonus(Integer viewCount) {
-    int safeViewCount = viewCount == null ? 1 : Math.max(viewCount, 1);
+  private int calculateInteractionScoreBonus(PropertyRecommendationCandidate candidate) {
+    int bonus = calculateInteractionViewScoreBonus(candidate.getInteractionViewCount());
+    if (safeLong(candidate.getInteractionTotalDwellTimeMillis())
+        >= INTERACTION_DWELL_TIME_THRESHOLD_MILLIS) {
+      bonus += INTERACTION_SCORE_BONUS;
+    }
+    if (safeInt(candidate.getInteractionMaxScrollDepthPercent())
+        >= INTERACTION_SCROLL_DEPTH_THRESHOLD_PERCENT) {
+      bonus += INTERACTION_SCORE_BONUS;
+    }
+    if (safeInt(candidate.getRecommendationDetailClickCount()) > 0) {
+      bonus += INTERACTION_SCORE_BONUS;
+    }
+    if (safeInt(candidate.getDealHistoryClickCount()) > 0) {
+      bonus += INTERACTION_SCORE_BONUS;
+    }
+    int maxBonus = MAX_INTERACTION_VIEW_SCORE_BONUS + MAX_INTERACTION_SCORE_BONUS;
+    return Math.min(bonus, maxBonus);
+  }
+
+  private int calculateInteractionViewScoreBonus(Integer viewCount) {
+    int safeViewCount = viewCount == null ? 0 : Math.max(viewCount, 0);
     return Math.min(
-        safeViewCount * RECENT_PROPERTY_SCORE_BONUS,
-        MAX_RECENT_PROPERTY_SCORE_BONUS
+        safeViewCount * INTERACTION_VIEW_SCORE_BONUS,
+        MAX_INTERACTION_VIEW_SCORE_BONUS
     );
+  }
+
+  private int safeInt(Integer value) {
+    return value == null ? 0 : value;
+  }
+
+  private long safeLong(Long value) {
+    return value == null ? 0L : value;
   }
 
   private PropertyRecommendationCandidateFilter toCandidateFilter(
+      Long userId,
       List<UserPreferenceResponse> preferences) {
     List<String> regions = new ArrayList<>();
     Long salePriceMax = null;
@@ -231,12 +245,27 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     return new PropertyRecommendationCandidateFilter(
+        userId,
         regions,
         salePriceMax,
         depositMax,
         monthlyRentMax,
         minExclusiveArea,
-        monthlyRentPreferred
+        monthlyRentPreferred,
+        false
+    );
+  }
+
+  private PropertyRecommendationCandidateFilter interactedCandidateFilter(Long userId) {
+    return new PropertyRecommendationCandidateFilter(
+        userId,
+        List.of(),
+        null,
+        null,
+        null,
+        null,
+        false,
+        true
     );
   }
 

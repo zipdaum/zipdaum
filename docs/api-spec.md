@@ -19,6 +19,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 실거래가 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
 | 사용자 맞춤 | 주택 맞춤 조건 적합도 조회 | GET | `/properties/{propertyId}/recommendation-score` |
 | 사용자 맞춤 | 사용자 맞춤 지역 조건 후보 검색 | GET | `/users/info/preferences/regions/candidates` |
+| 사용자 맞춤 | 주택 상세 화면 행동 로그 저장 | POST | `/properties/{propertyId}/interactions` |
 | 사용자 맞춤 | 사용자 맞춤 조건 전체 저장(조건 조합) | PUT | `/users/info/preferences` |
 | 사용자 맞춤 | 사용자 맞춤 조건 해제(조건 조합) | DELETE | `/users/info/preferences` |
 | 사용자 맞춤 | 관심 지역 전체 조회 | GET | `/users/info/regions` |
@@ -52,6 +53,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
 | 주택 주변 편의시설 조회 | GET | `/properties/{propertyId}/surroundings` |
 | 주택 맞춤 조건 적합도 조회 | GET | `/properties/{propertyId}/recommendation-score` |
+| 주택 상세 화면 행동 로그 저장 | POST | `/properties/{propertyId}/interactions` |
 
 ### 주택 맞춤 조건 적합도 점수 기준
 
@@ -70,11 +72,16 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
   - 버스, CCTV: 500m
   - 지하철역, 공원: 1000m
   - 병원: 1500m
-- 사용자 맞춤 주택 추천 목록에서는 최근 본 주택인 경우 조회 횟수에 따라 5점씩 가산하며 최대 15점까지 반영한다.
-- 사용자 맞춤 주택 추천 목록에서는 평가 가능한 맞춤 조건이 없어도 최근 본 주택 이력이 있으면 최근 본 주택 점수만으로 추천할 수 있다.
-- 최근 본 주택 가산점 반영 후 최종 `score`는 100점을 초과하지 않는다.
+- 사용자 맞춤 주택 추천 목록에서는 상세 화면 행동 로그의 조회 횟수에 따라 5점씩 가산하며 최대 15점까지 반영한다.
+- 사용자 맞춤 주택 추천 목록에서는 상세 화면 행동 로그에 따라 추가 행동 항목별 5점씩 가산하며 최대 20점까지 반영한다.
+  - 체류시간이 30초 이상이면 5점을 가산한다.
+  - 최대 스크롤 깊이가 80% 이상이면 5점을 가산한다.
+  - 적합도 상세 보기를 1회 이상 클릭했으면 5점을 가산한다.
+  - 전체 거래 보러가기를 1회 이상 클릭했으면 5점을 가산한다.
+- 사용자 맞춤 주택 추천 목록에서는 평가 가능한 맞춤 조건이 없어도 상세 화면 행동 로그가 있으면 해당 가산점만으로 추천할 수 있다.
+- 상세 화면 행동 로그 가산점 반영 후 최종 `score`는 100점을 초과하지 않는다.
 - 사용자 맞춤 주택 추천 목록은 최종 `score`가 높은 순서로 정렬한다.
-- 주택 맞춤 조건 적합도 조회는 평가 가능한 맞춤 조건이 없으면 최근 본 주택 이력을 반영하지 않고 `NO_EVALUABLE_CONDITION`을 반환한다.
+- 주택 맞춤 조건 적합도 조회는 평가 가능한 맞춤 조건이 없으면 상세 화면 행동 로그를 반영하지 않고 `NO_EVALUABLE_CONDITION`을 반환한다.
 
 ## 사용자 맞춤
 
@@ -90,3 +97,25 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 관심 주택 등록 | POST | `/users/info/properties` |
 | 관심 주택 해제 | DELETE | `/users/info/properties` |
 | 최근 본 주택 조회 | GET | `/users/info/recent-properties` |
+
+### 주택 상세 화면 행동 로그 저장
+
+로그인한 사용자가 주택 상세 화면을 떠날 때 아래 값을 저장한다.
+
+- `dwellTimeMillis`: 상세 화면 체류시간(ms)
+- `maxScrollDepthPercent`: 상세 화면 최대 스크롤 깊이(0~100)
+- `recommendationDetailClicked`: 적합도 상세 보기 클릭 여부
+- `dealHistoryClicked`: 전체 거래 보러가기 클릭 여부
+
+요청 예시:
+
+```json
+{
+  "dwellTimeMillis": 30000,
+  "maxScrollDepthPercent": 80,
+  "recommendationDetailClicked": true,
+  "dealHistoryClicked": true
+}
+```
+
+성공 시 `204 No Content`를 반환한다.

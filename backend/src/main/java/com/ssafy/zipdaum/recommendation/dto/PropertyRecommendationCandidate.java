@@ -27,4 +27,9 @@ public class PropertyRecommendationCandidate {
   private Long latestDealPrice;
   private LocalDate latestDealDate;
   private BigDecimal exclusiveArea;
+  private Integer interactionViewCount;
+  private Long interactionTotalDwellTimeMillis;
+  private Integer interactionMaxScrollDepthPercent;
+  private Integer recommendationDetailClickCount;
+  private Integer dealHistoryClickCount;
 }

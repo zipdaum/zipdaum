@@ -9,10 +9,12 @@ import lombok.Getter;
 @AllArgsConstructor
 public class PropertyRecommendationCandidateFilter {
 
+  private Long userId;
   private List<String> regions;
   private Long salePriceMax;
   private Long depositMax;
   private Long monthlyRentMax;
   private BigDecimal minExclusiveArea;
   private boolean monthlyRentPreferred;
+  private boolean interactedOnly;
 }

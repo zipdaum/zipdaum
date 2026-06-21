@@ -8,6 +8,8 @@ import {
   getPropertyRecommendations as fetchPropertyRecommendations,
   getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
+  savePropertyInteraction,
+  savePropertyInteractionKeepalive,
   searchProperties,
 } from "../api/property";
 import {
@@ -138,6 +140,7 @@ const surroundingsErrorMessage = ref("");
 const recommendationScore = ref(null);
 const isRecommendationScoreLoading = ref(false);
 const recommendationScoreErrorMessage = ref("");
+const detailInteraction = ref(null);
 const mapZoom = ref(1);
 const mapPan = ref({ x: 0, y: 0 });
 const isMapDragging = ref(false);
@@ -198,6 +201,7 @@ onMounted(async () => {
     loadPropertyRecommendations(),
     loadFavoritePropertyIds(),
   ]);
+  window.addEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.addEventListener("popstate", handleBrowserBack);
 });
 
@@ -214,8 +218,11 @@ watch(isLoggedIn, (loggedIn) => {
 });
 
 onUnmounted(() => {
+  saveDetailInteraction();
   clearResultHighlightTimer();
   stopMapDrag();
+  window.removeEventListener("scroll", updateDetailScrollDepth);
+  window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.removeEventListener("popstate", handleBrowserBack);
 });
 
@@ -415,6 +422,7 @@ async function handleSortChange() {
 }
 
 function openResultsView() {
+  saveDetailInteraction();
   window.history.pushState(
     { view: "results" },
     "",
@@ -425,6 +433,7 @@ function openResultsView() {
 }
 
 function openRecommendationResultsView() {
+  saveDetailInteraction();
   window.history.pushState(
     { view: "recommendations" },
     "",
@@ -435,6 +444,7 @@ function openRecommendationResultsView() {
 }
 
 function openHomeView({ updateHistory = true } = {}) {
+  saveDetailInteraction();
   if (updateHistory) {
     window.history.pushState({ view: "home" }, "", getViewUrl("home"));
   }
@@ -467,6 +477,13 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
     return;
   }
 
+  if (
+    detailInteraction.value &&
+    (detailInteraction.value.propertyId !== normalizedPropertyId || view !== "detail")
+  ) {
+    saveDetailInteraction();
+  }
+
   currentView.value = view;
   if (
     !selectedPropertyDetail.value ||
@@ -488,6 +505,9 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   rentHistoryPage.value = 1;
   hoveredTrendDot.value = null;
   window.scrollTo({ top: 0, behavior: "smooth" });
+  if (view === "detail") {
+    startDetailInteraction(normalizedPropertyId);
+  }
 
   try {
     if (
@@ -583,19 +603,43 @@ function goToLoginForRecommendation() {
   });
 }
 
-function openRecommendationScoreDetail() {
-  const propertyId = normalizePropertyId(selectedPropertyDetail.value?.id);
+async function openRecommendationScoreDetail() {
+  const propertyId = getActiveDetailPropertyId();
 
   if (!propertyId) {
     return;
   }
 
-  router.push({
+  markRecommendationDetailClicked();
+  saveDetailInteraction();
+  const target = {
     name: "property-recommendation-score",
     params: {
       propertyId,
     },
-  });
+  };
+  const targetUrl = router.resolve(target).href;
+
+  try {
+    await router.push(target);
+  } catch (error) {
+    window.location.assign(targetUrl);
+    return;
+  }
+
+  if (!window.location.pathname.startsWith("/recommendation-score/properties/")) {
+    window.location.assign(targetUrl);
+  }
+}
+
+function getActiveDetailPropertyId() {
+  return (
+    normalizePropertyId(selectedPropertyDetail.value?.id) ||
+    normalizePropertyId(detailInteraction.value?.propertyId) ||
+    normalizePropertyId(
+      new URLSearchParams(window.location.search).get("propertyId"),
+    )
+  );
 }
 
 async function loadHistories(propertyId, options = {}) {
@@ -783,6 +827,8 @@ async function openDealHistoryView() {
     return;
   }
 
+  markDealHistoryClicked();
+  saveDetailInteraction();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
   activeRentHistoryType.value =
@@ -922,6 +968,7 @@ function normalizeTextParam(value) {
 }
 
 async function loadRegionSearchView(route) {
+  saveDetailInteraction();
   currentView.value = "results";
   selectedPropertyDetail.value = null;
   detailErrorMessage.value = "";
@@ -940,12 +987,104 @@ async function loadRegionSearchView(route) {
 }
 
 async function loadRecommendationResultsView() {
+  saveDetailInteraction();
   currentView.value = "recommendations";
   selectedPropertyDetail.value = null;
   detailErrorMessage.value = "";
   historiesErrorMessage.value = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
   await loadPropertyRecommendations();
+}
+
+function startDetailInteraction(propertyId) {
+  if (!isLoggedIn.value) {
+    return;
+  }
+
+  if (detailInteraction.value?.propertyId === propertyId) {
+    updateDetailScrollDepth();
+    return;
+  }
+
+  detailInteraction.value = {
+    propertyId,
+    startedAt: Date.now(),
+    maxScrollDepthPercent: 0,
+    recommendationDetailClicked: false,
+    dealHistoryClicked: false,
+  };
+  updateDetailScrollDepth();
+  window.addEventListener("scroll", updateDetailScrollDepth, { passive: true });
+}
+
+function saveDetailInteraction() {
+  const interaction = consumeDetailInteraction();
+  if (!interaction) {
+    return;
+  }
+
+  savePropertyInteraction(interaction.propertyId, interaction.payload).catch(() => {});
+}
+
+function saveDetailInteractionOnPageHide() {
+  const interaction = consumeDetailInteraction();
+  if (!interaction) {
+    return;
+  }
+
+  savePropertyInteractionKeepalive(interaction.propertyId, interaction.payload);
+}
+
+function consumeDetailInteraction() {
+  if (!detailInteraction.value || !isLoggedIn.value) {
+    detailInteraction.value = null;
+    window.removeEventListener("scroll", updateDetailScrollDepth);
+    return null;
+  }
+
+  updateDetailScrollDepth();
+  const interaction = detailInteraction.value;
+  detailInteraction.value = null;
+  window.removeEventListener("scroll", updateDetailScrollDepth);
+
+  return {
+    propertyId: interaction.propertyId,
+    payload: {
+      dwellTimeMillis: Math.max(Date.now() - interaction.startedAt, 0),
+      maxScrollDepthPercent: interaction.maxScrollDepthPercent,
+      recommendationDetailClicked: interaction.recommendationDetailClicked,
+      dealHistoryClicked: interaction.dealHistoryClicked,
+    },
+  };
+}
+
+function updateDetailScrollDepth() {
+  if (!detailInteraction.value) {
+    return;
+  }
+
+  const scrollableHeight =
+    document.documentElement.scrollHeight - window.innerHeight;
+  const depth =
+    scrollableHeight <= 0
+      ? 100
+      : Math.round((window.scrollY / scrollableHeight) * 100);
+  detailInteraction.value.maxScrollDepthPercent = Math.min(
+    Math.max(detailInteraction.value.maxScrollDepthPercent, depth),
+    100,
+  );
+}
+
+function markRecommendationDetailClicked() {
+  if (detailInteraction.value) {
+    detailInteraction.value.recommendationDetailClicked = true;
+  }
+}
+
+function markDealHistoryClicked() {
+  if (detailInteraction.value) {
+    detailInteraction.value.dealHistoryClicked = true;
+  }
 }
 
 function sortProperties(properties, selectedSort) {
