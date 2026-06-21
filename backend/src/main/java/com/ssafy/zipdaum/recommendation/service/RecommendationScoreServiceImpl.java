@@ -315,11 +315,11 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     if (preferredRegion == null) {
       return false;
     }
-    String sggCd = normalize(property.getSggCd());
+    String sggNm = normalize(property.getSggNm());
     String umdNm = normalize(property.getUmdNm());
-    return preferredRegion.equals(sggCd)
-        || (umdNm != null && preferredRegion.contains(umdNm))
-        || (umdNm != null && umdNm.contains(preferredRegion));
+    String fullRegionName = sggNm == null || umdNm == null ? null : sggNm + " " + umdNm;
+    return preferredRegion.equals(sggNm)
+        || preferredRegion.equals(fullRegionName);
   }
 
   private ScoredPreference scoreFacility(
