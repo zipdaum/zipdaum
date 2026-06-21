@@ -1,13 +1,12 @@
 package com.ssafy.zipdaum.property.batch.config;
 
+import com.ssafy.zipdaum.property.api.KakaoGeocodeApiClient;
 import com.ssafy.zipdaum.property.api.PropertyApiClient;
 import com.ssafy.zipdaum.property.batch.wrapper.PropertyDealWrapper;
 import com.ssafy.zipdaum.property.domain.DealApiType;
-import com.ssafy.zipdaum.property.dto.PropertyItem;
-import com.ssafy.zipdaum.property.dto.PropertySaveCommand;
-import com.ssafy.zipdaum.property.dto.RentDealSaveCommand;
-import com.ssafy.zipdaum.property.dto.SaleDealSaveCommand;
+import com.ssafy.zipdaum.property.dto.*;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
+import com.ssafy.zipdaum.property.service.GeocodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
@@ -31,10 +30,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Configuration
 @RequiredArgsConstructor
 @Slf4j
-public class PropertDataBatch {
+public class PropertyDataBatch {
 
     private final PropertyApiClient propertyApiClient;
     private final PropertyMapper propertyMapper;
+    private final GeocodeService geocodeService;
 
     @Bean
     @StepScope
@@ -85,6 +85,13 @@ public class PropertDataBatch {
             property.setUmdNm(item.umdNm());
             property.setJibun(item.jibun());
             property.setBuildYear(item.buildYear());
+
+            CoordinateDto coordinate = geocodeService.getCoordinate(property.getUmdNm() + " " + property.getJibun());
+
+            if (coordinate.latitude() != null && coordinate.longitude() != null) {
+                property.setLatitude(coordinate.latitude());
+                property.setLongitude(coordinate.longitude());
+            }
 
             wrapper.setProperty(property);
 
