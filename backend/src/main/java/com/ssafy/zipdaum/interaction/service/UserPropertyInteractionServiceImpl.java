@@ -5,9 +5,9 @@ import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.interaction.dto.UserPropertyInteractionRequest;
 import com.ssafy.zipdaum.interaction.dto.UserPropertyInteractionSaveCommand;
 import com.ssafy.zipdaum.interaction.mapper.UserPropertyInteractionMapper;
-import com.ssafy.zipdaum.property.mapper.PropertyMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserPropertyInteractionServiceImpl implements UserPropertyInteractionService {
 
   private final UserPropertyInteractionMapper userPropertyInteractionMapper;
-  private final PropertyMapper propertyMapper;
 
   @Override
   @Transactional
@@ -28,21 +27,22 @@ public class UserPropertyInteractionServiceImpl implements UserPropertyInteracti
   ) {
     validatePropertyId(propertyId);
 
-    if (!propertyMapper.existsPropertyById(propertyId)) {
+    try {
+      userPropertyInteractionMapper.saveUserPropertyInteraction(
+          new UserPropertyInteractionSaveCommand(
+              userId,
+              propertyId,
+              request.getDwellTimeMillis(),
+              request.getMaxScrollDepthPercent(),
+              request.getRecommendationDetailClicked(),
+              request.getDealHistoryClicked()
+          )
+      );
+    } catch (DataIntegrityViolationException e) {
       log.warn("행동 로그 저장 실패 - 존재하지 않는 주택 propertyId={}", propertyId);
-      throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND);
+      throw new BusinessException(ErrorCode.PROPERTY_NOT_FOUND, e);
     }
 
-    userPropertyInteractionMapper.saveUserPropertyInteraction(
-        new UserPropertyInteractionSaveCommand(
-            userId,
-            propertyId,
-            request.getDwellTimeMillis(),
-            request.getMaxScrollDepthPercent(),
-            request.getRecommendationDetailClicked(),
-            request.getDealHistoryClicked()
-        )
-    );
     log.info("행동 로그 저장 완료 userId={}, propertyId={}", userId, propertyId);
   }
 
