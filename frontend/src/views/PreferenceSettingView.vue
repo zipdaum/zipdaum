@@ -1,8 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
-import { getUserPreferences, saveUserPreferences } from "../api/preference";
+import {
+  getUserPreferenceRegionCandidates,
+  getUserPreferences,
+  saveUserPreferences,
+} from "../api/preference";
 
 const router = useRouter();
 
@@ -11,12 +15,31 @@ const isLoading = ref(true);
 const isSaving = ref(false);
 const message = ref("");
 const messageType = ref("error");
+const regionKeyword = ref("");
+const regionCandidates = ref([]);
+const isSearchingRegions = ref(false);
+const hasSearchedRegions = ref(false);
+let regionSearchSeq = 0;
+let regionSearchTimerId = null;
+
+const MAX_SELECTED_REGION_COUNT = 10;
+const REGION_SEARCH_DELAY_MS = 250;
 
 const selectedFacilityCount = computed(() =>
   Object.values(form.value.facilities).filter(Boolean).length,
 );
+const shouldShowRegionSearchPanel = computed(() =>
+  regionKeyword.value.trim().length >= 2 || regionCandidates.value.length > 0,
+);
+const hasNoRegionSearchResult = computed(() =>
+  hasSearchedRegions.value &&
+  !isSearchingRegions.value &&
+  regionKeyword.value.trim().length >= 2 &&
+  regionCandidates.value.length === 0,
+);
 
 onMounted(loadPreferences);
+onBeforeUnmount(clearRegionSearchTimer);
 
 function goHome() {
   router.push({ name: "home" });
@@ -66,6 +89,9 @@ async function handleSavePreferences() {
 
 function resetForm() {
   form.value = createDefaultForm();
+  regionKeyword.value = "";
+  regionCandidates.value = [];
+  hasSearchedRegions.value = false;
   message.value = "";
 }
 
@@ -76,7 +102,7 @@ function createDefaultForm() {
     monthlyRent: "",
     area: "",
     buildYear: "",
-    region: "",
+    regions: [],
     facilities: {
       BUS: false,
       SUBWAY: false,
@@ -108,7 +134,7 @@ function toPreferenceForm(preferences) {
         nextForm.buildYear = preference.value;
         break;
       case "REGION":
-        nextForm.region = preference.value;
+        addLoadedRegion(nextForm, preference.value);
         break;
       case "BUS":
       case "SUBWAY":
@@ -133,7 +159,9 @@ function toPreferencePayload() {
   addPreference(items, "MONTHLY_RENT", form.value.monthlyRent);
   addPreference(items, "AREA", form.value.area);
   addPreference(items, "BUILD_YEAR", form.value.buildYear);
-  addPreference(items, "REGION", form.value.region);
+  for (const region of form.value.regions) {
+    addPreference(items, "REGION", region.value);
+  }
 
   for (const [code, checked] of Object.entries(form.value.facilities)) {
     if (checked) {
@@ -160,6 +188,259 @@ function addPreference(items, code, value) {
   });
 }
 
+function addLoadedRegion(targetForm, value) {
+  const regionValue = toFullRegionName(value);
+  if (!regionValue) {
+    return;
+  }
+  if (hasParentRegionValue(targetForm.regions, regionValue)) {
+    return;
+  }
+
+  if (isParentRegionDisplayName(regionValue)) {
+    targetForm.regions = targetForm.regions.filter(
+      (region) => !isParentOfDisplayName(regionValue, region.value),
+    );
+  }
+
+  if (isSelectedRegionValue(targetForm.regions, regionValue)) {
+    return;
+  }
+
+  targetForm.regions.push({
+    key: createRegionKeyFromDisplayName(regionValue),
+    value: regionValue,
+    displayName: toShortRegionName(regionValue),
+  });
+}
+
+function searchRegions() {
+  const keyword = regionKeyword.value.trim();
+
+  if (keyword.length < 2) {
+    clearRegionSearchTimer();
+    regionSearchSeq += 1;
+    regionCandidates.value = [];
+    isSearchingRegions.value = false;
+    hasSearchedRegions.value = false;
+    return;
+  }
+
+  clearRegionSearchTimer();
+  const seq = ++regionSearchSeq;
+  isSearchingRegions.value = true;
+  hasSearchedRegions.value = false;
+  regionSearchTimerId = window.setTimeout(() => {
+    regionSearchTimerId = null;
+    fetchRegionCandidates(keyword, seq);
+  }, REGION_SEARCH_DELAY_MS);
+}
+
+async function fetchRegionCandidates(keyword, seq) {
+  try {
+    const candidates = await getUserPreferenceRegionCandidates(keyword);
+    if (seq !== regionSearchSeq) {
+      return;
+    }
+    regionCandidates.value = candidates.filter(
+      (candidate) => !isExcludedRegionCandidate(candidate),
+    );
+    hasSearchedRegions.value = true;
+  } catch (error) {
+    if (seq === regionSearchSeq) {
+      regionCandidates.value = [];
+      hasSearchedRegions.value = true;
+    }
+  } finally {
+    if (seq === regionSearchSeq) {
+      isSearchingRegions.value = false;
+    }
+  }
+}
+
+function selectRegion(candidate) {
+  if (
+    !candidate?.displayName ||
+    isExactSelectedRegion(candidate) ||
+    hasSelectedParentRegion(candidate)
+  ) {
+    return;
+  }
+
+  const regionKey = createRegionKey(candidate);
+  const nextRegions = isParentRegion(candidate)
+    ? form.value.regions.filter((region) => !isNestedChildRegion(region, candidate))
+    : form.value.regions;
+
+  if (nextRegions.length >= MAX_SELECTED_REGION_COUNT) {
+    return;
+  }
+
+  form.value.regions = nextRegions;
+  form.value.regions.push({
+    key: regionKey,
+    value: candidate.displayName,
+    displayName: toShortRegionName(candidate.displayName),
+  });
+  clearRegionSearchTimer();
+  regionSearchSeq += 1;
+  regionKeyword.value = "";
+  regionCandidates.value = [];
+  isSearchingRegions.value = false;
+  hasSearchedRegions.value = false;
+}
+
+function removeRegion(displayName) {
+  form.value.regions = form.value.regions.filter(
+    (region) => region.displayName !== displayName,
+  );
+}
+
+function clearRegions() {
+  form.value.regions = [];
+}
+
+function isExcludedRegionCandidate(candidate) {
+  return isExactSelectedRegion(candidate) || hasSelectedParentRegion(candidate);
+}
+
+function isExactSelectedRegion(candidate) {
+  return form.value.regions.some((region) => isSameRegion(region, candidate));
+}
+
+function hasSelectedParentRegion(candidate) {
+  if (isParentRegion(candidate)) {
+    return false;
+  }
+  return form.value.regions.some((region) => isParentOfCandidate(region, candidate));
+}
+
+function isSelectedRegionValue(regions, displayName) {
+  return regions.some((region) =>
+    region.key === createRegionKeyFromDisplayName(displayName) ||
+    normalizeRegionName(region.value) === normalizeRegionName(displayName)
+  );
+}
+
+function hasParentRegionValue(regions, displayName) {
+  return regions.some((region) => isParentOfDisplayName(region.value, displayName));
+}
+
+function isSameRegion(selectedRegion, candidate) {
+  if (selectedRegion.key === createRegionKey(candidate)) {
+    return true;
+  }
+  return normalizeRegionName(selectedRegion.value) === normalizeRegionName(candidate.displayName);
+}
+
+function isNestedChildRegion(selectedRegion, parentCandidate) {
+  if (!isParentRegion(parentCandidate) || isParentRegionValue(selectedRegion)) {
+    return false;
+  }
+  if (isParentOfCandidate(selectedRegion, parentCandidate)) {
+    return false;
+  }
+  return isParentOfDisplayName(parentCandidate.displayName, selectedRegion.value);
+}
+
+function isParentOfCandidate(selectedRegion, candidate) {
+  const selectedKey = selectedRegion.key;
+  const candidateKey = createRegionKey(candidate);
+  if (isParentRegionKey(selectedKey, candidateKey)) {
+    return true;
+  }
+  return isParentOfDisplayName(selectedRegion.value, candidate.displayName);
+}
+
+function isParentRegionKey(parentKey, childKey) {
+  if (!parentKey || !childKey || parentKey.startsWith("name:") || childKey.startsWith("name:")) {
+    return false;
+  }
+
+  const [selectedSggCd, selectedUmdCd] = parentKey.split(":");
+  const [candidateSggCd, candidateUmdCd] = childKey.split(":");
+  return selectedUmdCd === "sgg" &&
+    candidateUmdCd !== "sgg" &&
+    selectedSggCd &&
+    selectedSggCd === candidateSggCd &&
+    Boolean(candidateUmdCd);
+}
+
+function isParentOfDisplayName(parent, child) {
+  const normalizedParent = normalizeRegionName(parent);
+  const normalizedChild = normalizeRegionName(child);
+  return normalizedParent !== normalizedChild &&
+    normalizedChild.startsWith(normalizedParent);
+}
+
+function isParentRegion(candidate) {
+  return !String(candidate?.umdCd || "").trim();
+}
+
+function isParentRegionValue(region) {
+  if (!region) {
+    return false;
+  }
+  if (region.key && !region.key.startsWith("name:")) {
+    return region.key.endsWith(":sgg");
+  }
+  return /[군구]$/.test(normalizeRegionName(region.value));
+}
+
+function isParentRegionDisplayName(displayName) {
+  return /[군구]$/.test(normalizeRegionName(displayName));
+}
+
+function createRegionKey(candidate) {
+  if (!candidate) {
+    return "";
+  }
+  const sggCd = String(candidate.sggCd || "").trim();
+  const umdCd = String(candidate.umdCd || "").trim();
+
+  if (sggCd && umdCd) {
+    return `${sggCd}:${umdCd}`;
+  }
+  if (sggCd) {
+    return `${sggCd}:sgg`;
+  }
+  return createRegionKeyFromDisplayName(candidate.displayName);
+}
+
+function createRegionKeyFromDisplayName(displayName) {
+  return `name:${normalizeRegionName(displayName)}`;
+}
+
+function normalizeRegionName(value) {
+  return String(value || "")
+    .replace(/^부산광역시\s*/, "")
+    .replace(/\s+/g, "");
+}
+
+function toShortRegionName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^부산광역시\s*/, "");
+}
+
+function toFullRegionName(value) {
+  const regionName = String(value || "").trim();
+  if (!regionName) {
+    return "";
+  }
+  if (regionName.startsWith("부산광역시")) {
+    return regionName;
+  }
+  return `부산광역시 ${regionName}`;
+}
+
+function clearRegionSearchTimer() {
+  if (regionSearchTimerId !== null) {
+    window.clearTimeout(regionSearchTimerId);
+    regionSearchTimerId = null;
+  }
+}
+
 function showMessage(text, type) {
   message.value = text;
   messageType.value = type;
@@ -178,8 +459,8 @@ function getErrorMessage(error, fallbackMessage) {
 
     <section class="preference-header" aria-labelledby="preference-setting-title">
       <div>
-        <p>Preference Settings</p>
         <h1 id="preference-setting-title">맞춤 조건 설정</h1>
+        <p>맞춤형 매물 추천을 위해 선호 조건을 설정하세요.</p>
       </div>
       <button class="ghost-button" type="button" @click="goMyPage">
         마이페이지
@@ -189,113 +470,166 @@ function getErrorMessage(error, fallbackMessage) {
     <p v-if="isLoading" class="empty-message">맞춤 조건을 불러오는 중입니다.</p>
 
     <form v-else class="preference-setting-layout" @submit.prevent="handleSavePreferences">
-      <section class="preference-setting-panel" aria-labelledby="base-condition-title">
-        <div class="panel-title-row">
-          <div>
-            <p class="result-kicker">Basic Conditions</p>
+      <div class="preference-main-grid">
+        <section class="preference-setting-panel" aria-labelledby="base-condition-title">
+          <div class="panel-title-row">
             <h2 id="base-condition-title">기본 조건</h2>
           </div>
-        </div>
 
-        <div class="preference-field-grid">
-          <label>
-            <span>매매가</span>
-            <input
-              v-model.trim="form.salePrice"
-              inputmode="numeric"
-              placeholder="예: 500000000"
-              type="text"
-            />
-          </label>
-          <label>
-            <span>보증금</span>
-            <input
-              v-model.trim="form.deposit"
-              inputmode="numeric"
-              placeholder="예: 300000000"
-              type="text"
-            />
-          </label>
-          <label>
-            <span>월세</span>
-            <input
-              v-model.trim="form.monthlyRent"
-              inputmode="numeric"
-              placeholder="예: 80"
-              type="text"
-            />
-          </label>
-          <label>
-            <span>면적</span>
-            <input
-              v-model.trim="form.area"
-              inputmode="decimal"
-              placeholder="예: 84.5"
-              type="text"
-            />
-          </label>
-          <label>
-            <span>건축연도</span>
-            <input
-              v-model.trim="form.buildYear"
-              inputmode="numeric"
-              placeholder="예: 2010"
-              type="text"
-            />
-          </label>
-        </div>
-      </section>
-
-      <section class="preference-setting-panel" aria-labelledby="region-condition-title">
-        <div class="panel-title-row">
-          <div>
-            <p class="result-kicker">Region</p>
-            <h2 id="region-condition-title">선호 지역</h2>
+          <div class="condition-table">
+            <div class="condition-table-head" aria-hidden="true">
+              <span>항목</span>
+              <span>값</span>
+              <span>단위</span>
+            </div>
+            <label class="condition-row">
+              <span>매매가</span>
+              <input
+                v-model.trim="form.salePrice"
+                inputmode="numeric"
+                placeholder="80000"
+                type="text"
+              />
+              <span>만원</span>
+            </label>
+            <label class="condition-row">
+              <span>보증금</span>
+              <input
+                v-model.trim="form.deposit"
+                inputmode="numeric"
+                placeholder="50000"
+                type="text"
+              />
+              <span>만원</span>
+            </label>
+            <label class="condition-row">
+              <span>월세</span>
+              <input
+                v-model.trim="form.monthlyRent"
+                inputmode="numeric"
+                placeholder="300"
+                type="text"
+              />
+              <span>만원</span>
+            </label>
+            <label class="condition-row">
+              <span>면적</span>
+              <input
+                v-model.trim="form.area"
+                inputmode="decimal"
+                placeholder="84.5"
+                type="text"
+              />
+              <span>m²</span>
+            </label>
+            <label class="condition-row">
+              <span>건축연도</span>
+              <input
+                v-model.trim="form.buildYear"
+                inputmode="numeric"
+                placeholder="2010"
+                type="text"
+              />
+              <span>년</span>
+            </label>
           </div>
-        </div>
+        </section>
 
-        <label class="preference-single-field">
-          <span>지역명</span>
-          <input
-            v-model.trim="form.region"
-            placeholder="예: 해운대구 중동"
-            type="text"
-          />
-        </label>
-      </section>
+        <div class="preference-side-stack">
+          <section class="preference-setting-panel" aria-labelledby="region-condition-title">
+            <div class="panel-title-row">
+              <h2 id="region-condition-title">선호 지역</h2>
+            </div>
 
-      <section class="preference-setting-panel" aria-labelledby="facility-condition-title">
-        <div class="panel-title-row">
-          <div>
-            <p class="result-kicker">Facilities</p>
-            <h2 id="facility-condition-title">생활 편의 조건</h2>
-          </div>
-          <span>{{ selectedFacilityCount.toLocaleString() }}개</span>
-        </div>
+            <label class="preference-single-field">
+              <span>지역 검색</span>
+              <input
+                v-model="regionKeyword"
+                autocomplete="off"
+                placeholder="해운대구 우동"
+                type="search"
+                @input="searchRegions"
+              />
+            </label>
 
-        <div class="facility-toggle-grid">
-          <label>
-            <input v-model="form.facilities.BUS" type="checkbox" />
-            <span>버스</span>
-          </label>
-          <label>
-            <input v-model="form.facilities.SUBWAY" type="checkbox" />
-            <span>지하철</span>
-          </label>
-          <label>
-            <input v-model="form.facilities.HOSPITAL" type="checkbox" />
-            <span>병원</span>
-          </label>
-          <label>
-            <input v-model="form.facilities.CCTV" type="checkbox" />
-            <span>CCTV</span>
-          </label>
-          <label>
-            <input v-model="form.facilities.PARK" type="checkbox" />
-            <span>공원</span>
-          </label>
+            <div v-if="shouldShowRegionSearchPanel" class="region-search-panel">
+              <div v-if="regionCandidates.length > 0" class="region-candidate-list">
+                <button
+                  v-for="candidate in regionCandidates"
+                  :key="`${candidate.sggCd}-${candidate.umdCd || 'sgg'}-${candidate.displayName}`"
+                  type="button"
+                  @click="selectRegion(candidate)"
+                >
+                  {{ candidate.displayName }}
+                </button>
+              </div>
+              <p v-else-if="isSearchingRegions" class="region-search-state">
+                지역을 검색하는 중입니다.
+              </p>
+              <p v-else-if="hasNoRegionSearchResult" class="region-search-state">
+                검색 결과가 없습니다.
+              </p>
+            </div>
+
+            <div class="selected-region-summary">
+              <span>
+                선택된 지역
+                ({{ form.regions.length }}/{{ MAX_SELECTED_REGION_COUNT }})
+              </span>
+              <button
+                v-if="form.regions.length > 0"
+                type="button"
+                @click="clearRegions"
+              >
+                전체 삭제
+              </button>
+            </div>
+
+            <div class="selected-region-list">
+              <button
+                v-for="region in form.regions"
+                :key="region.key"
+                class="selected-region-chip"
+                type="button"
+                @click="removeRegion(region.displayName)"
+              >
+                {{ region.displayName }}
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="preference-setting-panel" aria-labelledby="facility-condition-title">
+            <div class="panel-title-row">
+              <h2 id="facility-condition-title">생활 편의 조건</h2>
+              <span>{{ selectedFacilityCount.toLocaleString() }}/5 선택</span>
+            </div>
+
+            <div class="facility-toggle-grid">
+              <label :class="{ selected: form.facilities.BUS }">
+                <span>버스</span>
+                <input v-model="form.facilities.BUS" type="checkbox" />
+              </label>
+              <label :class="{ selected: form.facilities.SUBWAY }">
+                <span>지하철</span>
+                <input v-model="form.facilities.SUBWAY" type="checkbox" />
+              </label>
+              <label :class="{ selected: form.facilities.HOSPITAL }">
+                <span>병원</span>
+                <input v-model="form.facilities.HOSPITAL" type="checkbox" />
+              </label>
+              <label :class="{ selected: form.facilities.CCTV }">
+                <span>CCTV</span>
+                <input v-model="form.facilities.CCTV" type="checkbox" />
+              </label>
+              <label :class="{ selected: form.facilities.PARK }">
+                <span>공원</span>
+                <input v-model="form.facilities.PARK" type="checkbox" />
+              </label>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
 
       <p
         v-if="message"

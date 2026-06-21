@@ -115,6 +115,39 @@ class RecommendationScoreServiceImplTest {
   }
 
   @Test
+  void calculateMatchScore_여러_REGION은_하나의_OR_조건으로_평가한다() {
+    PropertyRecommendationCandidate property = property(
+        "26350",
+        "우동",
+        2018,
+        0L,
+        0L,
+        0L,
+        new BigDecimal("84.5")
+    );
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(
+            preference("AREA", "84.5", 1),
+            preference("REGION", "부산광역시 수영구 광안동", 2),
+            preference("REGION", "부산광역시 해운대구 우동", 3)
+        ),
+        null
+    );
+
+    assertThat(result.getScore()).isEqualTo(100);
+    assertThat(result.getConditions())
+        .extracting("code", "matched", "score")
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("AREA", true, 100),
+            org.assertj.core.groups.Tuple.tuple("REGION", true, 100)
+        );
+    assertThat(result.getConditions().get(1).getValue())
+        .isEqualTo("부산광역시 수영구 광안동, 부산광역시 해운대구 우동");
+  }
+
+  @Test
   void calculateMatchScore_월세는_월세거래의_보증금과_월세를_함께_판단한다() {
     PropertyRecommendationCandidate property = property(
         "26110",

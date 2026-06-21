@@ -120,11 +120,13 @@
       FROM property p
     ) candidate
     <where>
-      <if test="filter.region != null">
+      <if test="filter.regions != null and filter.regions.size() > 0">
         AND (
-          candidate.sgg_cd = #{filter.region}
-          OR #{filter.region} LIKE CONCAT('%', candidate.umd_nm, '%')
-          OR candidate.umd_nm LIKE CONCAT('%', #{filter.region}, '%')
+          <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
+            candidate.sgg_cd = #{region}
+            OR #{region} LIKE CONCAT('%', candidate.umd_nm, '%')
+            OR candidate.umd_nm LIKE CONCAT('%', #{region}, '%')
+          </foreach>
         )
       </if>
       <if test="filter.salePriceMax != null">

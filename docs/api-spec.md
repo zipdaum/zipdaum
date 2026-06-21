@@ -18,6 +18,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 실거래가 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 실거래가 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
 | 사용자 맞춤 | 주택 맞춤 조건 적합도 조회 | GET | `/properties/{propertyId}/recommendation-score` |
+| 사용자 맞춤 | 사용자 맞춤 지역 조건 후보 검색 | GET | `/users/info/preferences/regions/candidates` |
 | 사용자 맞춤 | 사용자 맞춤 조건 전체 저장(조건 조합) | PUT | `/users/info/preferences` |
 | 사용자 맞춤 | 사용자 맞춤 조건 해제(조건 조합) | DELETE | `/users/info/preferences` |
 | 사용자 맞춤 | 관심 지역 전체 조회 | GET | `/users/info/regions` |
@@ -79,6 +80,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 
 | 기능 | Method | URL |
 | --- | --- | --- |
+| 사용자 맞춤 지역 조건 후보 검색 | GET | `/users/info/preferences/regions/candidates` |
 | 사용자 맞춤 조건 전체 저장(조건 조합) | PUT | `/users/info/preferences` |
 | 사용자 맞춤 조건 해제(조건 조합) | DELETE | `/users/info/preferences` |
 | 관심 지역 전체 조회 | GET | `/users/info/regions` |
@@ -88,4 +90,3 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 관심 주택 등록 | POST | `/users/info/properties` |
 | 관심 주택 해제 | DELETE | `/users/info/properties` |
 | 최근 본 주택 조회 | GET | `/users/info/recent-properties` |
-

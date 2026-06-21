@@ -159,7 +159,7 @@ CREATE TABLE user_preference (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_user_preference_user_type (user_id, preference_type_id),
+  UNIQUE KEY uk_user_preference_user_type_value (user_id, preference_type_id, preference_value),
   KEY idx_user_preference_user_id (user_id),
   KEY idx_user_preference_type_id (preference_type_id),
   CONSTRAINT fk_user_preference_user

@@ -324,7 +324,7 @@ class RecommendationServiceImplTest {
         ArgumentCaptor.forClass(PropertyRecommendationCandidateFilter.class);
     then(recommendationMapper).should().selectPropertyRecommendationCandidates(captor.capture());
     PropertyRecommendationCandidateFilter filter = captor.getValue();
-    assertThat(filter.getRegion()).isEqualTo("부산광역시 해운대구 우동");
+    assertThat(filter.getRegions()).containsExactly("부산광역시 해운대구 우동");
     assertThat(filter.getSalePriceMax()).isEqualTo(110_000_000L);
     assertThat(filter.getDepositMax()).isEqualTo(44_000_000L);
     assertThat(filter.getMonthlyRentMax()).isEqualTo(880_000L);

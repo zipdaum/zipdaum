@@ -30,13 +30,27 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       return noEvaluableConditionScore();
     }
 
-    List<ScoredPreference> scoredPreferences = preferences.stream()
+    List<UserPreferenceResponse> regionPreferences = preferences.stream()
+        .filter(preference -> UserPreferenceType.REGION.name().equalsIgnoreCase(preference.getCode()))
+        .toList();
+    List<UserPreferenceResponse> scoringPreferences = mergeRegionPreferences(
+        preferences,
+        regionPreferences
+    );
+
+    List<ScoredPreference> scoredPreferences = scoringPreferences.stream()
         .sorted(Comparator.comparing(
             UserPreferenceResponse::getPriority,
             Comparator.nullsLast(Comparator.naturalOrder())
         ))
         .filter(this::isEvaluablePreference)
-        .map(preference -> scorePreference(property, preference, preferences, surroundingSummary))
+        .map(preference -> scorePreference(
+            property,
+            preference,
+            preferences,
+            regionPreferences,
+            surroundingSummary
+        ))
         .toList();
 
     if (scoredPreferences.isEmpty()) {
@@ -76,10 +90,44 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     );
   }
 
+  private List<UserPreferenceResponse> mergeRegionPreferences(
+      List<UserPreferenceResponse> preferences,
+      List<UserPreferenceResponse> regionPreferences) {
+    if (regionPreferences.isEmpty()) {
+      return preferences;
+    }
+
+    List<UserPreferenceResponse> mergedPreferences = new ArrayList<>();
+    preferences.stream()
+        .filter(preference -> !UserPreferenceType.REGION.name().equalsIgnoreCase(preference.getCode()))
+        .forEach(mergedPreferences::add);
+    mergedPreferences.add(toMergedRegionPreference(regionPreferences));
+    return mergedPreferences;
+  }
+
+  private UserPreferenceResponse toMergedRegionPreference(
+      List<UserPreferenceResponse> regionPreferences) {
+    UserPreferenceResponse firstRegion = regionPreferences.get(0);
+    UserPreferenceResponse mergedRegion = new UserPreferenceResponse();
+    mergedRegion.setCode(UserPreferenceType.REGION.name());
+    mergedRegion.setName(resolveName(firstRegion, UserPreferenceType.REGION));
+    mergedRegion.setValue(regionPreferences.stream()
+        .map(UserPreferenceResponse::getValue)
+        .filter(value -> value != null && !value.isBlank())
+        .collect(java.util.stream.Collectors.joining(", ")));
+    mergedRegion.setPriority(regionPreferences.stream()
+        .map(UserPreferenceResponse::getPriority)
+        .filter(priority -> priority != null && priority > 0)
+        .min(Comparator.naturalOrder())
+        .orElse(firstRegion.getPriority()));
+    return mergedRegion;
+  }
+
   private ScoredPreference scorePreference(
       PropertyRecommendationCandidate property,
       UserPreferenceResponse preference,
       List<UserPreferenceResponse> preferences,
+      List<UserPreferenceResponse> regionPreferences,
       SurroundingSummaryResponse surroundingSummary) {
     UserPreferenceType type = parseType(preference.getCode());
     if (type == null) {
@@ -100,7 +148,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       case MONTHLY_RENT -> scoreMonthlyRent(property, preference, preferences);
       case AREA -> scoreArea(property, preference);
       case BUILD_YEAR -> scoreBuildYear(property, preference);
-      case REGION -> scoreRegion(property, preference);
+      case REGION -> scoreRegion(property, preference, regionPreferences);
       case BUS -> scoreFacility(preference, surroundingSummary, surroundingSummary == null
           ? 0 : surroundingSummary.getBusCount(), "버스 정류장이 가까움");
       case SUBWAY -> scoreFacility(preference, surroundingSummary, surroundingSummary == null
@@ -245,23 +293,33 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
 
   private ScoredPreference scoreRegion(
       PropertyRecommendationCandidate property,
-      UserPreferenceResponse preference) {
-    String preferredRegion = normalize(preference.getValue());
-    if (preferredRegion == null) {
+      UserPreferenceResponse preference,
+      List<UserPreferenceResponse> regionPreferences) {
+    if (regionPreferences == null || regionPreferences.isEmpty()) {
       return unmatched(preference, UserPreferenceType.REGION);
     }
 
-    String sggCd = normalize(property.getSggCd());
-    String umdNm = normalize(property.getUmdNm());
-    boolean matched = preferredRegion.equals(sggCd)
-        || (umdNm != null && preferredRegion.contains(umdNm))
-        || (umdNm != null && umdNm.contains(preferredRegion));
+    boolean matched = regionPreferences.stream()
+        .map(UserPreferenceResponse::getValue)
+        .map(this::normalize)
+        .anyMatch(preferredRegion -> matchesRegion(property, preferredRegion));
     return scored(
         preference,
         UserPreferenceType.REGION,
         matched ? FULL_MATCH_SCORE : 0,
         matched ? "선호 지역과 일치" : null
     );
+  }
+
+  private boolean matchesRegion(PropertyRecommendationCandidate property, String preferredRegion) {
+    if (preferredRegion == null) {
+      return false;
+    }
+    String sggCd = normalize(property.getSggCd());
+    String umdNm = normalize(property.getUmdNm());
+    return preferredRegion.equals(sggCd)
+        || (umdNm != null && preferredRegion.contains(umdNm))
+        || (umdNm != null && umdNm.contains(preferredRegion));
   }
 
   private ScoredPreference scoreFacility(
