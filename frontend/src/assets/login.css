@@ -17,6 +17,10 @@
   padding: 32px;
 }
 
+.signup-card {
+  width: min(100%, 520px);
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -84,7 +88,35 @@
   box-shadow: 0 0 0 3px rgba(11, 92, 255, 0.12);
 }
 
+.form-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  gap: 10px;
+  align-items: end;
+}
+
+.sub-button {
+  min-height: 44px;
+  border: 1px solid #b9cdfd;
+  border-radius: 6px;
+  background: #eef4ff;
+  color: #0b5cff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sub-button:disabled {
+  border-color: #dce5f5;
+  background: #f5f8fd;
+  color: #9aa9c4;
+  cursor: not-allowed;
+}
+
 .login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   min-height: 44px;
   border: 1px solid #0b5cff;
   border-radius: 6px;
@@ -108,9 +140,30 @@
   line-height: 1.5;
 }
 
+.field-message {
+  margin: -8px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.field-message.error {
+  color: #c53030;
+}
+
+.field-message.success {
+  color: #15803d;
+}
+
 .error-message {
   background: #fff5f5;
   color: #c53030;
+}
+
+.success-message {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .info-message {
@@ -139,5 +192,9 @@
 
   .login-card {
     padding: 24px 20px;
+  }
+
+  .form-action-row {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { login } from '../api/auth'
 import { saveAuth } from '../stores/auth'
 
@@ -15,6 +15,8 @@ const errorMessage = ref('')
 const noticeMessage = computed(() =>
   route.query.reason === 'login-required'
     ? '로그인이 필요한 서비스입니다. 로그인 후 관심 목록을 확인할 수 있습니다.'
+    : route.query.reason === 'signup-success'
+      ? '회원가입이 완료되었습니다. 가입한 이메일로 로그인해주세요.'
     : ''
 )
 
@@ -102,7 +104,7 @@ function getRedirectPath() {
 
       <p class="signup-link">
         아직 회원이 아니신가요?
-        <a href="#">회원가입</a>
+        <RouterLink :to="{ name: 'signup' }">회원가입</RouterLink>
       </p>
     </section>
   </main>
