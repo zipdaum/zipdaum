@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { requestVerificationCode, signUp, verifyEmailCode } from '../api/auth'
 
@@ -10,10 +10,14 @@ const verificationCode = ref('')
 const password = ref('')
 const passwordConfirm = ref('')
 const name = ref('')
+const emailInput = ref(null)
+const verificationCodeInput = ref(null)
+const nameInput = ref(null)
 const isRequestingCode = ref(false)
 const isVerifyingCode = ref(false)
 const isSigningUp = ref(false)
 const isEmailVerified = ref(false)
+const isVerificationCodeVisible = ref(false)
 const verifiedEmail = ref('')
 const emailMessage = ref('')
 const emailMessageType = ref('success')
@@ -34,9 +38,15 @@ const canSubmit = computed(
     !isVerifyingCode.value
 )
 
+onMounted(() => {
+  emailInput.value?.focus()
+})
+
 watch(email, () => {
   if (email.value !== verifiedEmail.value) {
     isEmailVerified.value = false
+    isVerificationCodeVisible.value = false
+    verificationCode.value = ''
     clearEmailMessage()
     clearCodeMessage()
     signUpErrorMessage.value = ''
@@ -51,8 +61,14 @@ async function handleRequestCode() {
 
   try {
     await requestVerificationCode({ email: email.value })
+    verificationCode.value = ''
+    isVerificationCodeVisible.value = true
+    isEmailVerified.value = false
     setEmailMessage('인증코드를 보냈습니다. 메일함에서 6자리 숫자를 확인해주세요.')
+    await nextTick()
+    verificationCodeInput.value?.focus()
   } catch (error) {
+    isVerificationCodeVisible.value = false
     setEmailMessage(getErrorMessage(error, '인증코드 발송을 처리하지 못했습니다.'), 'error')
   } finally {
     isRequestingCode.value = false
@@ -71,6 +87,8 @@ async function handleVerifyCode() {
     isEmailVerified.value = true
     verifiedEmail.value = email.value
     setCodeMessage('인증이 완료되었습니다.')
+    await nextTick()
+    nameInput.value?.focus()
   } catch (error) {
     isEmailVerified.value = false
     setCodeMessage(getErrorMessage(error, '이메일 인증을 처리하지 못했습니다.'), 'error')
@@ -83,6 +101,7 @@ async function handleSignUp() {
   signUpErrorMessage.value = ''
 
   if (!isEmailVerified.value) {
+    isVerificationCodeVisible.value = true
     setCodeMessage('이메일 인증을 먼저 완료해주세요.', 'error')
     return
   }
@@ -162,6 +181,7 @@ function getErrorMessage(error, fallbackMessage) {
           <label>
             <span>이메일</span>
             <input
+              ref="emailInput"
               v-model.trim="email"
               type="email"
               name="email"
@@ -191,10 +211,11 @@ function getErrorMessage(error, fallbackMessage) {
           {{ emailMessage }}
         </p>
 
-        <div class="form-action-row">
+        <div v-if="isVerificationCodeVisible" class="form-action-row">
           <label>
             <span>인증번호</span>
             <input
+              ref="verificationCodeInput"
               v-model.trim="verificationCode"
               type="text"
               name="verificationCode"
@@ -217,7 +238,7 @@ function getErrorMessage(error, fallbackMessage) {
         </div>
 
         <p
-          v-if="codeMessage"
+          v-if="isVerificationCodeVisible && codeMessage"
           class="field-message"
           :class="codeMessageType === 'error' ? 'error' : 'success'"
           :role="codeMessageType === 'error' ? 'alert' : 'status'"
@@ -228,6 +249,7 @@ function getErrorMessage(error, fallbackMessage) {
         <label>
           <span>이름</span>
           <input
+            ref="nameInput"
             v-model.trim="name"
             type="text"
             name="name"
