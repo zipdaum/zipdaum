@@ -10,6 +10,11 @@ import {
   getSurroundings as fetchSurroundings,
   searchProperties,
 } from "../api/property";
+import {
+  addFavoriteProperty,
+  deleteFavoriteProperty,
+  getFavoriteProperties,
+} from "../api/favorite";
 import { isLoggedIn } from "../stores/auth";
 
 const router = useRouter();
@@ -139,6 +144,7 @@ const isMapDragging = ref(false);
 const saleHistoryPage = ref(1);
 const rentHistoryPage = ref(1);
 const favoritePropertyIds = ref([]);
+const isFavoritePropertyLoading = ref(false);
 const resultPanel = ref(null);
 const appliedSearchSummary = ref([]);
 const historyPageSize = 5;
@@ -187,18 +193,24 @@ function createEmptyRentMetaByType() {
 }
 
 onMounted(async () => {
-  await Promise.all([restoreViewFromUrl(), loadPropertyRecommendations()]);
+  await Promise.all([
+    restoreViewFromUrl(),
+    loadPropertyRecommendations(),
+    loadFavoritePropertyIds(),
+  ]);
   window.addEventListener("popstate", handleBrowserBack);
 });
 
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     loadPropertyRecommendations();
+    loadFavoritePropertyIds();
     return;
   }
 
   recommendationResults.value = [];
   recommendationListErrorMessage.value = "";
+  favoritePropertyIds.value = [];
 });
 
 onUnmounted(() => {
@@ -1331,18 +1343,61 @@ function getDefaultTrendType(property) {
 }
 
 function isFavoriteProperty(propertyId) {
-  return favoritePropertyIds.value.includes(propertyId);
+  const normalizedPropertyId = normalizePropertyId(propertyId);
+  return favoritePropertyIds.value.includes(normalizedPropertyId);
 }
 
-function toggleFavoriteProperty(propertyId) {
-  if (isFavoriteProperty(propertyId)) {
-    favoritePropertyIds.value = favoritePropertyIds.value.filter(
-      (id) => id !== propertyId,
-    );
+async function loadFavoritePropertyIds() {
+  if (!isLoggedIn.value) {
+    favoritePropertyIds.value = [];
     return;
   }
 
-  favoritePropertyIds.value = [...favoritePropertyIds.value, propertyId];
+  try {
+    const properties = await getFavoriteProperties();
+    favoritePropertyIds.value = properties
+      .map((property) => normalizePropertyId(property.propertyId))
+      .filter(Boolean);
+  } catch (error) {
+    favoritePropertyIds.value = [];
+  }
+}
+
+async function toggleFavoriteProperty(propertyId) {
+  const normalizedPropertyId = normalizePropertyId(propertyId);
+  if (!normalizedPropertyId || isFavoritePropertyLoading.value) {
+    return;
+  }
+
+  if (!isLoggedIn.value) {
+    detailErrorMessage.value = "로그인 후 관심 주택을 설정할 수 있습니다.";
+    return;
+  }
+
+  const wasFavorite = isFavoriteProperty(normalizedPropertyId);
+  isFavoritePropertyLoading.value = true;
+  detailErrorMessage.value = "";
+
+  favoritePropertyIds.value = wasFavorite
+    ? favoritePropertyIds.value.filter((id) => id !== normalizedPropertyId)
+    : [...favoritePropertyIds.value, normalizedPropertyId];
+
+  try {
+    if (wasFavorite) {
+      await deleteFavoriteProperty(normalizedPropertyId);
+    } else {
+      await addFavoriteProperty(normalizedPropertyId);
+    }
+  } catch (error) {
+    favoritePropertyIds.value = wasFavorite
+      ? [...favoritePropertyIds.value, normalizedPropertyId]
+      : favoritePropertyIds.value.filter((id) => id !== normalizedPropertyId);
+    detailErrorMessage.value = wasFavorite
+      ? "관심 주택을 해제하지 못했습니다."
+      : "관심 주택을 등록하지 못했습니다.";
+  } finally {
+    isFavoritePropertyLoading.value = false;
+  }
 }
 
 function getPrimaryDealType(property) {
@@ -2385,8 +2440,13 @@ function formatPrice(price) {
                     { active: isFavoriteProperty(selectedPropertyDetail.id) },
                   ]"
                   type="button"
+                  :disabled="isFavoritePropertyLoading"
                   :aria-pressed="isFavoriteProperty(selectedPropertyDetail.id)"
-                  aria-label="관심 주택 등록"
+                  :aria-label="
+                    isFavoriteProperty(selectedPropertyDetail.id)
+                      ? '관심 주택 해제'
+                      : '관심 주택 등록'
+                  "
                   @click="toggleFavoriteProperty(selectedPropertyDetail.id)"
                 >
                   ★
