@@ -6,9 +6,11 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   name VARCHAR(30) NOT NULL,
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deletion_scheduled_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  KEY idx_users_deletion_scheduled_at (is_deleted, deletion_scheduled_at),
   UNIQUE KEY uk_users_email_deleted (email, is_deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

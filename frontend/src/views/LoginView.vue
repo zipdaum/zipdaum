@@ -12,11 +12,17 @@ const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-const noticeMessage = computed(() =>
-  route.query.reason === 'login-required'
-    ? '로그인이 필요한 서비스입니다. 로그인 후 관심 목록을 확인할 수 있습니다.'
-    : ''
-)
+const noticeMessage = computed(() => {
+  if (route.query.reason === 'login-required') {
+    return '로그인이 필요한 서비스입니다. 로그인 후 관심 목록을 확인할 수 있습니다.'
+  }
+
+  if (route.query.reason === 'account-deleted') {
+    return '회원 탈퇴 신청이 완료되었습니다. 회원 정보는 2주 뒤 완전히 삭제됩니다.'
+  }
+
+  return ''
+})
 
 async function handleLogin() {
   isLoading.value = true

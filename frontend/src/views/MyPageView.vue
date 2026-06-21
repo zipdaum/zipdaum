@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
-import { getUserInfo } from "../api/user";
+import { deleteUserInfo, getUserInfo } from "../api/user";
 import { getUserPreferences } from "../api/preference";
 import { getRecentProperties } from "../api/recent";
-import { currentUser } from "../stores/auth";
+import { clearAuth, currentUser } from "../stores/auth";
 
 const router = useRouter();
 
@@ -14,10 +14,26 @@ const preferences = ref([]);
 const recentProperties = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
+const deleteNameInput = ref("");
+const deleteTextInput = ref("");
+const deleteErrorMessage = ref("");
+const isDeleting = ref(false);
 
 const MAX_PREFERENCE_SUMMARY_ITEMS = 5;
+const DELETE_CONFIRMATION_PREFIX = "delete/";
 
 const displayedUser = computed(() => userInfo.value || currentUser.value || {});
+const deleteTargetName = computed(() => displayedUser.value.name || "");
+const deleteConfirmationText = computed(() =>
+  deleteTargetName.value ? `${DELETE_CONFIRMATION_PREFIX}${deleteTargetName.value}` : "",
+);
+const canRequestDeletion = computed(
+  () =>
+    deleteTargetName.value.length > 0
+    && deleteNameInput.value === deleteTargetName.value
+    && deleteTextInput.value === deleteConfirmationText.value
+    && !isDeleting.value,
+);
 const preferenceSummary = computed(() =>
   createPreferenceSummary(preferences.value).slice(0, MAX_PREFERENCE_SUMMARY_ITEMS),
 );
@@ -32,6 +48,36 @@ function goHome() {
 
 function openPreferenceSettings() {
   router.push({ name: "preferences" });
+}
+
+async function requestUserDeletion() {
+  if (!canRequestDeletion.value) {
+    deleteErrorMessage.value = "이름과 확인 문구를 정확히 입력해주세요.";
+    return;
+  }
+
+  isDeleting.value = true;
+  deleteErrorMessage.value = "";
+
+  try {
+    await deleteUserInfo({
+      name: deleteNameInput.value,
+      confirmationText: deleteTextInput.value,
+    });
+
+    clearAuth();
+    await router.replace({
+      name: "login",
+      query: {
+        reason: "account-deleted",
+      },
+    });
+  } catch (error) {
+    deleteErrorMessage.value =
+      error.response?.data?.message || "회원 탈퇴 신청을 처리하지 못했습니다.";
+  } finally {
+    isDeleting.value = false;
+  }
 }
 
 async function loadMyPage() {
@@ -349,6 +395,52 @@ function formatDateTime(value) {
             </span>
           </button>
         </div>
+      </section>
+
+      <section class="mypage-panel account-delete-panel" aria-labelledby="account-delete-title">
+        <div class="panel-title-row">
+          <div>
+            <h2 id="account-delete-title">회원 탈퇴</h2>
+          </div>
+        </div>
+
+        <p class="account-delete-description">
+          탈퇴 신청 후 계정은 바로 비활성화되며, 회원 정보는 2주 뒤 완전히 삭제됩니다.
+        </p>
+
+        <form class="account-delete-form" @submit.prevent="requestUserDeletion">
+          <label>
+            <span>이름 확인</span>
+            <input
+              v-model.trim="deleteNameInput"
+              type="text"
+              autocomplete="off"
+              :placeholder="deleteTargetName || '이름'"
+              :disabled="isDeleting"
+              required
+            />
+          </label>
+
+          <label>
+            <span>확인 문구</span>
+            <input
+              v-model.trim="deleteTextInput"
+              type="text"
+              autocomplete="off"
+              :placeholder="deleteConfirmationText || 'delete/이름'"
+              :disabled="isDeleting"
+              required
+            />
+          </label>
+
+          <p v-if="deleteErrorMessage" class="form-message" role="alert">
+            {{ deleteErrorMessage }}
+          </p>
+
+          <button class="danger-button" type="submit" :disabled="!canRequestDeletion">
+            {{ isDeleting ? "탈퇴 신청 중" : "탈퇴 신청" }}
+          </button>
+        </form>
       </section>
     </template>
   </main>

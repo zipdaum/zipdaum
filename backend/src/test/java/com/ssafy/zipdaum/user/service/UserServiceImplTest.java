@@ -3,6 +3,7 @@ package com.ssafy.zipdaum.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -11,10 +12,13 @@ import static org.mockito.Mockito.never;
 
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.user.dto.UserDeleteRequest;
 import com.ssafy.zipdaum.user.dto.UserDto;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.mapper.UserMapper;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -138,19 +142,59 @@ class UserServiceImplTest {
   }
 
   @Test
-  void deleteById_성공하면_논리삭제한다() {
-    given(userMapper.softDeleteById(1L)).willReturn(1);
+  void requestDeletion_확인값이_일치하면_1분뒤_삭제되도록_논리삭제한다() {
+    UserDto user = new UserDto();
+    user.setId(1L);
+    user.setName("홍길동");
+    UserDeleteRequest request = new UserDeleteRequest();
+    request.setName("홍길동");
+    request.setConfirmationText("delete/홍길동");
 
-    service.deleteById(1L);
+    given(userMapper.findById(1L)).willReturn(user);
+    given(userMapper.softDeleteById(any(Long.class), any(LocalDateTime.class))).willReturn(1);
 
-    then(userMapper).should().softDeleteById(1L);
+    LocalDateTime before = LocalDateTime.now().plusMinutes(1);
+
+    service.requestDeletion(1L, request);
+
+    ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
+    then(userMapper).should().softDeleteById(eq(1L), captor.capture());
+    assertThat(captor.getValue()).isAfterOrEqualTo(before);
+    assertThat(captor.getValue()).isBefore(LocalDateTime.now().plusMinutes(2));
   }
 
   @Test
-  void deleteById_삭제할_대상이_없으면_USER_NOT_FOUND_예외가_발생한다() {
-    given(userMapper.softDeleteById(1L)).willReturn(0);
+  void requestDeletion_확인값이_일치하지_않으면_USER_DELETE_CONFIRMATION_MISMATCH_예외가_발생한다() {
+    UserDto user = new UserDto();
+    user.setId(1L);
+    user.setName("홍길동");
+    UserDeleteRequest request = new UserDeleteRequest();
+    request.setName("다른이름");
+    request.setConfirmationText("delete/홍길동");
 
-    assertThatThrownBy(() -> service.deleteById(1L))
+    given(userMapper.findById(1L)).willReturn(user);
+
+    assertThatThrownBy(() -> service.requestDeletion(1L, request))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USER_DELETE_CONFIRMATION_MISMATCH)
+        );
+
+    then(userMapper).should(never()).softDeleteById(any(Long.class), any(LocalDateTime.class));
+  }
+
+  @Test
+  void requestDeletion_삭제할_대상이_없으면_USER_NOT_FOUND_예외가_발생한다() {
+    UserDto user = new UserDto();
+    user.setId(1L);
+    user.setName("홍길동");
+    UserDeleteRequest request = new UserDeleteRequest();
+    request.setName("홍길동");
+    request.setConfirmationText("delete/홍길동");
+
+    given(userMapper.findById(1L)).willReturn(user);
+    given(userMapper.softDeleteById(any(Long.class), any(LocalDateTime.class))).willReturn(0);
+
+    assertThatThrownBy(() -> service.requestDeletion(1L, request))
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND)
         );
