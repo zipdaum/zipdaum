@@ -6,6 +6,7 @@ import com.ssafy.zipdaum.auth.dto.AuthRequest;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceItemRequest;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceRequest;
 import com.ssafy.zipdaum.favorite.dto.FavoritePropertyCreateRequest;
+import com.ssafy.zipdaum.interaction.dto.UserPropertyInteractionRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.SurroundingRequest;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
@@ -45,7 +46,13 @@ class RequestValidationTest {
     surroundingRequest.setRadiusMeters(50);
 
     UserPreferenceRequest userPreferenceRequest = new UserPreferenceRequest();
-    userPreferenceRequest.setPreferences(List.of(preference("BUDGET", "500000000", 1)));
+    userPreferenceRequest.setPreferences(List.of(preference("SALE_PRICE", "500000000", 1)));
+
+    UserPropertyInteractionRequest interactionRequest = new UserPropertyInteractionRequest();
+    interactionRequest.setDwellTimeMillis(30000L);
+    interactionRequest.setMaxScrollDepthPercent(80);
+    interactionRequest.setRecommendationDetailClicked(true);
+    interactionRequest.setDealHistoryClicked(false);
 
     assertThat(validator.validate(signUpRequest)).isEmpty();
     assertThat(validator.validate(authRequest)).isEmpty();
@@ -53,6 +60,7 @@ class RequestValidationTest {
     assertThat(validator.validate(propertySearchRequest)).isEmpty();
     assertThat(validator.validate(surroundingRequest)).isEmpty();
     assertThat(validator.validate(userPreferenceRequest)).isEmpty();
+    assertThat(validator.validate(interactionRequest)).isEmpty();
   }
 
   @Test
@@ -137,6 +145,24 @@ class RequestValidationTest {
     assertThat(validator.validate(request))
         .extracting(violation -> violation.getPropertyPath().toString())
         .contains("preferences[0].code", "preferences[0].value", "preferences[0].priority");
+  }
+
+  @Test
+  void validate_행동_로그_요청값이_유효하지_않으면_각_필드의_검증_오류가_발생한다() {
+    UserPropertyInteractionRequest request = new UserPropertyInteractionRequest();
+    request.setDwellTimeMillis(-1L);
+    request.setMaxScrollDepthPercent(101);
+    request.setRecommendationDetailClicked(null);
+    request.setDealHistoryClicked(null);
+
+    assertThat(validator.validate(request))
+        .extracting(violation -> violation.getPropertyPath().toString())
+        .contains(
+            "dwellTimeMillis",
+            "maxScrollDepthPercent",
+            "recommendationDetailClicked",
+            "dealHistoryClicked"
+        );
   }
 
   private UserPreferenceItemRequest preference(String code, String value, Integer priority) {

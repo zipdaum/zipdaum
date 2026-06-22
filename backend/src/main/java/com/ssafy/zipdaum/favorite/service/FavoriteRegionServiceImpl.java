@@ -1,10 +1,10 @@
 package com.ssafy.zipdaum.favorite.service;
 
+import com.ssafy.zipdaum.favorite.dto.FavoriteRegionCandidateResponse;
 import com.ssafy.zipdaum.favorite.dto.FavoriteRegionResponse;
 import com.ssafy.zipdaum.favorite.mapper.FavoriteRegionMapper;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
-import com.ssafy.zipdaum.property.domain.RegionCode;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,17 +18,29 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FavoriteRegionServiceImpl implements FavoriteRegionService {
 
+  private static final int MAX_SEARCH_KEYWORD_LENGTH = 50;
+
   private final FavoriteRegionMapper favoriteRegionMapper;
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<FavoriteRegionCandidateResponse> findFavoriteRegionCandidates(String keyword) {
+    String normalizedKeyword = normalizeSearchKeyword(keyword);
+    String searchKeyword = escapeLikeKeyword(removeBlank(normalizedKeyword));
+
+    List<FavoriteRegionCandidateResponse> candidates =
+        favoriteRegionMapper.selectFavoriteRegionCandidates(searchKeyword);
+
+    log.debug("관심 지역 등록 후보 검색 완료 candidateCount={}", candidates.size());
+
+    return candidates;
+  }
 
   @Override
   @Transactional(readOnly = true)
   public List<FavoriteRegionResponse> findFavoriteRegions(Long userId) {
     List<FavoriteRegionResponse> favoriteRegions =
         favoriteRegionMapper.selectFavoriteRegions(userId, LocalDate.now().minusYears(1));
-
-    favoriteRegions.forEach(region ->
-        region.setRegionName(RegionCode.nameOf(region.getSggCd()))
-    );
 
     log.debug("관심 지역 조회 완료 userId={}, regionCount={}", userId, favoriteRegions.size());
 
@@ -41,8 +53,8 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
     String normalizedSggCd = sggCd.trim();
     String normalizedUmdNm = umdNm.trim();
 
-    if (!RegionCode.isValid(normalizedSggCd)) {
-      log.warn("존재하지 않는 지역 코드 sggCd={}", normalizedSggCd);
+    if (!favoriteRegionMapper.existsRegion(normalizedSggCd, normalizedUmdNm)) {
+      log.warn("존재하지 않는 지역 sggCd={}, umdNm={}", normalizedSggCd, normalizedUmdNm);
       throw new BusinessException(ErrorCode.INVALID_REGION_CODE);
     }
 
@@ -94,5 +106,37 @@ public class FavoriteRegionServiceImpl implements FavoriteRegionService {
         normalizedSggCd,
         normalizedUmdNm
     );
+  }
+
+  private String normalizeSearchKeyword(String keyword) {
+    if (keyword == null) {
+      log.warn("관심 지역 등록 후보 검색 실패 - 검색어 누락");
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    String normalizedKeyword = keyword.trim();
+
+    if (normalizedKeyword.isBlank()) {
+      log.warn("관심 지역 등록 후보 검색 실패 - 검색어 공백");
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    if (normalizedKeyword.length() > MAX_SEARCH_KEYWORD_LENGTH) {
+      log.warn("관심 지역 등록 후보 검색 실패 - 검색어 길이 초과 length={}", normalizedKeyword.length());
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    return normalizedKeyword;
+  }
+
+  private String escapeLikeKeyword(String keyword) {
+    return keyword
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_");
+  }
+
+  private String removeBlank(String value) {
+    return value.replaceAll("\\s+", "");
   }
 }

@@ -8,15 +8,21 @@ import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.dto.PropertySaveResult;
 import com.ssafy.zipdaum.property.dto.SurroundingRequest;
 import com.ssafy.zipdaum.property.dto.SurroundingResponse;
+import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import com.ssafy.zipdaum.property.service.PropertyFetchService;
 import com.ssafy.zipdaum.property.service.PropertyService;
 import com.ssafy.zipdaum.property.service.SurroundingService;
+import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
+import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
+import com.ssafy.zipdaum.recommendation.service.RecommendationService;
+import com.ssafy.zipdaum.recent.service.RecentPropertyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
@@ -25,6 +31,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -45,6 +52,8 @@ public class PropertyController {
   private final PropertyFetchService fetchService;
   private final PropertyService propertyService;
   private final SurroundingService surroundingService;
+  private final RecommendationService recommendationService;
+  private final RecentPropertyService recentPropertyService;
 
   @GetMapping
   @Operation(
@@ -69,6 +78,31 @@ public class PropertyController {
     return ResponseEntity.ok(propertyService.searchProperties(request));
   }
 
+  @GetMapping("/recommendations")
+  @Operation(
+      summary = "사용자 맞춤 주택 추천 목록 조회",
+      description = "현재 로그인한 사용자의 맞춤 조건을 기준으로 적합한 주택 목록을 조회합니다. "
+          + "최근 본 주택 가산점을 반영한 최종 추천 점수가 높은 순서로 정렬합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "사용자 맞춤 주택 추천 목록 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyRecommendationResponse.class))
+      ),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "맞춤 조건 정보 없음", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<List<PropertyRecommendationResponse>> getPropertyRecommendations(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser
+  ) {
+    log.info("GET /properties/recommendations 요청");
+    return ResponseEntity.ok(
+        recommendationService.findPropertyRecommendations(authenticatedUser.getId())
+    );
+  }
+
   @GetMapping("/{propertyId}")
   @Operation(
       summary = "주택 상세 조회",
@@ -85,10 +119,20 @@ public class PropertyController {
   })
   public ResponseEntity<PropertyDetailResponse> getPropertyDetail(
       @Parameter(description = "주택 ID", example = "1", required = true)
-      @PathVariable @Positive Long propertyId
+      @PathVariable @Positive Long propertyId,
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser
   ) {
     log.info("GET /properties/{} 요청", propertyId);
-    return ResponseEntity.ok(propertyService.findPropertyDetail(propertyId));
+    PropertyDetailResponse detail = propertyService.findPropertyDetail(propertyId);
+    if (authenticatedUser != null) {
+      try {
+        recentPropertyService.recordRecentProperty(authenticatedUser.getId(), propertyId);
+      } catch (RuntimeException e) {
+        log.warn("최근 본 주택 저장 실패 - 상세 조회 응답은 유지 userId={}, propertyId={}",
+            authenticatedUser.getId(), propertyId);
+      }
+    }
+    return ResponseEntity.ok(detail);
   }
 
   @GetMapping("/{propertyId}/histories")
@@ -151,6 +195,36 @@ public class PropertyController {
         propertyId, request.getRadiusMeters());
     return ResponseEntity.ok(
         surroundingService.findPropertySurroundings(propertyId, request.getRadiusMeters())
+    );
+  }
+
+  @GetMapping("/{propertyId}/recommendation-score")
+  @Operation(
+      summary = "주택 맞춤 조건 적합도 조회",
+      description = "주택 상세 화면에서 현재 로그인한 사용자의 맞춤 조건 기준 적합도 점수와 조건별 적합 여부를 조회합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "주택 맞춤 조건 적합도 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyRecommendationScore.class))
+      ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "주택 또는 맞춤 조건 정보 없음", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<PropertyRecommendationScore> getPropertyRecommendationScore(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @Parameter(description = "주택 ID", example = "1", required = true)
+      @PathVariable @Positive Long propertyId
+  ) {
+    log.info("GET /properties/{}/recommendation-score 요청", propertyId);
+    return ResponseEntity.ok(
+        recommendationService.findPropertyRecommendationScore(
+            authenticatedUser.getId(),
+            propertyId
+        )
     );
   }
 
