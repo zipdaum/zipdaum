@@ -5,10 +5,13 @@ CREATE TABLE users (
   email VARCHAR(100) NOT NULL,
   password VARCHAR(255) NOT NULL,
   name VARCHAR(30) NOT NULL,
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deletion_scheduled_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_users_email (email)
+  KEY idx_users_deletion_scheduled_at (is_deleted, deletion_scheduled_at),
+  UNIQUE KEY uk_users_email_deleted (email, is_deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE property (
@@ -28,7 +31,22 @@ CREATE TABLE property (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_property_region (sgg_cd, umd_nm),
-  KEY idx_property_name (name)
+  KEY idx_property_name (name),
+  UNIQUE KEY uk_property_public_source (property_type, sgg_cd, umd_nm, jibun, name, build_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE region (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  sgg_cd VARCHAR(10) NOT NULL,
+  sgg_nm VARCHAR(50) NOT NULL,
+  umd_cd VARCHAR(10) NOT NULL,
+  umd_nm VARCHAR(50) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_region_umd_cd (umd_cd),
+  UNIQUE KEY uk_region_sgg_umd (sgg_cd, umd_nm),
+  KEY idx_region_umd_nm (umd_nm)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE sale_deal (
@@ -45,6 +63,7 @@ CREATE TABLE sale_deal (
   PRIMARY KEY (id),
   KEY idx_sale_deal_property_id (property_id),
   KEY idx_sale_deal_date (deal_date),
+  UNIQUE KEY uk_sale_deal_public_source (property_id, exclusive_area, deal_amount, floor, deal_date),
   CONSTRAINT fk_sale_deal_property
     FOREIGN KEY (property_id) REFERENCES property (id)
     ON DELETE CASCADE
@@ -68,6 +87,7 @@ CREATE TABLE rent_deal (
   PRIMARY KEY (id),
   KEY idx_rent_deal_property_id (property_id),
   KEY idx_rent_deal_date (deal_date),
+  UNIQUE KEY uk_rent_deal_public_source (property_id, exclusive_area, deposit, monthly_rent, floor, deal_date),
   CONSTRAINT fk_rent_deal_property
     FOREIGN KEY (property_id) REFERENCES property (id)
     ON DELETE CASCADE
@@ -104,47 +124,73 @@ CREATE TABLE favorite_region (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE condition_type (
+CREATE TABLE recent_property (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  property_id BIGINT NOT NULL,
+  view_count INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_recent_property_user_property (user_id, property_id),
+  KEY idx_recent_property_user_viewed_at (user_id, updated_at),
+  KEY idx_recent_property_property_id (property_id),
+  CONSTRAINT fk_recent_property_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_recent_property_property
+    FOREIGN KEY (property_id) REFERENCES property (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_property_interaction (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  property_id BIGINT NOT NULL,
+  view_count INT NOT NULL DEFAULT 1,
+  total_dwell_time_millis BIGINT NOT NULL DEFAULT 0,
+  max_scroll_depth_percent TINYINT NOT NULL DEFAULT 0,
+  recommendation_detail_click_count INT NOT NULL DEFAULT 0,
+  deal_history_click_count INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_user_property_interaction_user_property (user_id, property_id),
+  KEY idx_user_property_interaction_user_updated_at (user_id, updated_at),
+  KEY idx_user_property_interaction_property_id (property_id),
+  CONSTRAINT fk_user_property_interaction_user
+    FOREIGN KEY (user_id) REFERENCES users (id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_user_property_interaction_property
+    FOREIGN KEY (property_id) REFERENCES property (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE preference_type (
   id BIGINT NOT NULL AUTO_INCREMENT,
   code VARCHAR(50) NOT NULL,
   name VARCHAR(50) NOT NULL,
   description VARCHAR(255) NOT NULL,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_condition_type_code (code)
+  UNIQUE KEY uk_preference_type_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE condition_item (
+CREATE TABLE user_preference (
   id BIGINT NOT NULL AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
-  condition_type_id BIGINT NOT NULL,
-  condition_value VARCHAR(100) NOT NULL,
+  preference_type_id BIGINT NOT NULL,
+  preference_value VARCHAR(100) NOT NULL,
   priority TINYINT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_condition_item_value (condition_value),
-  KEY idx_condition_item_user_id (user_id),
-  KEY idx_condition_item_type_id (condition_type_id),
-  CONSTRAINT fk_condition_item_user
+  UNIQUE KEY uk_user_preference_user_type_value (user_id, preference_type_id, preference_value),
+  KEY idx_user_preference_user_id (user_id),
+  KEY idx_user_preference_type_id (preference_type_id),
+  CONSTRAINT fk_user_preference_user
     FOREIGN KEY (user_id) REFERENCES users (id)
     ON DELETE CASCADE,
-  CONSTRAINT fk_condition_item_condition_type
-    FOREIGN KEY (condition_type_id) REFERENCES condition_type (id)
+  CONSTRAINT fk_user_preference_preference_type
+    FOREIGN KEY (preference_type_id) REFERENCES preference_type (id)
     ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE notification (
-  id BIGINT NOT NULL AUTO_INCREMENT,
-  user_id BIGINT NOT NULL,
-  type VARCHAR(30) NOT NULL,
-  content VARCHAR(255) NOT NULL,
-  is_read BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  KEY idx_notification_user_id (user_id),
-  KEY idx_notification_is_read (is_read),
-  CONSTRAINT fk_notification_user
-    FOREIGN KEY (user_id) REFERENCES users (id)
-    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

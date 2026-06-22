@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.zipdaum.preference.mapper.UserPreferenceMapper">
+
+  <resultMap id="userPreferenceResponseResultMap"
+             type="com.ssafy.zipdaum.preference.dto.UserPreferenceResponse">
+    <result property="code" column="code"/>
+    <result property="name" column="name"/>
+    <result property="value" column="preference_value"/>
+    <result property="priority" column="priority"/>
+  </resultMap>
+
+  <resultMap id="userPreferenceRegionCandidateResponseResultMap"
+             type="com.ssafy.zipdaum.preference.dto.UserPreferenceRegionCandidateResponse">
+    <id property="sggCd" column="sgg_cd"/>
+    <id property="umdCd" column="umd_cd"/>
+    <id property="umdNm" column="umd_nm"/>
+    <result property="sggNm" column="sgg_nm"/>
+    <result property="displayName" column="display_name"/>
+  </resultMap>
+
+  <sql id="normalizedRegionName">
+    REPLACE(
+      REPLACE(
+        REPLACE(
+          REPLACE(${alias}, '&#xD2B9;&#xBCC4;&#xC790;&#xCE58;&#xC2DC;', ''),
+          '&#xD2B9;&#xBCC4;&#xC790;&#xCE58;&#xB3C4;', ''
+        ),
+        '&#xD2B9;&#xBCC4;&#xC2DC;', ''
+      ),
+      '&#xAD11;&#xC5ED;&#xC2DC;', ''
+    )
+  </sql>
+
+  <select id="selectUserPreferencesByUserId" resultMap="userPreferenceResponseResultMap">
+    SELECT
+      pt.code,
+      pt.name,
+      up.preference_value,
+      up.priority
+    FROM user_preference up
+    JOIN preference_type pt ON pt.id = up.preference_type_id
+    WHERE up.user_id = #{userId}
+    ORDER BY up.priority ASC, up.id ASC
+  </select>
+
+  <select id="selectPreferenceTypesByCodes" resultType="com.ssafy.zipdaum.preference.dto.PreferenceTypeDto">
+    SELECT
+      id,
+      code,
+      name,
+      description
+    FROM preference_type
+    WHERE code IN
+    <foreach collection="codes" item="code" open="(" separator="," close=")">
+      #{code}
+    </foreach>
+  </select>
+
+  <select id="selectUserPreferenceRegionCandidates"
+          resultMap="userPreferenceRegionCandidateResponseResultMap">
+    SELECT DISTINCT
+      candidate.sgg_cd,
+      candidate.sgg_nm,
+      candidate.umd_cd,
+      candidate.umd_nm,
+      candidate.display_name,
+      candidate.sort_order
+    FROM (
+      SELECT
+        s.sgg_cd,
+        s.sgg_nm,
+        NULL AS umd_cd,
+        '' AS umd_nm,
+        s.sgg_nm AS display_name,
+        0 AS sort_order
+      FROM (
+        SELECT
+          r.sgg_cd,
+          MIN(r.sgg_nm) AS sgg_nm
+        FROM region r
+        GROUP BY r.sgg_cd
+      ) s
+      WHERE REPLACE(s.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(<include refid="normalizedRegionName"><property name="alias" value="s.sgg_nm"/></include>, ' ', '')
+          LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(
+          CASE
+            WHEN RIGHT(s.sgg_nm, 1) IN ('&#xAD70;', '&#xAD6C;')
+              THEN LEFT(s.sgg_nm, CHAR_LENGTH(s.sgg_nm) - 1)
+            ELSE s.sgg_nm
+          END,
+          ' ',
+          ''
+        ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+
+      UNION ALL
+
+      SELECT
+        r.sgg_cd,
+        r.sgg_nm,
+        r.umd_cd,
+        r.umd_nm,
+        CONCAT(r.sgg_nm, ' ', r.umd_nm) AS display_name,
+        1 AS sort_order
+      FROM region r
+      WHERE REPLACE(CONCAT(r.sgg_nm, r.umd_nm), ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(
+          CONCAT(
+            <include refid="normalizedRegionName"><property name="alias" value="r.sgg_nm"/></include>,
+            r.umd_nm
+          ),
+          ' ',
+          ''
+        ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(
+          CONCAT(
+            CASE
+              WHEN RIGHT(r.sgg_nm, 1) IN ('&#xAD70;', '&#xAD6C;')
+                THEN LEFT(r.sgg_nm, CHAR_LENGTH(r.sgg_nm) - 1)
+              ELSE r.sgg_nm
+            END,
+            r.umd_nm
+          ),
+          ' ',
+          ''
+        ) LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(r.sgg_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+        OR REPLACE(r.umd_nm, ' ', '') LIKE CONCAT('%', #{keyword}, '%') ESCAPE '\\'
+    ) candidate
+    ORDER BY candidate.sort_order ASC, candidate.sgg_cd ASC, candidate.umd_nm ASC
+    LIMIT 100
+  </select>
+
+  <select id="existsRegionDisplayName" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM region
+      WHERE sgg_nm = #{displayName}
+        OR CONCAT(sgg_nm, ' ', umd_nm) = #{displayName}
+        OR <include refid="normalizedRegionName"><property name="alias" value="sgg_nm"/></include> = #{displayName}
+        OR CONCAT(
+          <include refid="normalizedRegionName"><property name="alias" value="sgg_nm"/></include>,
+          ' ',
+          umd_nm
+        ) = #{displayName}
+    )
+  </select>
+
+  <insert id="insertUserPreferences">
+    INSERT INTO user_preference (user_id, preference_type_id, preference_value, priority)
+    VALUES
+    <foreach collection="items" item="item" separator=",">
+      (#{userId}, #{item.preferenceTypeId}, #{item.preferenceValue}, #{item.priority})
+    </foreach>
+  </insert>
+
+  <delete id="deleteUserPreferencesByUserId">
+    DELETE FROM user_preference
+    WHERE user_id = #{userId}
+  </delete>
+
+</mapper>

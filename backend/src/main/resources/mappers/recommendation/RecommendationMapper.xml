@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.zipdaum.recommendation.mapper.RecommendationMapper">
+
+  <resultMap id="propertyRecommendationCandidateResultMap"
+             type="com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate">
+    <id property="id" column="id"/>
+    <result property="propertyType" column="property_type"/>
+    <result property="name" column="name"/>
+    <result property="sggCd" column="sgg_cd"/>
+    <result property="sggNm" column="sgg_nm"/>
+    <result property="umdNm" column="umd_nm"/>
+    <result property="jibun" column="jibun"/>
+    <result property="buildYear" column="build_year"/>
+    <result property="latitude" column="latitude"/>
+    <result property="longitude" column="longitude"/>
+    <result property="latestSalePrice" column="latest_sale_price"/>
+    <result property="latestDeposit" column="latest_deposit"/>
+    <result property="latestMonthlyRent" column="latest_monthly_rent"/>
+    <result property="latestMonthlyRentDeposit" column="latest_monthly_rent_deposit"/>
+    <result property="latestMonthlyRentAmount" column="latest_monthly_rent_amount"/>
+    <result property="latestDealPrice" column="latest_deal_price"/>
+    <result property="latestDealDate" column="latest_deal_date"/>
+    <result property="exclusiveArea" column="exclusive_area"/>
+    <result property="interactionViewCount" column="interaction_view_count"/>
+    <result property="interactionTotalDwellTimeMillis"
+            column="interaction_total_dwell_time_millis"/>
+    <result property="interactionMaxScrollDepthPercent"
+            column="interaction_max_scroll_depth_percent"/>
+    <result property="recommendationDetailClickCount"
+            column="interaction_recommendation_detail_click_count"/>
+    <result property="dealHistoryClickCount" column="interaction_deal_history_click_count"/>
+  </resultMap>
+
+  <sql id="propertyRecommendationCandidateColumns">
+    p.id,
+    p.property_type,
+    p.name,
+    p.sgg_cd,
+    (
+      SELECT r.sgg_nm
+      FROM region r
+      WHERE r.sgg_cd = p.sgg_cd
+      LIMIT 1
+    ) AS sgg_nm,
+    p.umd_nm,
+    p.jibun,
+    p.build_year,
+    p.latitude,
+    p.longitude,
+    p.latest_sale_price,
+    p.latest_deposit,
+    p.latest_monthly_rent,
+    <!-- TODO: 성능 테스트 후 최신 거래 요약 테이블 또는 캐시 컬럼으로 개선 검토 -->
+    (
+      SELECT rd.deposit
+      FROM rent_deal rd
+      WHERE rd.property_id = p.id
+        AND rd.deposit &gt; 0
+        AND rd.monthly_rent &gt; 0
+      ORDER BY rd.deal_date DESC, rd.id DESC
+      LIMIT 1
+    ) AS latest_monthly_rent_deposit,
+    (
+      SELECT rd.monthly_rent
+      FROM rent_deal rd
+      WHERE rd.property_id = p.id
+        AND rd.deposit &gt; 0
+        AND rd.monthly_rent &gt; 0
+      ORDER BY rd.deal_date DESC, rd.id DESC
+      LIMIT 1
+    ) AS latest_monthly_rent_amount,
+    (
+      SELECT d.price
+      FROM (
+        SELECT sd.deal_amount AS price, sd.deal_date, sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        UNION ALL
+        SELECT rd.deposit AS price, rd.deal_date, rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+      ) d
+      ORDER BY d.deal_date DESC, d.id DESC
+      LIMIT 1
+    ) AS latest_deal_price,
+    (
+      SELECT d.deal_date
+      FROM (
+        SELECT sd.deal_date, sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        UNION ALL
+        SELECT rd.deal_date, rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+      ) d
+      ORDER BY d.deal_date DESC, d.id DESC
+      LIMIT 1
+    ) AS latest_deal_date,
+    (
+      SELECT d.exclusive_area
+      FROM (
+        SELECT sd.exclusive_area, sd.deal_date, sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = p.id
+        UNION ALL
+        SELECT rd.exclusive_area, rd.deal_date, rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = p.id
+      ) d
+      ORDER BY d.deal_date DESC, d.id DESC
+      LIMIT 1
+    ) AS exclusive_area,
+    upi.view_count AS interaction_view_count,
+    upi.total_dwell_time_millis AS interaction_total_dwell_time_millis,
+    upi.max_scroll_depth_percent AS interaction_max_scroll_depth_percent,
+    upi.recommendation_detail_click_count AS interaction_recommendation_detail_click_count,
+    upi.deal_history_click_count AS interaction_deal_history_click_count
+  </sql>
+
+  <select id="selectPropertyRecommendationCandidate"
+          resultMap="propertyRecommendationCandidateResultMap">
+    SELECT
+      <include refid="propertyRecommendationCandidateColumns"/>
+    FROM property p
+    LEFT JOIN user_property_interaction upi
+      ON upi.property_id = p.id
+      AND upi.user_id = #{userId}
+    WHERE p.id = #{propertyId}
+  </select>
+
+  <select id="selectPropertyRecommendationCandidates"
+          resultMap="propertyRecommendationCandidateResultMap">
+    SELECT
+      *
+    FROM (
+      SELECT
+        <include refid="propertyRecommendationCandidateColumns"/>
+      FROM property p
+      LEFT JOIN user_property_interaction upi
+        ON upi.property_id = p.id
+        AND upi.user_id = #{filter.userId}
+    ) candidate
+    <where>
+      <if test="filter.interactedOnly">
+        AND candidate.interaction_view_count IS NOT NULL
+      </if>
+      <if test="filter.regions != null and filter.regions.size() > 0">
+        AND (
+          <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
+            candidate.sgg_nm = #{region}
+            OR CONCAT(candidate.sgg_nm, ' ', candidate.umd_nm) = #{region}
+          </foreach>
+        )
+      </if>
+      <if test="filter.salePriceMax != null">
+        AND candidate.latest_sale_price &gt; 0
+        AND candidate.latest_sale_price &lt;= #{filter.salePriceMax}
+      </if>
+      <if test="filter.depositMax != null">
+        <choose>
+          <when test="filter.monthlyRentPreferred">
+            AND candidate.latest_monthly_rent_deposit &gt; 0
+            AND candidate.latest_monthly_rent_deposit &lt;= #{filter.depositMax}
+          </when>
+          <otherwise>
+            AND candidate.latest_deposit &gt; 0
+            AND candidate.latest_deposit &lt;= #{filter.depositMax}
+          </otherwise>
+        </choose>
+      </if>
+      <if test="filter.monthlyRentMax != null">
+        AND candidate.latest_monthly_rent_amount &gt; 0
+        AND candidate.latest_monthly_rent_amount &lt;= #{filter.monthlyRentMax}
+      </if>
+      <if test="filter.minExclusiveArea != null">
+        AND candidate.exclusive_area &gt;= #{filter.minExclusiveArea}
+      </if>
+    </where>
+  </select>
+</mapper>

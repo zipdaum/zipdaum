@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.ssafy.zipdaum.user.mapper.UserMapper">
+
+  <insert id="insertUser" parameterType="com.ssafy.zipdaum.user.dto.UserDto">
+    INSERT INTO users (email, password, name)
+    VALUES (#{email}, #{password}, #{name})
+  </insert>
+
+  <select id="findByEmail" parameterType="string" resultType="com.ssafy.zipdaum.user.dto.UserDto">
+    SELECT * FROM users WHERE email = #{email} AND is_deleted = FALSE
+  </select>
+
+  <select id="findById" parameterType="long" resultType="com.ssafy.zipdaum.user.dto.UserDto">
+    SELECT * FROM users WHERE id = #{id} AND is_deleted = FALSE
+  </select>
+
+  <update id="updateNameById">
+    UPDATE users
+    SET name = #{name}
+    WHERE id = #{id}
+      AND is_deleted = FALSE
+  </update>
+
+  <update id="softDeleteById">
+    UPDATE users
+    SET is_deleted = TRUE,
+        deletion_scheduled_at = #{deletionScheduledAt}
+    WHERE id = #{id}
+      AND is_deleted = FALSE
+  </update>
+
+  <delete id="deleteScheduledUsers">
+    DELETE FROM users
+    WHERE is_deleted = TRUE
+      AND deletion_scheduled_at IS NOT NULL
+      AND deletion_scheduled_at &lt;= #{now}
+  </delete>
+
+</mapper>
