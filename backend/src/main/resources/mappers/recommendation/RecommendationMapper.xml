@@ -11,6 +11,7 @@
     <result property="propertyType" column="property_type"/>
     <result property="name" column="name"/>
     <result property="sggCd" column="sgg_cd"/>
+    <result property="sggNm" column="sgg_nm"/>
     <result property="umdNm" column="umd_nm"/>
     <result property="jibun" column="jibun"/>
     <result property="buildYear" column="build_year"/>
@@ -39,6 +40,12 @@
     p.property_type,
     p.name,
     p.sgg_cd,
+    (
+      SELECT r.sgg_nm
+      FROM region r
+      WHERE r.sgg_cd = p.sgg_cd
+      LIMIT 1
+    ) AS sgg_nm,
     p.umd_nm,
     p.jibun,
     p.build_year,
@@ -142,11 +149,12 @@
       <if test="filter.interactedOnly">
         AND candidate.interaction_view_count IS NOT NULL
       </if>
-      <if test="filter.region != null">
+      <if test="filter.regions != null and filter.regions.size() > 0">
         AND (
-          candidate.sgg_cd = #{filter.region}
-          OR #{filter.region} LIKE CONCAT('%', candidate.umd_nm, '%')
-          OR candidate.umd_nm LIKE CONCAT('%', #{filter.region}, '%')
+          <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
+            candidate.sgg_nm = #{region}
+            OR CONCAT(candidate.sgg_nm, ' ', candidate.umd_nm) = #{region}
+          </foreach>
         )
       </if>
       <if test="filter.salePriceMax != null">

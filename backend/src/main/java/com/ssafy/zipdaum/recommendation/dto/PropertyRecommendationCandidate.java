@@ -13,6 +13,7 @@ public class PropertyRecommendationCandidate {
   private String propertyType;
   private String name;
   private String sggCd;
+  private String sggNm;
   private String umdNm;
   private String jibun;
   private Integer buildYear;

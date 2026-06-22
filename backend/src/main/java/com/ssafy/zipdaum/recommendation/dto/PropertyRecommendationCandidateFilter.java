@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.recommendation.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -9,7 +10,7 @@ import lombok.Getter;
 public class PropertyRecommendationCandidateFilter {
 
   private Long userId;
-  private String region;
+  private List<String> regions;
   private Long salePriceMax;
   private Long depositMax;
   private Long monthlyRentMax;
