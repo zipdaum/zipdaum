@@ -80,22 +80,6 @@
     <result property="dealDate" column="deal_date"/>
   </resultMap>
 
-  <select id="selectAllProperties" resultMap="propertySearchResponseResultMap">
-    SELECT
-      id,
-      property_type,
-      name,
-      sgg_cd,
-      umd_nm,
-      jibun,
-      build_year,
-      latitude,
-      longitude,
-      latest_sale_price,
-      latest_deposit,
-      latest_monthly_rent
-    FROM property
-  </select>
 
   <select id="selectProperties"
           parameterType="com.ssafy.zipdaum.property.dto.PropertySearchRequest"
@@ -201,6 +185,20 @@
       </otherwise>
     </choose>
     , id DESC
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countProperties"
+          parameterType="com.ssafy.zipdaum.property.dto.PropertySearchRequest"
+          resultType="long">
+    SELECT COUNT(id)
+    FROM property
+    <where>
+      <if test="sggCd != null"> AND sgg_cd = #{sggCd} </if>
+      <if test="umdNm != null"> AND umd_nm = #{umdNm} </if>
+      <if test="name != null"> AND name LIKE CONCAT('%', #{name}, '%') </if>
+      <if test="propertyType != null"> AND property_type = #{propertyType} </if>
+    </where>
   </select>
 
   <select id="selectPropertyById"
