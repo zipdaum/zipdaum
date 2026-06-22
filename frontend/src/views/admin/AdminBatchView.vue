@@ -39,10 +39,11 @@ async function triggerBatch() {
   statusType.value = ''
 
   try {
-    statusMessage.value = await runPropertyBatchByRange({
+    await runPropertyBatchByRange({
       startMonth: validStartMonth.value,
       endMonth: validEndMonth.value,
     })
+    statusMessage.value = `${validStartMonth.value} ~ ${validEndMonth.value} 기간의 데이터 수집이 완료되었습니다.`
     statusType.value = 'success'
   } catch (error) {
     statusMessage.value =
@@ -92,7 +93,6 @@ function getValidMonth(value) {
       <article class="panel admin-control-panel">
         <div class="panel-title-row">
           <div>
-            <p class="result-kicker">Batch Control</p>
             <h2>작업 설정</h2>
           </div>
           <span>{{ isLoading ? '실행 중' : '대기' }}</span>
@@ -148,18 +148,20 @@ function getValidMonth(value) {
       <aside class="panel admin-status-panel" aria-labelledby="admin-status-title">
         <div class="panel-title-row">
           <div>
-            <p class="result-kicker">Status</p>
             <h2 id="admin-status-title">작업 상태</h2>
           </div>
         </div>
 
         <div v-if="isLoading" class="admin-status-box loading" role="status">
-          <strong>배치 실행을 요청하고 있습니다.</strong>
-          <p>요청이 완료되면 서버에서 데이터 수집을 백그라운드로 진행합니다.</p>
+          <span class="admin-loading-spinner" aria-hidden="true"></span>
+          <div>
+            <strong>데이터 수집 중입니다.</strong>
+            <p>데이터 수집이 완료될 때까지 잠시만 기다려주세요.</p>
+          </div>
         </div>
 
         <div v-else-if="statusMessage" :class="['admin-status-box', statusType]" role="status">
-          <strong>{{ statusType === 'success' ? '요청 완료' : '요청 실패' }}</strong>
+          <strong>{{ statusType === 'success' ? '데이터 수집 완료' : '요청 실패' }}</strong>
           <p>{{ statusMessage }}</p>
         </div>
 
@@ -184,14 +186,14 @@ function getValidMonth(value) {
   align-items: start;
 }
 
-.admin-control-panel,
-.admin-status-panel {
-  min-height: 292px;
-}
-
 .admin-batch-form {
   display: grid;
   gap: 16px;
+}
+
+.admin-control-panel,
+.admin-status-panel {
+  min-height: 220px;
 }
 
 .month-range-fields {
@@ -277,6 +279,26 @@ function getValidMonth(value) {
 
 .admin-status-box.loading strong {
   color: #0b5cff;
+}
+
+.admin-status-box.loading {
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+}
+
+.admin-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #dbe7ff;
+  border-top-color: #0b5cff;
+  border-radius: 999px;
+  animation: admin-spin 0.8s linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 900px) {
