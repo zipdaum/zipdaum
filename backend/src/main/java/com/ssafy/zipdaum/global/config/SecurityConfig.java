@@ -26,6 +26,9 @@ public class SecurityConfig {
   @Value("${app.cors.allowed-origins}")
   private String allowedOrigins;
 
+  @Value("${app.cors.allowed-origin-patterns:}")
+  private String allowedOriginPatterns;
+
   @Bean
   public PasswordEncoder passwordEncoder(){
     return new BCryptPasswordEncoder();
@@ -55,6 +58,7 @@ public class SecurityConfig {
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
     configuration.setAllowedOrigins(parseAllowedOrigins());
+    configuration.setAllowedOriginPatterns(parseAllowedOriginPatterns());
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("*"));
 
@@ -64,7 +68,15 @@ public class SecurityConfig {
   }
 
   private List<String> parseAllowedOrigins() {
-    return Arrays.stream(allowedOrigins.split(","))
+    return parseCorsValues(allowedOrigins);
+  }
+
+  private List<String> parseAllowedOriginPatterns() {
+    return parseCorsValues(allowedOriginPatterns);
+  }
+
+  private List<String> parseCorsValues(String corsValues) {
+    return Arrays.stream(corsValues.split(","))
         .map(String::trim)
         .filter(origin -> !origin.isBlank())
         .toList();
