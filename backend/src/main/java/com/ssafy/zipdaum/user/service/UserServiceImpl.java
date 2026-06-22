@@ -21,8 +21,6 @@ public class UserServiceImpl implements UserService{
 
   private static final String DELETE_CONFIRMATION_PREFIX = "delete/";
   private static final int USER_DELETION_GRACE_DAYS = 14;
-  // TODO: 회원 탈퇴 예약 삭제 테스트를 위해 임시로 1분으로 설정했습니다. 테스트 완료 후 14일 기준으로 변경합니다.
-  private static final int USER_DELETION_GRACE_MINUTES = 1;
 
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
@@ -91,7 +89,7 @@ public class UserServiceImpl implements UserService{
       throw new BusinessException(ErrorCode.USER_DELETE_CONFIRMATION_MISMATCH);
     }
 
-    LocalDateTime deletionScheduledAt = LocalDateTime.now().plusMinutes(USER_DELETION_GRACE_MINUTES);
+    LocalDateTime deletionScheduledAt = LocalDateTime.now().plusDays(USER_DELETION_GRACE_DAYS);
     int updatedRows = userMapper.softDeleteById(id, deletionScheduledAt);
     if (updatedRows == 0) {
       log.warn("탈퇴 처리할 대상이 없음 userId={}", id);

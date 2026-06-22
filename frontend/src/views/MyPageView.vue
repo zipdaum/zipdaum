@@ -14,9 +14,9 @@ const preferences = ref([]);
 const recentProperties = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
-const deleteNameInput = ref("");
 const deleteTextInput = ref("");
 const deleteErrorMessage = ref("");
+const isDeleteConfirmOpen = ref(false);
 const isDeleting = ref(false);
 
 const MAX_PREFERENCE_SUMMARY_ITEMS = 5;
@@ -30,7 +30,6 @@ const deleteConfirmationText = computed(() =>
 const canRequestDeletion = computed(
   () =>
     deleteTargetName.value.length > 0
-    && deleteNameInput.value === deleteTargetName.value
     && deleteTextInput.value === deleteConfirmationText.value
     && !isDeleting.value,
 );
@@ -50,9 +49,25 @@ function openPreferenceSettings() {
   router.push({ name: "preferences" });
 }
 
+function openDeleteConfirm() {
+  deleteTextInput.value = "";
+  deleteErrorMessage.value = "";
+  isDeleteConfirmOpen.value = true;
+}
+
+function closeDeleteConfirm() {
+  if (isDeleting.value) {
+    return;
+  }
+
+  deleteTextInput.value = "";
+  deleteErrorMessage.value = "";
+  isDeleteConfirmOpen.value = false;
+}
+
 async function requestUserDeletion() {
   if (!canRequestDeletion.value) {
-    deleteErrorMessage.value = "이름과 확인 문구를 정확히 입력해주세요.";
+    deleteErrorMessage.value = "확인 문구를 정확히 입력해주세요.";
     return;
   }
 
@@ -61,7 +76,7 @@ async function requestUserDeletion() {
 
   try {
     await deleteUserInfo({
-      name: deleteNameInput.value,
+      name: deleteTargetName.value,
       confirmationText: deleteTextInput.value,
     });
 
@@ -311,6 +326,11 @@ function formatDateTime(value) {
             <div>
               <h2 id="profile-title">내 정보</h2>
             </div>
+            <div class="panel-title-actions">
+              <button class="danger-outline-button" type="button" @click="openDeleteConfirm">
+                회원 탈퇴
+              </button>
+            </div>
           </div>
 
           <div class="profile-content">
@@ -397,51 +417,56 @@ function formatDateTime(value) {
         </div>
       </section>
 
-      <section class="mypage-panel account-delete-panel" aria-labelledby="account-delete-title">
-        <div class="panel-title-row">
-          <div>
-            <h2 id="account-delete-title">회원 탈퇴</h2>
+      <div
+        v-if="isDeleteConfirmOpen"
+        class="delete-confirm-backdrop"
+        role="presentation"
+        @click.self="closeDeleteConfirm"
+      >
+        <section
+          class="delete-confirm-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="account-delete-title"
+        >
+          <div class="panel-title-row">
+            <div>
+              <h2 id="account-delete-title">회원 탈퇴</h2>
+            </div>
           </div>
-        </div>
 
-        <p class="account-delete-description">
-          탈퇴 신청 후 계정은 바로 비활성화되며, 회원 정보는 2주 뒤 완전히 삭제됩니다.
-        </p>
-
-        <form class="account-delete-form" @submit.prevent="requestUserDeletion">
-          <label>
-            <span>이름 확인</span>
-            <input
-              v-model.trim="deleteNameInput"
-              type="text"
-              autocomplete="off"
-              :placeholder="deleteTargetName || '이름'"
-              :disabled="isDeleting"
-              required
-            />
-          </label>
-
-          <label>
-            <span>확인 문구</span>
-            <input
-              v-model.trim="deleteTextInput"
-              type="text"
-              autocomplete="off"
-              :placeholder="deleteConfirmationText || 'delete/이름'"
-              :disabled="isDeleting"
-              required
-            />
-          </label>
-
-          <p v-if="deleteErrorMessage" class="form-message" role="alert">
-            {{ deleteErrorMessage }}
+          <p class="account-delete-description">
+            탈퇴 신청 후 계정은 바로 비활성화되며, 회원 정보는 2주 뒤 완전히 삭제됩니다.
           </p>
 
-          <button class="danger-button" type="submit" :disabled="!canRequestDeletion">
-            {{ isDeleting ? "탈퇴 신청 중" : "탈퇴 신청" }}
-          </button>
-        </form>
-      </section>
+          <form class="account-delete-form" @submit.prevent="requestUserDeletion">
+            <label>
+              <span>확인 문구</span>
+              <input
+                v-model.trim="deleteTextInput"
+                type="text"
+                autocomplete="off"
+                :placeholder="deleteConfirmationText || 'delete/이름'"
+                :disabled="isDeleting"
+                required
+              />
+            </label>
+
+            <p v-if="deleteErrorMessage" class="form-message" role="alert">
+              {{ deleteErrorMessage }}
+            </p>
+
+            <div class="delete-confirm-actions">
+              <button class="secondary-button" type="button" :disabled="isDeleting" @click="closeDeleteConfirm">
+                취소
+              </button>
+              <button class="danger-button" type="submit" :disabled="!canRequestDeletion">
+                {{ isDeleting ? "탈퇴 신청 중" : "확인" }}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
     </template>
   </main>
 </template>
