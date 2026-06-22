@@ -62,3 +62,4 @@ jwt:
 app:
   cors:
     allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,https://zipdaum.vercel.app}
+    allowed-origin-patterns: ${FRONTEND_ORIGIN_PATTERNS:https://*.vercel.app}
