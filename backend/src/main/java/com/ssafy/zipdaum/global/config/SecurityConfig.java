@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -43,6 +44,7 @@ public class SecurityConfig {
         .httpBasic(basic -> basic.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/properties/recommendations").authenticated()
             .requestMatchers("/properties/*/recommendation-score").authenticated()
             .requestMatchers("/properties/*/interactions").authenticated()
@@ -57,27 +59,24 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOrigins(parseAllowedOrigins());
     configuration.setAllowedOriginPatterns(parseAllowedOriginPatterns());
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("*"));
+    configuration.setMaxAge(3600L);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
     return source;
   }
 
-  private List<String> parseAllowedOrigins() {
-    return parseCorsValues(allowedOrigins);
-  }
-
   private List<String> parseAllowedOriginPatterns() {
-    return parseCorsValues(allowedOriginPatterns);
+    return parseCorsValues(String.join(",", allowedOrigins, allowedOriginPatterns));
   }
 
   private List<String> parseCorsValues(String corsValues) {
     return Arrays.stream(corsValues.split(","))
         .map(String::trim)
+        .map(origin -> origin.replaceAll("^['\"]|['\"]$", ""))
         .filter(origin -> !origin.isBlank())
         .toList();
   }

@@ -33,6 +33,7 @@ public class KakaoGeocodeServiceImpl implements GeocodeService {
       if (e.getErrorCode() == ErrorCode.COORDINATE_NOT_FOUND) {
         log.warn("좌표 조회 실패 - 좌표 정보 없음");
       }
+      return null;
     }
   }
 }
