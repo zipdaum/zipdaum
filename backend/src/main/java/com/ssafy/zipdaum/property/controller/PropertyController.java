@@ -12,8 +12,10 @@ import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import com.ssafy.zipdaum.property.service.PropertyFetchService;
 import com.ssafy.zipdaum.property.service.PropertyService;
 import com.ssafy.zipdaum.property.service.SurroundingService;
+import com.ssafy.zipdaum.recommendation.dto.PropertyAiSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
+import com.ssafy.zipdaum.recommendation.service.PropertyAiSummaryService;
 import com.ssafy.zipdaum.recommendation.service.RecommendationService;
 import com.ssafy.zipdaum.recent.service.RecentPropertyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +55,7 @@ public class PropertyController {
   private final PropertyService propertyService;
   private final SurroundingService surroundingService;
   private final RecommendationService recommendationService;
+  private final PropertyAiSummaryService propertyAiSummaryService;
   private final RecentPropertyService recentPropertyService;
 
   @GetMapping
@@ -222,6 +225,37 @@ public class PropertyController {
     log.info("GET /properties/{}/recommendation-score 요청", propertyId);
     return ResponseEntity.ok(
         recommendationService.findPropertyRecommendationScore(
+            authenticatedUser.getId(),
+            propertyId
+        )
+    );
+  }
+
+  @GetMapping("/{propertyId}/ai-summary")
+  @Operation(
+      summary = "주택 AI 적합도 요약 조회",
+      description = "현재 로그인 사용자의 맞춤 조건과 주택 정보를 바탕으로 상세 제목 하단에 표시할 AI 요약 문장을 생성합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "주택 AI 적합도 요약 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyAiSummaryResponse.class))
+      ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "주택 또는 맞춤 조건 정보 없음", content = @Content),
+      @ApiResponse(responseCode = "500", description = "AI API 연동 오류", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<PropertyAiSummaryResponse> getPropertyAiSummary(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @Parameter(description = "주택 ID", example = "1", required = true)
+      @PathVariable @Positive Long propertyId
+  ) {
+    log.info("GET /properties/{propertyId}/ai-summary 요청");
+    return ResponseEntity.ok(
+        propertyAiSummaryService.summarizeProperty(
             authenticatedUser.getId(),
             propertyId
         )
