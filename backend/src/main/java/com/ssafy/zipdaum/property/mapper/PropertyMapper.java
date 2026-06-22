@@ -57,4 +57,10 @@ public interface PropertyMapper {
       @Param("deposit") Long deposit,
       @Param("monthlyRent") Long monthlyRent,
       @Param("dealDate") LocalDate dealDate);
+
+  int bulkInsertSaleDeals(List<SaleDealSaveCommand> deals);
+  int bulkInsertRentDeals(List<RentDealSaveCommand> deals);
+
+  int syncAllLatestSalePrices();
+  int syncAllLatestRentPrices();
 }

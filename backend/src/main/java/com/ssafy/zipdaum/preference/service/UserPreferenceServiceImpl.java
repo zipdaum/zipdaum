@@ -6,6 +6,7 @@ import com.ssafy.zipdaum.preference.domain.UserPreferenceType;
 import com.ssafy.zipdaum.preference.dto.PreferenceTypeDto;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceItemRequest;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceRequest;
+import com.ssafy.zipdaum.preference.dto.UserPreferenceRegionCandidateResponse;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceSaveCommand;
 import com.ssafy.zipdaum.preference.mapper.UserPreferenceMapper;
@@ -27,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserPreferenceServiceImpl implements UserPreferenceService {
 
+  private static final int MAX_SEARCH_KEYWORD_LENGTH = 50;
+
   private final UserPreferenceMapper userPreferenceMapper;
 
   @Override
@@ -45,6 +48,19 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public List<UserPreferenceRegionCandidateResponse> findRegionCandidates(String keyword) {
+    String normalizedKeyword = normalizeSearchKeyword(keyword);
+    String searchKeyword = escapeLikeKeyword(removeBlank(normalizedKeyword));
+
+    List<UserPreferenceRegionCandidateResponse> candidates =
+        userPreferenceMapper.selectUserPreferenceRegionCandidates(searchKeyword);
+
+    log.debug("맞춤 지역 조건 후보 검색 완료 candidateCount={}", candidates.size());
+    return candidates;
+  }
+
+  @Override
   @Transactional
   public void savePreferences(Long userId, UserPreferenceRequest request) {
     List<UserPreferenceValue> values = toUserPreferenceValues(request);
@@ -54,14 +70,18 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
       throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
     }
 
+    List<String> requestedCodes = values.stream()
+        .map(value -> value.type().name())
+        .distinct()
+        .toList();
     Map<String, PreferenceTypeDto> preferenceTypes = userPreferenceMapper.selectPreferenceTypesByCodes(
-            values.stream().map(value -> value.type().name()).toList()
+            requestedCodes
         ).stream()
         .collect(Collectors.toMap(PreferenceTypeDto::getCode, Function.identity()));
 
-    if (preferenceTypes.size() != values.size()) {
+    if (preferenceTypes.size() != requestedCodes.size()) {
       log.warn("맞춤 조건 타입 정보 누락 userId={}, requestedCount={}, foundCount={}",
-          userId, values.size(), preferenceTypes.size());
+          userId, requestedCodes.size(), preferenceTypes.size());
       throw new BusinessException(ErrorCode.PREFERENCE_NOT_FOUND);
     }
 
@@ -95,22 +115,104 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
   private List<UserPreferenceValue> toUserPreferenceValues(UserPreferenceRequest request) {
     List<UserPreferenceValue> values = new ArrayList<>();
     Set<UserPreferenceType> requestedTypes = new HashSet<>();
+    List<String> requestedRegions = new ArrayList<>();
 
     for (UserPreferenceItemRequest preference : request.getPreferences()) {
       UserPreferenceType type = parsePreferenceType(preference.getCode());
-      if (!requestedTypes.add(type)) {
+      String normalizedValue = normalizePreferenceValue(type, preference.getValue());
+      if (type == UserPreferenceType.REGION) {
+        RegionAddDecision decision = prepareRegionPreference(values, requestedRegions, normalizedValue);
+        if (decision == RegionAddDecision.SKIP) {
+          continue;
+        }
+        if (decision == RegionAddDecision.DUPLICATE) {
+          log.warn("중복된 맞춤 지역");
+          throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+      } else if (!requestedTypes.add(type)) {
         log.warn("중복된 맞춤 조건 code={}", type.name());
         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
       }
 
       values.add(new UserPreferenceValue(
           type,
-          normalizePreferenceValue(type, preference.getValue()),
+          normalizedValue,
           preference.getPriority()
       ));
     }
 
     return values;
+  }
+
+  private RegionAddDecision prepareRegionPreference(
+      List<UserPreferenceValue> values,
+      List<String> requestedRegions,
+      String region) {
+    String normalizedRegion = normalizeRegionName(region);
+
+    for (String requestedRegion : requestedRegions) {
+      String normalizedRequestedRegion = normalizeRegionName(requestedRegion);
+      if (normalizedRequestedRegion.equals(normalizedRegion)) {
+        return RegionAddDecision.DUPLICATE;
+      }
+      if (isParentRegion(normalizedRequestedRegion)
+          && normalizedRegion.startsWith(normalizedRequestedRegion)) {
+        return RegionAddDecision.SKIP;
+      }
+    }
+
+    if (isParentRegion(normalizedRegion)) {
+      requestedRegions.removeIf(requestedRegion ->
+          normalizeRegionName(requestedRegion).startsWith(normalizedRegion)
+      );
+      values.removeIf(value -> value.type() == UserPreferenceType.REGION
+          && normalizeRegionName(value.preferenceValue()).startsWith(normalizedRegion));
+    }
+
+    requestedRegions.add(region);
+    return RegionAddDecision.ADD;
+  }
+
+  private String normalizeRegionName(String value) {
+    return value
+        .replaceFirst("^부산광역시\\s*", "")
+        .replaceAll("\\s+", "");
+  }
+
+  private boolean isParentRegion(String normalizedRegion) {
+    return normalizedRegion.endsWith("구") || normalizedRegion.endsWith("군");
+  }
+
+  private String normalizeSearchKeyword(String keyword) {
+    if (keyword == null) {
+      log.warn("맞춤 지역 조건 후보 검색 실패 - 검색어 누락");
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    String normalizedKeyword = keyword.trim();
+
+    if (normalizedKeyword.isBlank()) {
+      log.warn("맞춤 지역 조건 후보 검색 실패 - 검색어 공백");
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    if (normalizedKeyword.length() > MAX_SEARCH_KEYWORD_LENGTH) {
+      log.warn("맞춤 지역 조건 후보 검색 실패 - 검색어 길이 초과 length={}", normalizedKeyword.length());
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    return normalizedKeyword;
+  }
+
+  private String escapeLikeKeyword(String keyword) {
+    return keyword
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_");
+  }
+
+  private String removeBlank(String value) {
+    return value.replaceAll("\\s+", "");
   }
 
   private UserPreferenceType parsePreferenceType(String code) {
@@ -131,7 +233,7 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
             String.valueOf(validatePrice(type, normalizedValue));
         case AREA -> validateArea(normalizedValue).stripTrailingZeros().toPlainString();
         case BUILD_YEAR -> String.valueOf(validateBuildYear(normalizedValue));
-        case REGION -> normalizedValue;
+        case REGION -> validateRegion(normalizedValue);
         case BUS, SUBWAY, HOSPITAL, CCTV, PARK ->
             String.valueOf(validateBoolean(type, normalizedValue));
       };
@@ -168,6 +270,14 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
     return buildYear;
   }
 
+  private String validateRegion(String value) {
+    if (!userPreferenceMapper.existsRegionDisplayName(value)) {
+      log.warn("존재하지 않는 맞춤 지역");
+      throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+    }
+    return value;
+  }
+
   private boolean validateBoolean(UserPreferenceType type, String value) {
     if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
       log.warn("맞춤 조건 값 형식 오류 type={}", type.name());
@@ -181,5 +291,11 @@ public class UserPreferenceServiceImpl implements UserPreferenceService {
       String preferenceValue,
       Integer priority
   ) {
+  }
+
+  private enum RegionAddDecision {
+    ADD,
+    SKIP,
+    DUPLICATE
   }
 }

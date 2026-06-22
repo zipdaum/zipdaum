@@ -1,0 +1,510 @@
+.mypage-page {
+  display: grid;
+  gap: 20px;
+}
+
+.mypage-panel {
+  border: 1px solid #dbe7ff;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(39, 83, 150, 0.08);
+}
+
+.mypage-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.mypage-panel {
+  min-width: 0;
+  padding: 20px;
+}
+
+.mypage-panel .panel-title-row {
+  margin-bottom: 12px;
+}
+
+.profile-panel {
+  min-height: 304px;
+}
+
+.preference-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 304px;
+  padding: 16px 18px;
+}
+
+.preference-panel .panel-title-row {
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.preference-panel h2 {
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.preference-panel .panel-title-actions {
+  gap: 14px;
+}
+
+.preference-panel .panel-title-actions span {
+  color: #53617c;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.preference-panel .panel-title-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.profile-content {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+}
+
+.profile-avatar {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  border: 1px solid #dbe7ff;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #0b5cff;
+}
+
+.profile-avatar svg {
+  width: 46px;
+  height: 46px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.profile-content dl,
+.preference-summary-list {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+
+.preference-summary-list {
+  gap: 0;
+  border: 1px solid #edf2fb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.profile-content dl > div,
+.preference-summary-list > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+  border-bottom: 1px solid #edf2fb;
+  padding-bottom: 12px;
+}
+
+.preference-summary-list > div {
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.preference-summary-list > div:nth-child(even) {
+  background: #f8fbff;
+}
+
+.profile-content dl > div:last-child,
+.preference-summary-list > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.preference-summary-list > div:last-child {
+  padding-bottom: 8px;
+}
+
+.profile-content dt,
+.preference-summary-list dt {
+  color: #71809d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.preference-summary-list dt {
+  font-size: 12px;
+}
+
+.profile-content dd,
+.preference-summary-list dd {
+  overflow: hidden;
+  margin: 0;
+  color: #17233f;
+  font-size: 14px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preference-summary-list dd {
+  font-size: 13px;
+}
+
+.preference-panel > .compact-empty-message {
+  display: grid;
+  min-height: 190px;
+  place-items: center;
+}
+
+.recent-panel {
+  display: grid;
+  gap: 2px;
+  min-height: 304px;
+}
+
+.recent-panel > .empty-message {
+  display: grid;
+  min-height: 76px;
+  place-items: center;
+}
+
+.recent-property-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recent-property-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 132px;
+  border: 1px solid #e2ebfb;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+  text-align: left;
+}
+
+.recent-property-card:hover,
+.recent-property-card:focus-visible {
+  border-color: #9fb8f2;
+  box-shadow: 0 10px 24px rgba(39, 83, 150, 0.14);
+  outline: 0;
+}
+
+.recent-property-image {
+  grid-row: 1 / span 2;
+  min-height: 86px;
+}
+
+.recent-property-info {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 72px;
+}
+
+.recent-property-info strong,
+.recent-property-info em,
+.recent-property-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-property-info strong {
+  color: #17233f;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.recent-property-info em {
+  color: #71809d;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.recent-property-info small {
+  color: #0b5cff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.recent-property-visit {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2563eb;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.recent-property-meta {
+  align-self: end;
+  justify-self: start;
+  border-radius: 999px;
+  background: #f3f7ff;
+  color: #53617c;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.profile-panel .panel-title-actions .danger-outline-button {
+  display: none;
+}
+
+.account-delete-entry {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #edf2fb;
+  padding-top: 4px;
+}
+
+.danger-outline-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid #f0b4b4;
+  border-radius: 6px;
+  background: #fffafa;
+  color: #b91c1c;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.danger-outline-button:hover,
+.danger-outline-button:focus-visible {
+  border-color: #dc2626;
+  outline: 3px solid rgba(220, 38, 38, 0.14);
+}
+
+.account-delete-entry .danger-outline-button {
+  min-height: auto;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  padding: 0;
+  font-size: 12px;
+}
+
+.account-delete-entry .danger-outline-button:hover,
+.account-delete-entry .danger-outline-button:focus-visible {
+  background: transparent;
+  color: #b91c1c;
+  outline: 0;
+}
+
+.delete-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(23, 35, 63, 0.34);
+  padding: 20px;
+}
+
+.delete-confirm-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 520px);
+  border: 1px solid #f1c8c8;
+  border-top: 4px solid #dc2626;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 52px rgba(39, 83, 150, 0.18);
+  padding: 20px;
+}
+
+.delete-dialog-header {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.delete-dialog-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.delete-dialog-header h2 {
+  margin: 0;
+  color: #17233f;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.delete-dialog-header p {
+  margin: 6px 0 0;
+  color: #71809d;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.account-delete-description {
+  display: grid;
+  gap: 5px;
+  color: #7f1d1d;
+}
+
+.account-delete-description strong,
+.account-delete-description span {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.account-delete-description strong {
+  font-weight: 900;
+}
+
+.account-delete-description span {
+  color: #991b1b;
+  font-weight: 800;
+}
+
+.account-delete-form {
+  display: grid;
+  gap: 12px;
+}
+
+.account-delete-form label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.account-delete-form label span {
+  color: #7e5360;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.account-delete-form input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #e4b3b3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17233f;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.account-delete-form input:focus {
+  border-color: #dc2626;
+  outline: 3px solid rgba(220, 38, 38, 0.14);
+}
+
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  background: #dc2626;
+  color: #ffffff;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.danger-button:disabled {
+  border-color: #f0b4b4;
+  background: #f5c6c6;
+  cursor: not-allowed;
+}
+
+.account-delete-form .form-message {
+  margin: 0;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #f1e2e2;
+  padding-top: 4px;
+}
+
+@media (max-width: 980px) {
+  .mypage-summary-grid,
+  .recent-property-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .mypage-panel {
+    padding: 18px;
+  }
+
+  .preference-panel {
+    min-height: 260px;
+  }
+
+  .profile-panel,
+  .recent-panel {
+    min-height: 260px;
+  }
+
+  .profile-content,
+  .recent-property-card {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-avatar {
+    width: 76px;
+    height: 76px;
+    font-size: 28px;
+  }
+
+  .profile-content dl > div,
+  .preference-summary-list > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .recent-property-image {
+    grid-row: auto;
+  }
+}

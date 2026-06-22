@@ -18,7 +18,7 @@ class RecommendationScoreServiceImplTest {
   @Test
   void calculateMatchScore_매매가_지역_주변시설을_가중치로_점수화한다() {
     PropertyRecommendationCandidate property = property(
-        "26110",
+        "26350",
         "우동",
         2018,
         450_000_000L,
@@ -68,7 +68,7 @@ class RecommendationScoreServiceImplTest {
         List.of(
             preference("AREA", "84.5", 1),
             preference("BUS", "true", 2),
-            preference("REGION", "우동", 3),
+            preference("REGION", "부산광역시 중구 우동", 3),
             preference("BUILD_YEAR", "2020", 4),
             preference("PARK", "true", 5)
         ),
@@ -112,6 +112,68 @@ class RecommendationScoreServiceImplTest {
     assertThat(result.getConditions())
         .extracting("code", "matched", "score", "reason")
         .containsExactly(org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 70, null));
+  }
+
+  @Test
+  void calculateMatchScore_여러_REGION은_하나의_OR_조건으로_평가한다() {
+    PropertyRecommendationCandidate property = property(
+        "26350",
+        "우동",
+        2018,
+        0L,
+        0L,
+        0L,
+        new BigDecimal("84.5")
+    );
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(
+            preference("AREA", "84.5", 1),
+            preference("REGION", "부산광역시 수영구 광안동", 2),
+            preference("REGION", "부산광역시 해운대구 우동", 3)
+        ),
+        null
+    );
+
+    assertThat(result.getScore()).isEqualTo(100);
+    assertThat(result.getConditions())
+        .extracting("code", "matched", "score")
+        .containsExactly(
+            org.assertj.core.groups.Tuple.tuple("AREA", true, 100),
+            org.assertj.core.groups.Tuple.tuple("REGION", true, 100)
+        );
+    assertThat(result.getConditions().get(1).getValue())
+        .isEqualTo("부산광역시 수영구 광안동, 부산광역시 해운대구 우동");
+  }
+
+  @Test
+  void calculateMatchScore_시군구_선호지역은_하위_읍면동_주택과_일치한다() {
+    PropertyRecommendationCandidate property = property(
+        "26350",
+        "반여동",
+        2018,
+        0L,
+        0L,
+        0L,
+        new BigDecimal("84.5")
+    );
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(preference("REGION", "부산광역시 해운대구", 1)),
+        null
+    );
+
+    assertThat(result.getScore()).isEqualTo(100);
+    assertThat(result.getConditions())
+        .extracting("code", "matched", "score", "reason")
+        .containsExactly(org.assertj.core.groups.Tuple.tuple(
+            "REGION",
+            true,
+            100,
+            "선호 지역과 일치"
+        ));
   }
 
   @Test
@@ -218,6 +280,7 @@ class RecommendationScoreServiceImplTest {
       BigDecimal exclusiveArea) {
     PropertyRecommendationCandidate property = new PropertyRecommendationCandidate();
     property.setSggCd(sggCd);
+    property.setSggNm(resolveSggNm(sggCd));
     property.setUmdNm(umdNm);
     property.setBuildYear(buildYear);
     property.setLatestSalePrice(latestSalePrice);
@@ -228,6 +291,16 @@ class RecommendationScoreServiceImplTest {
     );
     property.setExclusiveArea(exclusiveArea);
     return property;
+  }
+
+  private String resolveSggNm(String sggCd) {
+    if ("26350".equals(sggCd)) {
+      return "부산광역시 해운대구";
+    }
+    if ("26500".equals(sggCd)) {
+      return "부산광역시 수영구";
+    }
+    return "부산광역시 중구";
   }
 
   private UserPreferenceResponse preference(String code, String value, Integer priority) {

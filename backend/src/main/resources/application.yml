@@ -13,6 +13,10 @@ spring:
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  batch:
+    jdbc:
+      initialize-schema: always
+
   # ===== Redis 설정 추가 =====
   data:
     redis:

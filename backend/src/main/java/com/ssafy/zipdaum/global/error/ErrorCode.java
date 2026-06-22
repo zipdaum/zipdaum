@@ -22,6 +22,7 @@ public enum ErrorCode {
   FORBIDDEN_MEMBER_ONLY(HttpStatus.FORBIDDEN, "U005", "회원가입을 하면 예산, 면적, 선호지역 등을 기준으로 내 조건에 맞는 주택 정보를 확인할 수 있습니다."),
   TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "U006", "만료된 토큰입니다."),
   TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "U007", "유효하지 않은 토큰입니다."),
+  USER_DELETE_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "U008", "회원 탈퇴 확인 문구가 올바르지 않습니다."),
 
   // 3. Property / Deal
   PROPERTY_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "주택 정보를 찾을 수 없습니다."),
