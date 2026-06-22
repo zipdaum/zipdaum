@@ -34,7 +34,12 @@ public class BatchTriggerController {
 
         log.info(">>>> 관리자 요청: {} ~ {} 기간 부동산 실거래가 수동 배치 시작", startMonth, endMonth);
 
+        long startTime = System.currentTimeMillis();
+
         propertyDataBatchScheduler.runManualPropertyDataJobByRange(startMonth, endMonth);
+
+        long endTime = System.currentTimeMillis();
+        log.info("스케줄러 비동기 호출 소요 시간: {} ms", (endTime - startTime));
 
         return ResponseEntity.ok(startMonth + " ~ " + endMonth + " 기간의 데이터 수집이 백그라운드에서 시작되었습니다.");
     }

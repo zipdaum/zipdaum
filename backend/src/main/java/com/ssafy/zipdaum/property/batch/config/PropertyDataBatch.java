@@ -15,16 +15,22 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.AbstractPagingItemReader;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Configuration
@@ -35,6 +41,8 @@ public class PropertyDataBatch {
     private final PropertyApiClient propertyApiClient;
     private final PropertyMapper propertyMapper;
     private final GeocodeService geocodeService;
+
+    private final Map<String, CoordinateDto> geoCache = new ConcurrentHashMap<>();
 
     @Bean
     @StepScope
@@ -76,8 +84,6 @@ public class PropertyDataBatch {
         return item -> {
             PropertyDealWrapper wrapper = new PropertyDealWrapper();
 
-
-            // 부모 객체 (Property) 매핑
             PropertySaveCommand property = new PropertySaveCommand();
             property.setPropertyType(item.apiType().getPropertyType());
             property.setName(item.propertyName());
@@ -86,7 +92,8 @@ public class PropertyDataBatch {
             property.setJibun(item.jibun());
             property.setBuildYear(item.buildYear());
 
-            CoordinateDto coordinate = geocodeService.getCoordinate(property.getUmdNm() + " " + property.getJibun());
+            String addressKey = property.getUmdNm() + " " + property.getJibun();
+            CoordinateDto coordinate = geoCache.computeIfAbsent(addressKey, k -> geocodeService.getCoordinate(k));
 
             if (coordinate.latitude() != null && coordinate.longitude() != null) {
                 property.setLatitude(coordinate.latitude());
@@ -95,35 +102,18 @@ public class PropertyDataBatch {
 
             wrapper.setProperty(property);
 
-            // 자식 객체 (Deal) 매핑 (매매 vs 전월세 분기)
             if (item.apiType().isSale()) {
-                SaleDealSaveCommand saleDeal = new SaleDealSaveCommand(
-                        null,
-                        item.exclusiveArea(),
-                        item.landArea(),
-                        item.dealAmount(),
-                        item.floor(),
-                        item.dealDate(),
-                        item.buyerGbn(),
-                        item.sellerGbn()
-                );
-                wrapper.setSaleDeal(saleDeal);
+                wrapper.setSaleDeal(new SaleDealSaveCommand(
+                        null, item.exclusiveArea(), item.landArea(), item.dealAmount(),
+                        item.floor(), item.dealDate(), item.buyerGbn(), item.sellerGbn()
+                ));
             } else {
-                RentDealSaveCommand rentDeal = new RentDealSaveCommand(
-                        null,
-                        item.exclusiveArea(),
-                        item.landArea(),
-                        item.deposit(),
-                        item.monthlyRent(),
-                        item.floor(),
-                        item.contractTerm(),
-                        item.contractType(),
-                        item.useRrRight(),
-                        item.preDeposit(),
-                        item.preMonthlyRent(),
-                        item.dealDate()
-                );
-                wrapper.setRentDeal(rentDeal);
+                wrapper.setRentDeal(new RentDealSaveCommand(
+                        null, item.exclusiveArea(), item.landArea(), item.deposit(),
+                        item.monthlyRent(), item.floor(), item.contractTerm(),
+                        item.contractType(), item.useRrRight(), item.preDeposit(),
+                        item.preMonthlyRent(), item.dealDate()
+                ));
             }
 
             return wrapper;
@@ -134,55 +124,59 @@ public class PropertyDataBatch {
     @Bean
     public ItemWriter<PropertyDealWrapper> propertyCustomItemWriter() {
         return chunk -> {
+            // 💡 2. Chunk 전체 데이터를 담을 바구니 (Bulk Insert용)
+            List<SaleDealSaveCommand> saleDealsToSave = new ArrayList<>();
+            List<RentDealSaveCommand> rentDealsToSave = new ArrayList<>();
+
+            // Chunk 내 중복 Property DB 조회를 막기 위한 메모리 캐시
+            Map<String, Long> propertyIdCache = new HashMap<>();
+
             for (PropertyDealWrapper wrapper : chunk) {
                 PropertySaveCommand property = wrapper.getProperty();
-                PropertySaveCommand existingProperty = propertyMapper.findProperty(property);
 
-                Long propertyId;
-                if (existingProperty != null) {
-                    propertyId = existingProperty.getId();
-                } else {
-                    propertyMapper.insertProperty(property);
-                    propertyId = property.getId();
+                String propertyKey = property.getUmdNm() + "|" + property.getJibun() + "|" + property.getName();
+                Long propertyId = propertyIdCache.get(propertyKey);
+
+                // DB에 있는지 확인 후 ID 확보
+                if (propertyId == null) {
+                    PropertySaveCommand existingProperty = propertyMapper.findProperty(property);
+                    if (existingProperty != null) {
+                        propertyId = existingProperty.getId();
+                    } else {
+                        propertyMapper.insertProperty(property);
+                        propertyId = property.getId();
+                    }
+                    propertyIdCache.put(propertyKey, propertyId);
                 }
 
-                // 2. 자식(Deal) 데이터 외래키 세팅 및 저장
+                // Deal 데이터는 List에 담기만 함 (쿼리 실행 안 함)
                 if (wrapper.isSale()) {
                     SaleDealSaveCommand origDeal = wrapper.getSaleDeal();
-                    SaleDealSaveCommand dealToSave = new SaleDealSaveCommand(
-                            propertyId, // 💡 여기서 외래키 삽입!
-                            origDeal.exclusiveArea(),
-                            origDeal.landArea(),
-                            origDeal.dealAmount(),
-                            origDeal.floor(),
-                            origDeal.dealDate(),
-                            origDeal.buyerGbn(),
-                            origDeal.sellerGbn()
-                    );
-
-                    propertyMapper.insertSaleDeal(dealToSave);
-                    propertyMapper.updateLatestSalePrice(propertyId, dealToSave.dealAmount(), dealToSave.dealDate());
-
+                    saleDealsToSave.add(new SaleDealSaveCommand(
+                            propertyId, origDeal.exclusiveArea(), origDeal.landArea(),
+                            origDeal.dealAmount(), origDeal.floor(), origDeal.dealDate(),
+                            origDeal.buyerGbn(), origDeal.sellerGbn()
+                    ));
                 } else {
                     RentDealSaveCommand origDeal = wrapper.getRentDeal();
-                    RentDealSaveCommand dealToSave = new RentDealSaveCommand(
-                            propertyId, // 💡 여기서 외래키 삽입!
-                            origDeal.exclusiveArea(),
-                            origDeal.landArea(),
-                            origDeal.deposit(),
-                            origDeal.monthlyRent(),
-                            origDeal.floor(),
-                            origDeal.contractTerm(),
-                            origDeal.contractType(),
-                            origDeal.useRrRight(),
-                            origDeal.preDeposit(),
-                            origDeal.preMonthlyRent(),
-                            origDeal.dealDate()
-                    );
-
-                    propertyMapper.insertRentDeal(dealToSave);
-                    propertyMapper.updateLatestRentPrice(propertyId, dealToSave.deposit(), dealToSave.monthlyRent(), dealToSave.dealDate());
+                    rentDealsToSave.add(new RentDealSaveCommand(
+                            propertyId, origDeal.exclusiveArea(), origDeal.landArea(),
+                            origDeal.deposit(), origDeal.monthlyRent(), origDeal.floor(),
+                            origDeal.contractTerm(), origDeal.contractType(),
+                            origDeal.useRrRight(), origDeal.preDeposit(),
+                            origDeal.preMonthlyRent(), origDeal.dealDate()
+                    ));
                 }
+            } // end for
+
+            // 💡 2. for문이 끝나면 모아둔 리스트를 단 한 번의 벌크 쿼리로 DB에 전송!
+            if (!saleDealsToSave.isEmpty()) {
+                propertyMapper.bulkInsertSaleDeals(saleDealsToSave);
+                log.info(">> 매매 거래 {}건 벌크 Insert 완료", saleDealsToSave.size());
+            }
+            if (!rentDealsToSave.isEmpty()) {
+                propertyMapper.bulkInsertRentDeals(rentDealsToSave);
+                log.info(">> 전월세 거래 {}건 벌크 Insert 완료", rentDealsToSave.size());
             }
         };
     }
@@ -203,11 +197,27 @@ public class PropertyDataBatch {
                 .build();
     }
 
+    @Bean
+    public Step syncPriceStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        Tasklet tasklet = (contribution, chunkContext) -> {
+            log.info(">>>> [가격 동기화 시작] DB 전체 최신 실거래가 일괄 갱신 중...");
+            propertyMapper.syncAllLatestSalePrices();
+            propertyMapper.syncAllLatestRentPrices();
+            log.info("<<<< [가격 동기화 완료]");
+            return RepeatStatus.FINISHED;
+        };
+
+        return new StepBuilder("syncPriceStep", jobRepository)
+                .tasklet(tasklet, transactionManager)
+                .build();
+    }
+
 
     @Bean
-    public Job propertyApiJob(JobRepository jobRepository, Step propertyApiStep) {
+    public Job propertyApiJob(JobRepository jobRepository, Step propertyApiStep, Step syncPriceStep) {
         return new JobBuilder("propertyApiJob", jobRepository)
                 .start(propertyApiStep)
+                .next(syncPriceStep)
                 .build();
     }
 }
