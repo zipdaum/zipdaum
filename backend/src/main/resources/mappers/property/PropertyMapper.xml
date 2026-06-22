@@ -80,6 +80,23 @@
     <result property="dealDate" column="deal_date"/>
   </resultMap>
 
+  <select id="selectAllProperties" resultMap="propertySearchResponseResultMap">
+    SELECT
+      id,
+      property_type,
+      name,
+      sgg_cd,
+      umd_nm,
+      jibun,
+      build_year,
+      latitude,
+      longitude,
+      latest_sale_price,
+      latest_deposit,
+      latest_monthly_rent
+    FROM property
+  </select>
+
   <select id="selectProperties"
           parameterType="com.ssafy.zipdaum.property.dto.PropertySearchRequest"
           resultMap="propertySearchResponseResultMap">

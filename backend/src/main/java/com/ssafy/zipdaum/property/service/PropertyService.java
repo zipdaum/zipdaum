@@ -9,6 +9,7 @@ import java.util.List;
 public interface PropertyService {
 
   List<PropertySearchResponse> searchProperties(PropertySearchRequest request);
+  List<PropertySearchResponse> searchAllProperties();
 
   PropertyDetailResponse findPropertyDetail(Long propertyId);
 

@@ -78,6 +78,19 @@ public class PropertyController {
     return ResponseEntity.ok(propertyService.searchProperties(request));
   }
 
+  @GetMapping("/all")
+  @ApiResponses({
+          @ApiResponse(
+                  responseCode = "200",
+                  description = "주택 실거래가 전체 조회 성공",
+                  content = @Content(schema = @Schema(implementation = PropertySearchResponse.class))
+          ),
+  })
+  public ResponseEntity<List<PropertySearchResponse>> searchAllProperties() {
+    log.info("GET /properties/all 요청");
+    return ResponseEntity.ok(propertyService.searchAllProperties());
+  }
+
   @GetMapping("/recommendations")
   @Operation(
       summary = "사용자 맞춤 주택 추천 목록 조회",

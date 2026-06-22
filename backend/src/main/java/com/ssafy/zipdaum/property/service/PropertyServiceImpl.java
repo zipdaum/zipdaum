@@ -36,6 +36,12 @@ public class PropertyServiceImpl implements PropertyService {
   }
 
   @Override
+  public List<PropertySearchResponse> searchAllProperties() {
+    return propertyMapper.selectAllProperties();
+  }
+
+
+  @Override
   public PropertyDetailResponse findPropertyDetail(Long propertyId) {
     validatePropertyId(propertyId);
 
