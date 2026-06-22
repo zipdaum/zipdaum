@@ -417,6 +417,12 @@ function formatDateTime(value) {
         </div>
       </section>
 
+      <div class="account-delete-entry">
+        <button class="danger-outline-button" type="button" @click="openDeleteConfirm">
+          회원 탈퇴
+        </button>
+      </div>
+
       <div
         v-if="isDeleteConfirmOpen"
         class="delete-confirm-backdrop"
@@ -429,19 +435,24 @@ function formatDateTime(value) {
           aria-modal="true"
           aria-labelledby="account-delete-title"
         >
-          <div class="panel-title-row">
+          <div class="delete-dialog-header">
+            <span class="delete-dialog-icon" aria-hidden="true">!</span>
             <div>
               <h2 id="account-delete-title">회원 탈퇴</h2>
+              <p>계정을 비활성화하기 전에 본인 확인이 필요합니다.</p>
             </div>
           </div>
 
-          <p class="account-delete-description">
-            탈퇴 신청 후 계정은 바로 비활성화되며, 회원 정보는 2주 뒤 완전히 삭제됩니다.
-          </p>
+          <div class="account-delete-description">
+            <strong>탈퇴 신청 후 계정은 바로 비활성화됩니다.</strong>
+            <span>회원 정보는 신청 시점으로부터 2주 뒤 완전히 삭제됩니다.</span>
+          </div>
 
           <form class="account-delete-form" @submit.prevent="requestUserDeletion">
             <label>
-              <span>확인 문구</span>
+              <span class="delete-confirm-copy">
+                <span>아래 문구를 입력해주세요</span>
+              </span>
               <input
                 v-model.trim="deleteTextInput"
                 type="text"
@@ -461,7 +472,7 @@ function formatDateTime(value) {
                 취소
               </button>
               <button class="danger-button" type="submit" :disabled="!canRequestDeletion">
-                {{ isDeleting ? "탈퇴 신청 중" : "확인" }}
+                {{ isDeleting ? "탈퇴 신청 중" : "탈퇴 신청" }}
               </button>
             </div>
           </form>
