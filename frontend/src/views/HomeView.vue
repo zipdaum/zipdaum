@@ -5,6 +5,7 @@ import AppHeader from "../components/AppHeader.vue";
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
   getPropertyDetail as fetchPropertyDetail,
+  getPropertyAiSummary as fetchPropertyAiSummary,
   getPropertyRecommendations as fetchPropertyRecommendations,
   getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
@@ -140,6 +141,10 @@ const surroundingsErrorMessage = ref("");
 const recommendationScore = ref(null);
 const isRecommendationScoreLoading = ref(false);
 const recommendationScoreErrorMessage = ref("");
+const propertyAiSummary = ref("");
+const isPropertyAiSummaryLoading = ref(false);
+const propertyAiSummaryErrorMessage = ref("");
+const isPropertyAiSummaryHighlighted = ref(false);
 const detailInteraction = ref(null);
 const mapZoom = ref(1);
 const mapPan = ref({ x: 0, y: 0 });
@@ -167,6 +172,7 @@ const emptyHistoryMeta = {
   rentServerPaged: false,
 };
 let resultHighlightTimer = null;
+let propertyAiSummaryHighlightTimer = null;
 let mapDragStart = null;
 
 function createEmptyRentDealsByType() {
@@ -220,6 +226,7 @@ watch(isLoggedIn, (loggedIn) => {
 onUnmounted(() => {
   saveDetailInteraction();
   clearResultHighlightTimer();
+  clearPropertyAiSummaryHighlightTimer();
   stopMapDrag();
   window.removeEventListener("scroll", updateDetailScrollDepth);
   window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
@@ -500,6 +507,9 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   surroundingsErrorMessage.value = "";
   recommendationScore.value = null;
   recommendationScoreErrorMessage.value = "";
+  propertyAiSummary.value = "";
+  propertyAiSummaryErrorMessage.value = "";
+  isPropertyAiSummaryHighlighted.value = false;
   resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
@@ -530,6 +540,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       }),
       loadSurroundings(selectedPropertyDetail.value),
       loadRecommendationScore(normalizedPropertyId),
+      loadPropertyAiSummary(normalizedPropertyId),
     ]);
 
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
@@ -591,6 +602,50 @@ async function loadRecommendationScore(propertyId) {
   } finally {
     isRecommendationScoreLoading.value = false;
   }
+}
+
+async function loadPropertyAiSummary(propertyId) {
+  propertyAiSummary.value = "";
+  propertyAiSummaryErrorMessage.value = "";
+
+  if (!isLoggedIn.value) {
+    return;
+  }
+
+  isPropertyAiSummaryLoading.value = true;
+
+  try {
+    const response = await fetchPropertyAiSummary(propertyId);
+    propertyAiSummary.value = response?.summary || "";
+    if (propertyAiSummary.value) {
+      highlightPropertyAiSummary();
+    }
+  } catch (error) {
+    propertyAiSummaryErrorMessage.value = "AI 요약을 불러오지 못했습니다.";
+  } finally {
+    isPropertyAiSummaryLoading.value = false;
+  }
+}
+
+function highlightPropertyAiSummary() {
+  if (propertyAiSummaryHighlightTimer) {
+    clearPropertyAiSummaryHighlightTimer();
+  }
+
+  isPropertyAiSummaryHighlighted.value = true;
+  propertyAiSummaryHighlightTimer = window.setTimeout(() => {
+    isPropertyAiSummaryHighlighted.value = false;
+    propertyAiSummaryHighlightTimer = null;
+  }, 1800);
+}
+
+function clearPropertyAiSummaryHighlightTimer() {
+  if (!propertyAiSummaryHighlightTimer) {
+    return;
+  }
+
+  clearTimeout(propertyAiSummaryHighlightTimer);
+  propertyAiSummaryHighlightTimer = null;
 }
 
 function goToLoginForRecommendation() {
@@ -2593,6 +2648,28 @@ function formatPrice(price) {
               </div>
               <p class="detail-address">
                 {{ getPropertyAddress(selectedPropertyDetail) }}
+              </p>
+              <p
+                v-if="isPropertyAiSummaryLoading"
+                class="property-ai-summary loading"
+              >
+                <span class="property-ai-summary-spinner" aria-hidden="true"></span>
+                <span>AI가 이 집의 적합도를 요약하고 있습니다.</span>
+              </p>
+              <p
+                v-else-if="propertyAiSummary"
+                :class="[
+                  'property-ai-summary',
+                  { highlighted: isPropertyAiSummaryHighlighted },
+                ]"
+              >
+                {{ propertyAiSummary }}
+              </p>
+              <p
+                v-else-if="propertyAiSummaryErrorMessage"
+                class="property-ai-summary muted"
+              >
+                {{ propertyAiSummaryErrorMessage }}
               </p>
               <div class="detail-tags">
                 <span
