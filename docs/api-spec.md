@@ -18,6 +18,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 실거래가 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 실거래가 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
 | 사용자 맞춤 | 주택 맞춤 조건 적합도 조회 | GET | `/properties/{propertyId}/recommendation-score` |
+| 사용자 맞춤 | 사용자 맞춤 지역 조건 후보 검색 | GET | `/users/info/preferences/regions/candidates` |
 | 사용자 맞춤 | 주택 상세 화면 행동 로그 저장 | POST | `/properties/{propertyId}/interactions` |
 | 사용자 맞춤 | 사용자 맞춤 조건 전체 저장(조건 조합) | PUT | `/users/info/preferences` |
 | 사용자 맞춤 | 사용자 맞춤 조건 해제(조건 조합) | DELETE | `/users/info/preferences` |
@@ -40,6 +41,21 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 회원 정보 조회 | GET | `/users/info` |
 | 회원 정보 수정 | PATCH | `/users/info` |
 | 회원 탈퇴 | DELETE | `/users/info` |
+
+### 회원 탈퇴
+
+로그인한 사용자가 현재 이름과 확인 문구를 입력하면 탈퇴를 신청한다.
+
+요청 예시:
+
+```json
+{
+  "name": "홍길동",
+  "confirmationText": "delete/홍길동"
+}
+```
+
+성공 시 계정은 즉시 비활성화되며, 회원 정보는 탈퇴 신청 시점으로부터 2주 뒤 물리 삭제된다.
 
 ## 실거래가 조회 및 주택/거래 상세 조회
 
@@ -66,7 +82,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 - 가격 조건은 선호 금액 이하이면 100점, 선호 금액의 110% 이하이면 70점으로 평가한다.
 - 면적 조건은 선호 면적 이상이면 100점, 선호 면적의 90% 이상이면 70점으로 평가한다.
 - 건축연도 조건은 선호 연도 이상이면 100점, 선호 연도보다 5년 이내로 오래된 경우 70점으로 평가한다.
-- 지역 조건은 선호 지역과 주택 지역이 일치하면 100점으로 평가한다.
+- 지역 조건은 `region` 테이블 기준으로 선호 시군구가 주택 읍면동을 포함하거나 선호 읍면동과 주택 읍면동이 일치하면 100점으로 평가한다.
 - 시설 조건은 시설별 기준 반경 내 해당 시설이 1개 이상 있으면 100점으로 평가한다.
   - 버스, CCTV: 500m
   - 지하철역, 공원: 1000m
@@ -86,6 +102,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 
 | 기능 | Method | URL |
 | --- | --- | --- |
+| 사용자 맞춤 지역 조건 후보 검색 | GET | `/users/info/preferences/regions/candidates` |
 | 사용자 맞춤 조건 전체 저장(조건 조합) | PUT | `/users/info/preferences` |
 | 사용자 맞춤 조건 해제(조건 조합) | DELETE | `/users/info/preferences` |
 | 관심 지역 전체 조회 | GET | `/users/info/regions` |

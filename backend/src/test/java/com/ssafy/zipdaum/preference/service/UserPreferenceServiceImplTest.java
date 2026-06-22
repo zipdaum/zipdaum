@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 
 import com.ssafy.zipdaum.preference.dto.UserPreferenceItemRequest;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceRequest;
+import com.ssafy.zipdaum.preference.dto.UserPreferenceRegionCandidateResponse;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.preference.dto.PreferenceTypeDto;
 import com.ssafy.zipdaum.preference.mapper.UserPreferenceMapper;
@@ -44,6 +45,59 @@ class UserPreferenceServiceImplTest {
   }
 
   @Test
+  void findRegionCandidates_검색어_공백을_제거한_키워드로_맞춤_지역_후보를_조회한다() {
+    UserPreferenceRegionCandidateResponse candidate = new UserPreferenceRegionCandidateResponse();
+    candidate.setSggCd("26350");
+    candidate.setUmdNm("우동");
+    candidate.setDisplayName("부산광역시 해운대구 우동");
+    given(userPreferenceMapper.selectUserPreferenceRegionCandidates("해운대우동"))
+        .willReturn(List.of(candidate));
+
+    List<UserPreferenceRegionCandidateResponse> result =
+        service.findRegionCandidates(" 해운대 우동 ");
+
+    assertThat(result).containsExactly(candidate);
+    then(userPreferenceMapper).should().selectUserPreferenceRegionCandidates("해운대우동");
+  }
+
+  @Test
+  void findRegionCandidates_LIKE_특수문자를_이스케이프해서_조회한다() {
+    given(userPreferenceMapper.selectUserPreferenceRegionCandidates("\\%우\\_동"))
+        .willReturn(List.of());
+
+    List<UserPreferenceRegionCandidateResponse> result = service.findRegionCandidates("%우_동");
+
+    assertThat(result).isEmpty();
+    then(userPreferenceMapper).should().selectUserPreferenceRegionCandidates("\\%우\\_동");
+  }
+
+  @Test
+  void findRegionCandidates_검색어가_null이면_INVALID_INPUT_VALUE_예외가_발생한다() {
+    assertThatThrownBy(() -> service.findRegionCandidates(null))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE)
+        );
+  }
+
+  @Test
+  void findRegionCandidates_검색어가_공백이면_INVALID_INPUT_VALUE_예외가_발생한다() {
+    assertThatThrownBy(() -> service.findRegionCandidates("   "))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE)
+        );
+  }
+
+  @Test
+  void findRegionCandidates_검색어가_너무_길면_INVALID_INPUT_VALUE_예외가_발생한다() {
+    String keyword = "a".repeat(51);
+
+    assertThatThrownBy(() -> service.findRegionCandidates(keyword))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE)
+        );
+  }
+
+  @Test
   void savePreferences_입력된_조건을_등록한다() {
     UserPreferenceRequest request = new UserPreferenceRequest();
     request.setPreferences(List.of(
@@ -67,6 +121,8 @@ class UserPreferenceServiceImplTest {
         preferenceType(6L, "BUS"),
         preferenceType(9L, "CCTV")
     ));
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구 우동"))
+        .willReturn(true);
 
     service.savePreferences(1L, request);
 
@@ -90,6 +146,101 @@ class UserPreferenceServiceImplTest {
     assertThat(captor.getValue())
         .extracting("priority")
         .containsExactly(3, 6, 7, 2, 1, 5, 4);
+  }
+
+  @Test
+  void savePreferences_REGION_조건은_여러_개_등록할_수_있다() {
+    UserPreferenceRequest request = new UserPreferenceRequest();
+    request.setPreferences(List.of(
+        preference("REGION", "부산광역시 해운대구 우동", 1),
+        preference("REGION", "부산광역시 수영구 광안동", 2)
+    ));
+
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구 우동"))
+        .willReturn(true);
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 수영구 광안동"))
+        .willReturn(true);
+    given(userPreferenceMapper.selectPreferenceTypesByCodes(List.of("REGION")))
+        .willReturn(List.of(preferenceType(5L, "REGION")));
+
+    service.savePreferences(1L, request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<com.ssafy.zipdaum.preference.dto.UserPreferenceSaveCommand>> captor =
+        ArgumentCaptor.forClass(List.class);
+    then(userPreferenceMapper).should().insertUserPreferences(org.mockito.ArgumentMatchers.eq(1L),
+        captor.capture());
+    assertThat(captor.getValue())
+        .extracting("preferenceValue")
+        .containsExactly("부산광역시 해운대구 우동", "부산광역시 수영구 광안동");
+  }
+
+  @Test
+  void savePreferences_존재하지_않는_REGION이면_INVALID_INPUT_VALUE_예외가_발생한다() {
+    UserPreferenceRequest request = new UserPreferenceRequest();
+    request.setPreferences(List.of(preference("REGION", "부산광역시 해운대구 없는동", 1)));
+
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구 없는동"))
+        .willReturn(false);
+
+    assertThatThrownBy(() -> service.savePreferences(1L, request))
+        .isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE)
+        );
+  }
+
+  @Test
+  void savePreferences_하위_REGION_이후_상위_REGION을_등록하면_상위_REGION으로_대체한다() {
+    UserPreferenceRequest request = new UserPreferenceRequest();
+    request.setPreferences(List.of(
+        preference("REGION", "부산광역시 해운대구 우동", 1),
+        preference("REGION", "부산광역시 해운대구", 2)
+    ));
+
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구 우동"))
+        .willReturn(true);
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구"))
+        .willReturn(true);
+    given(userPreferenceMapper.selectPreferenceTypesByCodes(List.of("REGION")))
+        .willReturn(List.of(preferenceType(5L, "REGION")));
+
+    service.savePreferences(1L, request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<com.ssafy.zipdaum.preference.dto.UserPreferenceSaveCommand>> captor =
+        ArgumentCaptor.forClass(List.class);
+    then(userPreferenceMapper).should().insertUserPreferences(org.mockito.ArgumentMatchers.eq(1L),
+        captor.capture());
+    assertThat(captor.getValue())
+        .extracting("preferenceValue")
+        .containsExactly("부산광역시 해운대구");
+  }
+
+  @Test
+  void savePreferences_상위_REGION_이후_하위_REGION을_등록하면_하위_REGION은_무시한다() {
+    UserPreferenceRequest request = new UserPreferenceRequest();
+    request.setPreferences(List.of(
+        preference("REGION", "부산광역시 해운대구", 1),
+        preference("REGION", "부산광역시 해운대구 우동", 2)
+    ));
+
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구"))
+        .willReturn(true);
+    given(userPreferenceMapper.existsRegionDisplayName("부산광역시 해운대구 우동"))
+        .willReturn(true);
+    given(userPreferenceMapper.selectPreferenceTypesByCodes(List.of("REGION")))
+        .willReturn(List.of(preferenceType(5L, "REGION")));
+
+    service.savePreferences(1L, request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<com.ssafy.zipdaum.preference.dto.UserPreferenceSaveCommand>> captor =
+        ArgumentCaptor.forClass(List.class);
+    then(userPreferenceMapper).should().insertUserPreferences(org.mockito.ArgumentMatchers.eq(1L),
+        captor.capture());
+    assertThat(captor.getValue())
+        .extracting("preferenceValue")
+        .containsExactly("부산광역시 해운대구");
   }
 
   @Test

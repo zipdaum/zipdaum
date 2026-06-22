@@ -1,6 +1,7 @@
 package com.ssafy.zipdaum.preference.controller;
 
 import com.ssafy.zipdaum.preference.dto.UserPreferenceRequest;
+import com.ssafy.zipdaum.preference.dto.UserPreferenceRegionCandidateResponse;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.preference.service.UserPreferenceService;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -34,6 +36,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserPreferenceController {
 
   private final UserPreferenceService userPreferenceService;
+
+  @GetMapping("/regions/candidates")
+  @Operation(summary = "사용자 맞춤 지역 조건 후보 검색", description = "사용자 맞춤 지역 조건으로 설정할 수 있는 지역 후보를 검색합니다.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "맞춤 지역 조건 후보 검색 성공"),
+      @ApiResponse(responseCode = "400", description = "입력값 오류", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<List<UserPreferenceRegionCandidateResponse>> getRegionCandidates(
+      @RequestParam String keyword
+  ) {
+    log.info("GET /users/info/preferences/regions/candidates 요청");
+
+    return ResponseEntity.ok(userPreferenceService.findRegionCandidates(keyword));
+  }
 
   @GetMapping
   @Operation(summary = "사용자 맞춤 조건 조회", description = "현재 로그인한 사용자의 맞춤 조건을 조회합니다.")

@@ -215,7 +215,7 @@ public class RecommendationServiceImpl implements RecommendationService {
   private PropertyRecommendationCandidateFilter toCandidateFilter(
       Long userId,
       List<UserPreferenceResponse> preferences) {
-    String region = null;
+    List<String> regions = new ArrayList<>();
     Long salePriceMax = null;
     Long depositMax = null;
     Long monthlyRentMax = null;
@@ -233,7 +233,12 @@ public class RecommendationServiceImpl implements RecommendationService {
         case DEPOSIT -> depositMax = toPartialPriceMax(preference.getValue());
         case MONTHLY_RENT -> monthlyRentMax = toPartialPriceMax(preference.getValue());
         case AREA -> minExclusiveArea = toPartialAreaMin(preference.getValue());
-        case REGION -> region = normalize(preference.getValue());
+        case REGION -> {
+          String region = normalize(preference.getValue());
+          if (region != null) {
+            regions.add(region);
+          }
+        }
         case BUILD_YEAR, BUS, SUBWAY, HOSPITAL, CCTV, PARK -> {
         }
       }
@@ -241,7 +246,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     return new PropertyRecommendationCandidateFilter(
         userId,
-        region,
+        regions,
         salePriceMax,
         depositMax,
         monthlyRentMax,
@@ -254,7 +259,7 @@ public class RecommendationServiceImpl implements RecommendationService {
   private PropertyRecommendationCandidateFilter interactedCandidateFilter(Long userId) {
     return new PropertyRecommendationCandidateFilter(
         userId,
-        null,
+        List.of(),
         null,
         null,
         null,

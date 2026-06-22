@@ -23,11 +23,19 @@
       AND is_deleted = FALSE
   </update>
 
-  <update id="softDeleteById" parameterType="long">
+  <update id="softDeleteById">
     UPDATE users
-    SET is_deleted = TRUE
+    SET is_deleted = TRUE,
+        deletion_scheduled_at = #{deletionScheduledAt}
     WHERE id = #{id}
       AND is_deleted = FALSE
   </update>
+
+  <delete id="deleteScheduledUsers">
+    DELETE FROM users
+    WHERE is_deleted = TRUE
+      AND deletion_scheduled_at IS NOT NULL
+      AND deletion_scheduled_at &lt;= #{now}
+  </delete>
 
 </mapper>

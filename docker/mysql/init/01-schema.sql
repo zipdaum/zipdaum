@@ -6,9 +6,11 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   name VARCHAR(30) NOT NULL,
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  deletion_scheduled_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  KEY idx_users_deletion_scheduled_at (is_deleted, deletion_scheduled_at),
   UNIQUE KEY uk_users_email_deleted (email, is_deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -182,7 +184,7 @@ CREATE TABLE user_preference (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_user_preference_user_type (user_id, preference_type_id),
+  UNIQUE KEY uk_user_preference_user_type_value (user_id, preference_type_id, preference_value),
   KEY idx_user_preference_user_id (user_id),
   KEY idx_user_preference_type_id (preference_type_id),
   CONSTRAINT fk_user_preference_user

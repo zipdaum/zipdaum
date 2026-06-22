@@ -2,9 +2,11 @@ package com.ssafy.zipdaum.user.service;
 
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.user.dto.UserDeleteRequest;
 import com.ssafy.zipdaum.user.dto.UserDto;
 import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.mapper.UserMapper;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -16,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService{
+
+  private static final String DELETE_CONFIRMATION_PREFIX = "delete/";
+  private static final int USER_DELETION_GRACE_DAYS = 14;
 
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
@@ -75,13 +80,22 @@ public class UserServiceImpl implements UserService{
 
   @Override
   @Transactional
-  public void deleteById(Long id) {
-    int updatedRows = userMapper.softDeleteById(id);
+  public void requestDeletion(Long id, UserDeleteRequest request) {
+    UserDto user = findById(id);
+    String deleteConfirmationText = DELETE_CONFIRMATION_PREFIX + user.getName();
+    if (!user.getName().equals(request.getName())
+        || !deleteConfirmationText.equals(request.getConfirmationText())) {
+      log.warn("회원 탈퇴 확인 실패 userId={}", id);
+      throw new BusinessException(ErrorCode.USER_DELETE_CONFIRMATION_MISMATCH);
+    }
+
+    LocalDateTime deletionScheduledAt = LocalDateTime.now().plusDays(USER_DELETION_GRACE_DAYS);
+    int updatedRows = userMapper.softDeleteById(id, deletionScheduledAt);
     if (updatedRows == 0) {
       log.warn("탈퇴 처리할 대상이 없음 userId={}", id);
       throw new BusinessException(ErrorCode.USER_NOT_FOUND);
     }
 
-    log.info("회원 탈퇴 완료 userId={}", id);
+    log.info("회원 탈퇴 신청 완료 userId={}, deletionScheduledAt={}", id, deletionScheduledAt);
   }
 }

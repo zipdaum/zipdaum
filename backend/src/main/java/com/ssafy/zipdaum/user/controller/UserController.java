@@ -88,7 +88,7 @@ public class UserController {
   }
 
   @DeleteMapping("/info")
-  @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자를 논리 삭제 처리합니다.")
+  @Operation(summary = "회원 탈퇴", description = "현재 로그인한 사용자의 탈퇴를 신청하고 2주 뒤 물리 삭제되도록 예약합니다.")
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "회원 탈퇴 성공", content = @Content),
       @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
@@ -96,11 +96,12 @@ public class UserController {
   })
   @SecurityRequirement(name = "bearerAuth")
   public ResponseEntity<String> deleteUser(
-      @AuthenticationPrincipal AuthenticatedUser authenticatedUser
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @Valid @RequestBody UserDeleteRequest request
   ) {
     log.info("DELETE /users/info 요청");
-    userService.deleteById(authenticatedUser.getId());
-    return ResponseEntity.ok("회원 탈퇴 성공");
+    userService.requestDeletion(authenticatedUser.getId(), request);
+    return ResponseEntity.ok("회원 탈퇴 신청 완료");
   }
 
 

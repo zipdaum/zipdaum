@@ -34,7 +34,9 @@ function handleLogout() {
       <RouterLink :to="{ name: 'favorites' }" active-class="active">
         관심목록
       </RouterLink>
-      <a href="#">마이페이지</a>
+      <RouterLink :to="{ name: 'mypage' }" active-class="active">
+        마이페이지
+      </RouterLink>
     </nav>
 
     <div v-if="isLoggedIn" class="account-actions">
