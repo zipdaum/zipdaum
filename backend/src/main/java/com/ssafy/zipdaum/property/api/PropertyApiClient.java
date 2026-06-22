@@ -32,7 +32,7 @@ public class PropertyApiClient {
   private final RestClient restClient;
   private final PropertyApiProperties properties;
 
-  public List<PropertyItem> fetch(DealApiType apiType, String lawdCd, String dealYmd) {
+  public List<PropertyItem> fetch(DealApiType apiType, String lawdCd, String dealYmd, int pageNo) {
     String response;
     try {
       response = restClient.get()
@@ -41,7 +41,7 @@ public class PropertyApiClient {
               + "&LAWD_CD=" + lawdCd
               + "&DEAL_YMD=" + dealYmd
               + "&numOfRows=" + NUM_OF_ROWS
-              + "&pageNo=1"))
+              + "&pageNo=" + pageNo))
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {
