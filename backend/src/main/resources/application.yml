@@ -14,7 +14,9 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   batch:
-    jdbc:
+    job:
+      enabled: false
+    JDBC:
       initialize-schema: always
 
   # ===== Redis 설정 추가 =====
@@ -26,23 +28,16 @@ spring:
   # ===== 메일 설정 추가 =====
   mail:
     host: smtp.gmail.com
-    port: 465
-    default-encoding: UTF-8
+    port: 587
     username: ${MAIL_USERNAME} # .env 파일에서 주입
     password: ${MAIL_PASSWORD} # .env 파일에서 주입
     properties:
       mail:
-        debug: true
         smtp:
           auth: true
           starttls:
             enable: true
-          socketFactory:
-            class: javax.net.ssl.SSLSocketFactory
-        smtps:
-          ssl:
-            checkserveridentity: true
-            trust: '*'
+            required: true
 
 mybatis:
   mapper-locations: classpath:/mappers/**/*.xml
