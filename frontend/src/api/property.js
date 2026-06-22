@@ -1,12 +1,10 @@
-import client from './client'
-
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+import client, { apiBaseURL } from './client'
 
 function getApiUrl(path) {
-  if (!apiBaseUrl) {
+  if (!apiBaseURL) {
     return path
   }
-  return `${apiBaseUrl.replace(/\/$/, '')}${path}`
+  return `${apiBaseURL.replace(/\/$/, '')}${path}`
 }
 
 export async function searchProperties(params) {
