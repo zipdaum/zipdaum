@@ -15,8 +15,6 @@ import com.ssafy.zipdaum.property.dto.PropertyAiComparisonResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDealHistoryResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
-import com.ssafy.zipdaum.recent.dto.RecentPropertyResponse;
-import com.ssafy.zipdaum.recent.service.RecentPropertyService;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.service.RecommendationService;
 import java.nio.charset.StandardCharsets;
@@ -39,16 +37,19 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private static final int RENT_HISTORY_PAGE = 1;
   private static final int HISTORY_SIZE = 3;
   private static final int SURROUNDING_RADIUS_METERS = 1000;
-  private static final int RECENT_CONTEXT_SIZE = 5;
   private static final String DEFAULT_RENT_DEAL_TYPE = "JEONSE";
   private static final String DEVELOPER_PROMPT = """
       너는 ZipDaum의 주택 비교 도우미다. 반드시 한국어로 답한다.
       입력으로 제공된 데이터만 근거로 두 주택을 비교한다.
       없는 정보는 추측하지 말고 '제공된 정보만으로는 판단하기 어렵습니다'라고 말한다.
+      null, 빈 배열, 0 값은 유리한 근거로 사용하지 않는다. 0 값이 실제 가격인지 데이터 없음인지 불명확하면 판단 보류로 설명한다.
       추천 점수, 거래 금액, 주변시설 개수는 재계산하지 말고 입력값을 그대로 해석한다.
-      사용자 선호 조건, 최근 본 주택 여부, 관심 주택 여부, 조건별 적합도, 최근 거래 이력을 함께 참고한다.
+      판단 우선순위는 사용자 선호 조건과 조건별 적합도 reason, 거래 가격과 보증금/월세 조건, 최근 거래 이력, 입지와 주변시설, 관심 주택 여부 순서다.
       투자 수익률, 미래 가격 상승, 확정적 가치 판단은 하지 않는다.
       예시는 'A 주택: 예산 적합, 병원 가까움, 최근 거래가 안정적 / B 주택: 가격은 좋지만 선호 시설 부족'처럼 짧고 구체적인 근거로 설명한다.
+      응답 전에 내부적으로 단계별로 근거를 점검하되, 사고 과정은 출력하지 않는다.
+      recommendedProperty는 반드시 'A', 'B', 'NONE' 중 하나로 작성한다. 우열이 명확하지 않으면 'NONE'을 사용한다.
+      oneLineSummary는 '실거주 관점에서는 ... 때문에 A/B가 더 적합합니다.' 또는 우열이 명확하지 않을 때 '제공된 정보만으로는 A와 B의 우열을 판단하기 어렵습니다.' 형식으로 작성한다.
       응답은 반드시 유효한 JSON 객체로만 작성한다.
       """;
 
@@ -58,7 +59,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private final RecommendationService recommendationService;
   private final UserPreferenceService userPreferenceService;
   private final FavoritePropertyService favoritePropertyService;
-  private final RecentPropertyService recentPropertyService;
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
 
@@ -69,7 +69,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
       RecommendationService recommendationService,
       UserPreferenceService userPreferenceService,
       FavoritePropertyService favoritePropertyService,
-      RecentPropertyService recentPropertyService,
       @Qualifier("propertyAiRestClient") RestClient restClient,
       ObjectMapper objectMapper) {
     this.properties = properties;
@@ -78,7 +77,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     this.recommendationService = recommendationService;
     this.userPreferenceService = userPreferenceService;
     this.favoritePropertyService = favoritePropertyService;
-    this.recentPropertyService = recentPropertyService;
     this.restClient = restClient;
     this.objectMapper = objectMapper;
   }
@@ -139,12 +137,10 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private UserComparisonContext buildUserContext(Long userId, PropertyAiComparisonRequest request) {
     List<UserPreferenceResponse> preferences = findPreferences(userId);
     List<FavoritePropertyResponse> favoriteProperties = favoritePropertyService.findFavoriteProperties(userId);
-    List<RecentPropertyResponse> recentProperties = recentPropertyService.findRecentProperties(userId);
 
     return new UserComparisonContext(
         normalizeComparisonPurpose(request.getComparisonPurpose()),
         preferences,
-        recentProperties,
         favoriteProperties.stream()
             .map(FavoritePropertyResponse::getPropertyId)
             .collect(Collectors.toSet())
@@ -182,8 +178,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
         summarizeDealHistories(histories),
         findSurroundingSummary(detail),
         summarizeRecommendationScore(findRecommendationScore(userId, propertyId)),
-        userContext.favoritePropertyIds().contains(propertyId),
-        summarizeRecentProperty(findRecentProperty(userContext.recentProperties(), propertyId))
+        userContext.favoritePropertyIds().contains(propertyId)
     );
   }
 
@@ -209,15 +204,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
           userId, propertyId, e.getErrorCode().name());
       return null;
     }
-  }
-
-  private RecentPropertyResponse findRecentProperty(
-      List<RecentPropertyResponse> recentProperties,
-      Long propertyId) {
-    return recentProperties.stream()
-        .filter(property -> propertyId.equals(property.getPropertyId()))
-        .findFirst()
-        .orElse(null);
   }
 
   private String requestAiComparison(PropertyComparisonInput input) throws JsonProcessingException {
@@ -257,10 +243,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     return new UserComparisonContextSummary(
         userContext.comparisonPurpose(),
         userContext.preferences(),
-        userContext.recentProperties().stream()
-            .limit(RECENT_CONTEXT_SIZE)
-            .map(this::summarizeRecentProperty)
-            .toList(),
         userContext.favoritePropertyIds()
     );
   }
@@ -325,19 +307,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     );
   }
 
-  private RecentPropertySummary summarizeRecentProperty(RecentPropertyResponse recentProperty) {
-    if (recentProperty == null) {
-      return null;
-    }
-
-    return new RecentPropertySummary(
-        recentProperty.getPropertyId(),
-        recentProperty.getName(),
-        recentProperty.getViewCount(),
-        recentProperty.getViewedAt()
-    );
-  }
-
   private String normalizeComparisonPurpose(String comparisonPurpose) {
     if (comparisonPurpose == null || comparisonPurpose.isBlank()) {
       return "실거주 관점의 주택 비교";
@@ -348,13 +317,13 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private OutputFormat outputFormat() {
     return new OutputFormat(
         "string",
-        "A | B | 판단 어려움",
+        "A | B | NONE",
         "string",
         List.of(new OutputComparisonItem(
             "가격 | 거래 이력 | 면적 | 연식 | 입지 | 주변시설 | 맞춤 적합도 | 사용자 관심",
             "string",
             "string",
-            "A | B | 비슷함 | 판단 어려움",
+            "A | B | NONE",
             "string"
         )),
         List.of("string"),
@@ -368,10 +337,12 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
 
   private List<String> comparisonRules() {
     return List.of(
-        "사용자 선호 조건과 조건별 적합도 reason을 우선 근거로 삼는다.",
-        "최근 본 주택이면 사용자가 관심을 보인 후보로 해석하되, 단독 추천 근거로 삼지 않는다.",
+        "사용자 선호 조건과 조건별 적합도 reason을 가장 우선적인 추천 근거로 삼는다.",
+        "입력값에 없는 정보는 비교 근거에 포함하지 않는다.",
         "거래 이력이 비어 있거나 좌표가 없으면 해당 항목은 판단 보류로 설명한다.",
-        "최종 추천은 단정하지 말고 사용 목적에 따라 다르게 안내한다."
+        "null, 빈 배열, 0 값은 유리한 근거로 해석하지 않는다.",
+        "최종 추천은 A, B, NONE 중 하나로 정하고, 단정 대신 제공된 근거의 범위 안에서 안내한다.",
+        "JSON을 반환하기 전에 recommendedProperty 값과 필수 필드 누락 여부를 내부적으로 검증한다."
     );
   }
 
@@ -392,14 +363,12 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private record UserComparisonContext(
       String comparisonPurpose,
       List<UserPreferenceResponse> preferences,
-      List<RecentPropertyResponse> recentProperties,
       Set<Long> favoritePropertyIds) {
   }
 
   private record UserComparisonContextSummary(
       String comparisonPurpose,
       List<UserPreferenceResponse> preferences,
-      List<RecentPropertySummary> recentProperties,
       Set<Long> favoritePropertyIds) {
   }
 
@@ -409,8 +378,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
       DealHistorySummary recentDeals,
       SurroundingSummaryResponse surroundings,
       RecommendationScoreSummary recommendationScore,
-      boolean favorite,
-      RecentPropertySummary recentProperty) {
+      boolean favorite) {
   }
 
   private record PropertySummary(
@@ -461,13 +429,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
       boolean matched,
       int score,
       String reason) {
-  }
-
-  private record RecentPropertySummary(
-      Long propertyId,
-      String name,
-      Integer viewCount,
-      Object viewedAt) {
   }
 
   private record OutputFormat(

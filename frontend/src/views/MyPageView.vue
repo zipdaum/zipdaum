@@ -64,6 +64,13 @@ const selectedPropertyIds = computed(() =>
 const canRequestComparison = computed(
   () => selectedPropertyIds.value.length === 2 && !isComparing.value,
 );
+const comparisonRecommendationText = computed(() => {
+  const recommendedProperty = comparisonResult.value?.recommendedProperty;
+  if (recommendedProperty === "A" || recommendedProperty === "B") {
+    return `AI는 ${recommendedProperty}를 더 추천합니다`;
+  }
+  return "AI는 판단을 보류합니다";
+});
 
 onMounted(loadMyPage);
 
@@ -618,7 +625,7 @@ function formatDateTime(value) {
             </section>
 
             <section class="mypage-panel recent-panel" aria-labelledby="recent-title">
-              <div class="panel-title-row compare-result-title-row">
+              <div class="panel-title-row">
                 <div>
                   <h2 id="recent-title">최근 본 주택</h2>
                 </div>
@@ -784,9 +791,7 @@ function formatDateTime(value) {
               <div class="panel-title-row compare-result-title-row">
                 <div class="compare-result-heading">
                   <h2 id="compare-result-title">AI 비교 결과</h2>
-                  <span>
-                    AI는 {{ comparisonResult.recommendedProperty || "판단 보류" }}{{ comparisonResult.recommendedProperty ? "를 더 추천합니다" : "로 안내합니다" }}
-                  </span>
+                  <span>{{ comparisonRecommendationText }}</span>
                 </div>
               </div>
 
