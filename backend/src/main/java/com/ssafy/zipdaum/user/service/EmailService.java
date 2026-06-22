@@ -23,7 +23,7 @@ public class EmailService {
     private final RedisUtil redisUtil;
     private final UserMapper userMapper;
 
-    @Value("${MAIL_USERNAME}")
+    @Value("${spring.mail.username}")
     private String configEmail;
 
 
