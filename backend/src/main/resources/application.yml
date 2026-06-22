@@ -57,6 +57,12 @@ property:
     read-timeout: ${PUBLIC_DATA_READ_TIMEOUT:30s}
   kakao:
     rest-api-key: ${KAKAO_REST_API_KEY:}
+  ai:
+    gms-url: ${GMS_OPENAI_URL:https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions}
+    model: ${GMS_OPENAI_MODEL:gpt-5.5}
+    api-key: ${GMS_KEY:}
+    connect-timeout: ${GMS_CONNECT_TIMEOUT:5s}
+    read-timeout: ${GMS_READ_TIMEOUT:180s}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -64,5 +70,5 @@ jwt:
 
 app:
   cors:
-    allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,https://zipdaum.vercel.app}
+    allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,https://zipdaum.vercel.app}
     allowed-origin-patterns: ${FRONTEND_ORIGIN_PATTERNS:https://*.vercel.app}

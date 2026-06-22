@@ -14,6 +14,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | 회원 | 회원 탈퇴 | DELETE | `/users/info` |
 | 실거래가 | 주택 실거래가 검색 | GET | `/properties` |
 | 사용자 맞춤 | 사용자 맞춤 주택 추천 목록 조회 | GET | `/properties/recommendations` |
+| 사용자 맞춤 | AI 주택 비교 | POST | `/properties/compare/ai` |
 | 실거래가 | 실거래가 저장 | POST | `/properties` |
 | 실거래가 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 실거래가 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
@@ -63,6 +64,7 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 | --- | --- | --- |
 | 주택 실거래가 검색 | GET | `/properties` |
 | 사용자 맞춤 주택 추천 목록 조회 | GET | `/properties/recommendations` |
+| AI 주택 비교 | POST | `/properties/compare/ai` |
 | 실거래가 저장 | POST | `/properties` |
 | 주택 상세 조회 | GET | `/properties/{propertyId}` |
 | 거래 이력 조회 | GET | `/properties/{propertyId}/histories` |
@@ -97,6 +99,52 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 - 상세 화면 행동 로그 가산점 반영 후 최종 `score`는 100점을 초과하지 않는다.
 - 사용자 맞춤 주택 추천 목록은 최종 `score`가 높은 순서로 정렬한다.
 - 주택 맞춤 조건 적합도 조회는 평가 가능한 맞춤 조건이 없으면 상세 화면 행동 로그를 반영하지 않고 `NO_EVALUABLE_CONDITION`을 반환한다.
+
+### AI 주택 비교
+
+로그인한 사용자가 선택한 두 주택의 상세 정보, 거래 이력, 주변시설, 맞춤 적합도, 사용자 맞춤 조건, 최근 본 주택, 관심 주택 정보를 기반으로 AI 비교 결과를 생성한다.
+
+요청 예시:
+
+```json
+{
+  "propertyIds": [1, 2],
+  "selectedDealType": "SALE",
+  "comparisonPurpose": "실거주 관점의 주택 비교"
+}
+```
+
+- `propertyIds`는 서로 다른 주택 ID 2개를 전달한다.
+- `selectedDealType`은 `SALE`, `JEONSE`, `MONTHLY_RENT`, `UNKNOWN` 중 하나이다.
+- 외부 AI API 키는 서버 환경 변수 `GMS_KEY`로 관리한다.
+
+응답 예시:
+
+```json
+{
+  "oneLineSummary": "A는 예산과 병원 접근성이 좋고, B는 가격은 낮지만 선호 시설 근거가 부족합니다.",
+  "recommendedProperty": "A",
+  "recommendationReason": "사용자 선호 조건과 주변시설 정보를 함께 보면 A가 더 안정적인 선택입니다.",
+  "comparisonTable": [
+    {
+      "criterion": "맞춤 적합도",
+      "propertyA": "예산 적합, 병원 가까움",
+      "propertyB": "가격은 좋지만 선호 시설 부족",
+      "better": "A",
+      "reason": "A가 사용자 선호 조건을 더 많이 충족합니다."
+    }
+  ],
+  "propertyAPros": ["예산 조건에 적합합니다."],
+  "propertyACons": ["제공된 정보 기준 단점은 제한적입니다."],
+  "propertyBPros": ["가격 부담이 상대적으로 낮습니다."],
+  "propertyBCons": ["선호 시설 충족 근거가 부족합니다."],
+  "cautions": ["AI 비교는 제공된 데이터만 기준으로 하며 실제 계약 전 추가 확인이 필요합니다."],
+  "recommendedFor": {
+    "propertyA": "선호 조건 충족도를 중요하게 보는 사용자",
+    "propertyB": "가격 부담을 우선으로 보는 사용자"
+  }
+}
+```
 
 ## 사용자 맞춤
 
