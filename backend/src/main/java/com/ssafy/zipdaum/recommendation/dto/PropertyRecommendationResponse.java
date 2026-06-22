@@ -1,0 +1,30 @@
+package com.ssafy.zipdaum.recommendation.dto;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
+public class PropertyRecommendationResponse {
+
+  private Long id;
+  private String propertyType;
+  private String name;
+  private String sggCd;
+  private String umdNm;
+  private String jibun;
+  private Integer buildYear;
+  private BigDecimal latitude;
+  private BigDecimal longitude;
+  private Long latestSalePrice;
+  private Long latestDeposit;
+  private Long latestMonthlyRent;
+  private Long latestMonthlyRentDeposit;
+  private Long latestDealPrice;
+  private LocalDate latestDealDate;
+  private BigDecimal exclusiveArea;
+  private RecommendationStatus recommendationStatus;
+  private Integer score;
+}

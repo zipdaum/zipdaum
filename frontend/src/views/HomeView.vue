@@ -1,12 +1,20 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
   getPropertyDetail as fetchPropertyDetail,
+  getPropertyRecommendations as fetchPropertyRecommendations,
+  getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
+  savePropertyInteraction,
+  savePropertyInteractionKeepalive,
   searchProperties,
 } from "../api/property";
+import { isLoggedIn } from "../stores/auth";
+
+const router = useRouter();
 
 const dealTypes = [
   { label: "전체", value: "" },
@@ -77,6 +85,21 @@ const facilityTypeLabels = {
   PARK: "공원",
 };
 
+const preferenceTypeLabels = {
+  SALE_PRICE: "매매 예산",
+  DEPOSIT: "전월세 보증금",
+  MONTHLY_RENT: "월세",
+  AREA: "면적",
+  BUILD_YEAR: "건축연도",
+  REGION: "선호 지역",
+  BUS: "버스",
+  SUBWAY: "지하철역",
+  HOSPITAL: "병원",
+  CCTV: "CCTV",
+  PARK: "공원",
+  RECENT_PROPERTY: "최근 본 주택",
+};
+
 const searchForm = ref({
   sggCd: "26350",
   umdNm: "",
@@ -88,11 +111,15 @@ const searchForm = ref({
 });
 
 const currentView = ref("home");
+const homeResultTab = ref("search");
 const searchResults = ref([]);
+const recommendationResults = ref([]);
 const hasSearched = ref(false);
 const isLoading = ref(false);
+const isRecommendationListLoading = ref(false);
 const isResultHighlighted = ref(false);
 const errorMessage = ref("");
+const recommendationListErrorMessage = ref("");
 const isDetailLoading = ref(false);
 const detailErrorMessage = ref("");
 const isSaleHistoryLoading = ref(false);
@@ -105,6 +132,10 @@ const activeRentHistoryType = ref("JEONSE");
 const surroundings = ref(null);
 const isSurroundingsLoading = ref(false);
 const surroundingsErrorMessage = ref("");
+const recommendationScore = ref(null);
+const isRecommendationScoreLoading = ref(false);
+const recommendationScoreErrorMessage = ref("");
+const detailInteraction = ref(null);
 const mapZoom = ref(1);
 const mapPan = ref({ x: 0, y: 0 });
 const isMapDragging = ref(false);
@@ -159,62 +190,50 @@ function createEmptyRentMetaByType() {
 }
 
 onMounted(async () => {
-  await restoreViewFromUrl();
+  await Promise.all([restoreViewFromUrl(), loadPropertyRecommendations()]);
+  window.addEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.addEventListener("popstate", handleBrowserBack);
 });
 
+watch(isLoggedIn, (loggedIn) => {
+  if (loggedIn) {
+    loadPropertyRecommendations();
+    return;
+  }
+
+  recommendationResults.value = [];
+  recommendationListErrorMessage.value = "";
+});
+
 onUnmounted(() => {
+  saveDetailInteraction();
   clearResultHighlightTimer();
   stopMapDrag();
+  window.removeEventListener("scroll", updateDetailScrollDepth);
+  window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.removeEventListener("popstate", handleBrowserBack);
 });
 
-const userSummary = [
-  { label: "예산", value: "3억 - 5억" },
-  { label: "전용면적", value: "50㎡ - 84㎡" },
-  { label: "거래유형", value: "매매, 전세" },
-  { label: "생활편의", value: "교통, 학교" },
+const homeResultTabs = [
+  { label: "실거래가 결과", value: "search" },
+  { label: "맞춤 추천", value: "recommendation" },
 ];
 
-const recommendedHomes = [
-  {
-    rank: 1,
-    name: "해운대 아이파크",
-    region: "해운대구 우동",
-    price: "12.8억원",
-    detail: "매매 기준",
-  },
-  {
-    rank: 2,
-    name: "삼익비치",
-    region: "수영구 남천동",
-    price: "9.6억원",
-    detail: "매매 기준",
-  },
-  {
-    rank: 3,
-    name: "대연 힐스테이트푸르지오",
-    region: "남구 대연동",
-    price: "6.4억원",
-    detail: "매매 기준",
-  },
-];
-
-const recentDeals = [
-  { name: "해운대 아이파크", price: "12.8억원", date: "2024.05.20" },
-  { name: "삼익비치", price: "9.6억원", date: "2024.05.19" },
-  { name: "동래 래미안 아이파크", price: "7.2억원", date: "2024.05.18" },
-];
-
-const regionTrends = [
-  { name: "해운대구", change: "+0.8%" },
-  { name: "수영구", change: "+1.2%" },
-  { name: "동래구", change: "-0.4%" },
-];
+const recommendationCards = computed(() =>
+  sortRecommendationsByScore(recommendationResults.value).map(
+    mapRecommendationToHomeCard,
+  ),
+);
+const displayedRecommendationCards = computed(() =>
+  recommendationCards.value.slice(0, 5),
+);
+const hasMoreRecommendations = computed(
+  () => recommendationCards.value.length > displayedRecommendationCards.value.length,
+);
 
 const displayedHomes = computed(() => {
   if (!hasSearched.value) {
-    return recommendedHomes;
+    return [];
   }
 
   return searchResults.value.slice(0, 5).map(mapPropertyToHomeCard);
@@ -245,6 +264,53 @@ function mapPropertyToHomeCard(property, index) {
   };
 }
 
+function mapRecommendationToHomeCard(property, index) {
+  return {
+    ...mapPropertyToHomeCard(property, index),
+    score: property.score,
+    status: property.recommendationStatus,
+  };
+}
+
+function sortRecommendationsByScore(properties) {
+  return [...properties].sort((left, right) => {
+    const scoreCompared =
+      getComparableRecommendationScore(right) -
+      getComparableRecommendationScore(left);
+
+    if (scoreCompared !== 0) {
+      return scoreCompared;
+    }
+
+    return Number(right.id || 0) - Number(left.id || 0);
+  });
+}
+
+function getComparableRecommendationScore(property) {
+  return Number.isFinite(Number(property.score)) ? Number(property.score) : 0;
+}
+
+async function loadPropertyRecommendations() {
+  if (!isLoggedIn.value) {
+    recommendationResults.value = [];
+    recommendationListErrorMessage.value = "";
+    return;
+  }
+
+  isRecommendationListLoading.value = true;
+  recommendationListErrorMessage.value = "";
+
+  try {
+    recommendationResults.value = await fetchPropertyRecommendations();
+  } catch (error) {
+    recommendationResults.value = [];
+    recommendationListErrorMessage.value =
+      "맞춤 추천 주택 목록을 불러오지 못했습니다.";
+  } finally {
+    isRecommendationListLoading.value = false;
+  }
+}
+
 const resultCountText = computed(() => {
   if (isLoading.value) {
     return "검색 중";
@@ -258,20 +324,16 @@ const resultCountText = computed(() => {
     return "0건";
   }
 
-  return "추천";
+  return "검색 전";
 });
 
 const resultTitle = computed(() => {
-  if (hasSearched.value) {
-    return "실거래가 검색 결과";
-  }
-
-  return "부산 추천 지역 TOP 3";
+  return "실거래가 검색 결과";
 });
 
 const resultNotice = computed(() => {
   if (!hasSearched.value) {
-    return "검색 조건을 입력하면 이 영역이 실거래가 결과로 바뀝니다.";
+    return "검색 조건을 입력하면 실거래가 결과가 표시됩니다.";
   }
 
   if (isLoading.value) {
@@ -294,6 +356,7 @@ function selectDealType(dealType) {
 }
 
 async function handleSearch() {
+  homeResultTab.value = "search";
   searchForm.value.sortIndex = 0;
   await runSearch();
 }
@@ -347,11 +410,29 @@ async function handleSortChange() {
 }
 
 function openResultsView() {
+  saveDetailInteraction();
+  window.history.pushState(
+    { view: "results" },
+    "",
+    getViewUrl("results"),
+  );
   currentView.value = "results";
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function openRecommendationResultsView() {
+  saveDetailInteraction();
+  window.history.pushState(
+    { view: "recommendations" },
+    "",
+    getViewUrl("recommendations"),
+  );
+  currentView.value = "recommendations";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function openHomeView({ updateHistory = true } = {}) {
+  saveDetailInteraction();
   if (updateHistory) {
     window.history.pushState({ view: "home" }, "", getViewUrl("home"));
   }
@@ -384,6 +465,13 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
     return;
   }
 
+  if (
+    detailInteraction.value &&
+    (detailInteraction.value.propertyId !== normalizedPropertyId || view !== "detail")
+  ) {
+    saveDetailInteraction();
+  }
+
   currentView.value = view;
   if (
     !selectedPropertyDetail.value ||
@@ -398,11 +486,16 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   activeRentHistoryType.value = "JEONSE";
   surroundings.value = null;
   surroundingsErrorMessage.value = "";
+  recommendationScore.value = null;
+  recommendationScoreErrorMessage.value = "";
   resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
   hoveredTrendDot.value = null;
   window.scrollTo({ top: 0, behavior: "smooth" });
+  if (view === "detail") {
+    startDetailInteraction(normalizedPropertyId);
+  }
 
   try {
     if (
@@ -410,7 +503,10 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       selectedPropertyDetail.value.id !== normalizedPropertyId
     ) {
       const detail = await fetchPropertyDetail(normalizedPropertyId);
-      selectedPropertyDetail.value = createPropertyDetailState(detail);
+      selectedPropertyDetail.value = createPropertyDetailState(
+        detail,
+        normalizedPropertyId,
+      );
     }
 
     isDetailLoading.value = false;
@@ -421,6 +517,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
         rentDealType: "JEONSE",
       }),
       loadSurroundings(selectedPropertyDetail.value),
+      loadRecommendationScore(normalizedPropertyId),
     ]);
 
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
@@ -447,15 +544,90 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   }
 }
 
-function createPropertyDetailState(detail) {
+function createPropertyDetailState(detail, propertyId) {
   return {
     ...detail,
+    id: normalizePropertyId(detail?.id) || propertyId,
     saleDeals: [],
     rentDeals: [],
     rentDealsByType: createEmptyRentDealsByType(),
     rentMetaByType: createEmptyRentMetaByType(),
     ...emptyHistoryMeta,
   };
+}
+
+async function loadRecommendationScore(propertyId) {
+  recommendationScore.value = null;
+  recommendationScoreErrorMessage.value = "";
+
+  if (!isLoggedIn.value) {
+    return;
+  }
+
+  isRecommendationScoreLoading.value = true;
+
+  try {
+    recommendationScore.value = await fetchPropertyRecommendationScore(
+      propertyId,
+    );
+  } catch (error) {
+    const status = error.response?.status;
+    recommendationScoreErrorMessage.value =
+      status === 404
+        ? "등록된 맞춤 조건이 없어 적합도를 계산하지 못했습니다."
+        : "맞춤 적합도 정보를 불러오지 못했습니다.";
+  } finally {
+    isRecommendationScoreLoading.value = false;
+  }
+}
+
+function goToLoginForRecommendation() {
+  router.push({
+    name: "login",
+    query: {
+      redirect: `${window.location.pathname}${window.location.search}`,
+      reason: "login-required",
+    },
+  });
+}
+
+async function openRecommendationScoreDetail() {
+  const propertyId = getActiveDetailPropertyId();
+
+  if (!propertyId) {
+    return;
+  }
+
+  markRecommendationDetailClicked();
+  saveDetailInteraction();
+  const target = {
+    name: "property-recommendation-score",
+    params: {
+      propertyId,
+    },
+  };
+  const targetUrl = router.resolve(target).href;
+
+  try {
+    await router.push(target);
+  } catch (error) {
+    window.location.assign(targetUrl);
+    return;
+  }
+
+  if (!window.location.pathname.startsWith("/recommendation-score/properties/")) {
+    window.location.assign(targetUrl);
+  }
+}
+
+function getActiveDetailPropertyId() {
+  return (
+    normalizePropertyId(selectedPropertyDetail.value?.id) ||
+    normalizePropertyId(detailInteraction.value?.propertyId) ||
+    normalizePropertyId(
+      new URLSearchParams(window.location.search).get("propertyId"),
+    )
+  );
 }
 
 async function loadHistories(propertyId, options = {}) {
@@ -643,6 +815,8 @@ async function openDealHistoryView() {
     return;
   }
 
+  markDealHistoryClicked();
+  saveDetailInteraction();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
   activeRentHistoryType.value =
@@ -676,17 +850,23 @@ async function handleBrowserBack(event) {
     return;
   }
 
+  if (route.view === "results") {
+    await loadRegionSearchView(route);
+    return;
+  }
+
+  if (route.view === "recommendations") {
+    await loadRecommendationResultsView();
+    return;
+  }
+
   openHomeView({ updateHistory: false });
 }
 
 async function restoreViewFromUrl() {
   const route = getCurrentRoute();
 
-  window.history.replaceState(
-    route,
-    "",
-    getViewUrl(route.view, route.propertyId),
-  );
+  window.history.replaceState(route, "", getRouteUrl(route));
 
   if (route.view === "deal-history") {
     await loadPropertyDetailView(route.propertyId, "deal-history");
@@ -698,6 +878,16 @@ async function restoreViewFromUrl() {
     return;
   }
 
+  if (route.view === "results") {
+    await loadRegionSearchView(route);
+    return;
+  }
+
+  if (route.view === "recommendations") {
+    await loadRecommendationResultsView();
+    return;
+  }
+
   openHomeView({ updateHistory: false });
 }
 
@@ -705,12 +895,39 @@ function getCurrentRoute() {
   const params = new URLSearchParams(window.location.search);
   const view = params.get("view");
   const propertyId = normalizePropertyId(params.get("propertyId"));
+  const sggCd = normalizeTextParam(params.get("sggCd"));
+  const umdNm = normalizeTextParam(params.get("umdNm"));
 
   if ((view === "detail" || view === "deal-history") && propertyId) {
     return { view, propertyId };
   }
 
+  if (view === "results" && (sggCd || umdNm)) {
+    return { view, sggCd, umdNm };
+  }
+
+  if (view === "recommendations") {
+    return { view };
+  }
+
   return { view: "home" };
+}
+
+function getRouteUrl(route) {
+  if (route.view === "results") {
+    const params = new URLSearchParams({ view: "results" });
+
+    if (route.sggCd) {
+      params.set("sggCd", route.sggCd);
+    }
+    if (route.umdNm) {
+      params.set("umdNm", route.umdNm);
+    }
+
+    return `${window.location.pathname}?${params.toString()}`;
+  }
+
+  return getViewUrl(route.view, route.propertyId);
 }
 
 function getViewUrl(view, propertyId) {
@@ -722,12 +939,140 @@ function getViewUrl(view, propertyId) {
     return `${window.location.pathname}?${params.toString()}`;
   }
 
+  if (view === "recommendations") {
+    return `${window.location.pathname}?view=recommendations`;
+  }
+
   return window.location.pathname;
 }
 
 function normalizePropertyId(propertyId) {
   const normalized = Number(propertyId);
   return Number.isInteger(normalized) && normalized > 0 ? normalized : null;
+}
+
+function normalizeTextParam(value) {
+  return value?.trim() || "";
+}
+
+async function loadRegionSearchView(route) {
+  saveDetailInteraction();
+  currentView.value = "results";
+  selectedPropertyDetail.value = null;
+  detailErrorMessage.value = "";
+  historiesErrorMessage.value = "";
+  searchForm.value = {
+    ...searchForm.value,
+    sggCd: route.sggCd || searchForm.value.sggCd,
+    umdNm: route.umdNm || "",
+    name: "",
+    propertyType: "",
+    dealType: "",
+    priceRangeIndex: 0,
+    sortIndex: 0,
+  };
+  await runSearch();
+}
+
+async function loadRecommendationResultsView() {
+  saveDetailInteraction();
+  currentView.value = "recommendations";
+  selectedPropertyDetail.value = null;
+  detailErrorMessage.value = "";
+  historiesErrorMessage.value = "";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  await loadPropertyRecommendations();
+}
+
+function startDetailInteraction(propertyId) {
+  if (!isLoggedIn.value) {
+    return;
+  }
+
+  if (detailInteraction.value?.propertyId === propertyId) {
+    updateDetailScrollDepth();
+    return;
+  }
+
+  detailInteraction.value = {
+    propertyId,
+    startedAt: Date.now(),
+    maxScrollDepthPercent: 0,
+    recommendationDetailClicked: false,
+    dealHistoryClicked: false,
+  };
+  updateDetailScrollDepth();
+  window.addEventListener("scroll", updateDetailScrollDepth, { passive: true });
+}
+
+function saveDetailInteraction() {
+  const interaction = consumeDetailInteraction();
+  if (!interaction) {
+    return;
+  }
+
+  savePropertyInteraction(interaction.propertyId, interaction.payload).catch(() => {});
+}
+
+function saveDetailInteractionOnPageHide() {
+  const interaction = consumeDetailInteraction();
+  if (!interaction) {
+    return;
+  }
+
+  savePropertyInteractionKeepalive(interaction.propertyId, interaction.payload);
+}
+
+function consumeDetailInteraction() {
+  if (!detailInteraction.value || !isLoggedIn.value) {
+    detailInteraction.value = null;
+    window.removeEventListener("scroll", updateDetailScrollDepth);
+    return null;
+  }
+
+  updateDetailScrollDepth();
+  const interaction = detailInteraction.value;
+  detailInteraction.value = null;
+  window.removeEventListener("scroll", updateDetailScrollDepth);
+
+  return {
+    propertyId: interaction.propertyId,
+    payload: {
+      dwellTimeMillis: Math.max(Date.now() - interaction.startedAt, 0),
+      maxScrollDepthPercent: interaction.maxScrollDepthPercent,
+      recommendationDetailClicked: interaction.recommendationDetailClicked,
+      dealHistoryClicked: interaction.dealHistoryClicked,
+    },
+  };
+}
+
+function updateDetailScrollDepth() {
+  if (!detailInteraction.value) {
+    return;
+  }
+
+  const scrollableHeight =
+    document.documentElement.scrollHeight - window.innerHeight;
+  const depth =
+    scrollableHeight <= 0
+      ? 100
+      : Math.round((window.scrollY / scrollableHeight) * 100);
+  detailInteraction.value.maxScrollDepthPercent = Math.min(
+    Math.max(detailInteraction.value.maxScrollDepthPercent, depth),
+    100,
+  );
+}
+
+function markRecommendationDetailClicked() {
+  if (detailInteraction.value) {
+    detailInteraction.value.recommendationDetailClicked = true;
+  }
+}
+
+function markDealHistoryClicked() {
+  if (detailInteraction.value) {
+    detailInteraction.value.dealHistoryClicked = true;
+  }
 }
 
 function sortProperties(properties, selectedSort) {
@@ -830,6 +1175,157 @@ function getPropertyDetail(property) {
   const buildYear = getBuildYearLabel(property.buildYear);
 
   return `${type} · ${buildYear}`;
+}
+
+function getRecommendationScoreValue() {
+  return recommendationScore.value?.score ?? 0;
+}
+
+function getRecommendationScoreStyle() {
+  return {
+    "--score-progress": `${Math.min(
+      Math.max(getRecommendationScoreValue(), 0),
+      100,
+    )}%`,
+  };
+}
+
+function getRecommendationScoreLevelClass(score = recommendationScore.value?.score) {
+  if (score === null || score === undefined) {
+    return "score-muted";
+  }
+
+  if (score >= 85) {
+    return "score-excellent";
+  }
+
+  if (score >= 70) {
+    return "score-good";
+  }
+
+  if (score >= 40) {
+    return "score-partial";
+  }
+
+  return "score-low";
+}
+
+function getRecommendationScoreLabel(score) {
+  if (score === null || score === undefined) {
+    return "평가 불가";
+  }
+
+  return `${score}점`;
+}
+
+function getRecommendationConditions() {
+  return sortConditionsByPriority(recommendationScore.value?.conditions || []);
+}
+
+function getVisibleRecommendationConditions() {
+  const conditions = getRecommendationConditions();
+  return conditions.slice(0, 4);
+}
+
+function sortConditionsByPriority(conditions) {
+  return [...conditions].sort((left, right) => {
+    const leftPriority = Number.isFinite(Number(left.priority))
+      ? Number(left.priority)
+      : Number.MAX_SAFE_INTEGER;
+    const rightPriority = Number.isFinite(Number(right.priority))
+      ? Number(right.priority)
+      : Number.MAX_SAFE_INTEGER;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return String(left.code || "").localeCompare(String(right.code || ""));
+  });
+}
+
+function getPreferenceTypeLabel(code) {
+  return preferenceTypeLabels[code] || code || "조건";
+}
+
+function getRecommendationConditionTitle(condition) {
+  return condition.name || getPreferenceTypeLabel(condition.code);
+}
+
+function getConditionStatusIcon(condition) {
+  if (condition.score >= 100) {
+    return "✓";
+  }
+
+  if (condition.score >= 70) {
+    return "?";
+  }
+
+  return "!";
+}
+
+function getConditionStatusClass(condition) {
+  if (condition.score >= 100) {
+    return "fit";
+  }
+
+  if (condition.score >= 70) {
+    return "uncertain";
+  }
+
+  return "unfit";
+}
+
+function getConditionValueLabel(condition) {
+  const label = formatPreferenceValue(condition);
+  return label ? `(${label})` : "";
+}
+
+function formatPreferenceValue(condition) {
+  const value = condition.value;
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  switch (condition.code) {
+    case "SALE_PRICE":
+    case "DEPOSIT":
+      return `${formatStoredMoneyValue(value)} 이하`;
+    case "MONTHLY_RENT":
+      return `${formatMonthlyRentValue(value)} 이하`;
+    case "AREA":
+      return `${Number(value).toLocaleString()}㎡ 이상`;
+    case "BUILD_YEAR":
+      return `${value}년 이후`;
+    case "BUS":
+    case "SUBWAY":
+    case "HOSPITAL":
+    case "CCTV":
+    case "PARK":
+      return value === "true" ? "필요" : "제외";
+    default:
+      return value;
+  }
+}
+
+function formatStoredMoneyValue(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return value;
+  }
+
+  const priceInManwon = amount >= 1000000 ? amount / 10000 : amount;
+  return formatPrice(priceInManwon);
+}
+
+function formatMonthlyRentValue(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return value;
+  }
+
+  const rentInManwon = amount >= 10000 ? amount / 10000 : amount;
+  return `${rentInManwon.toLocaleString()}만원`;
 }
 
 function getPropertyAddress(property) {
@@ -1590,46 +2086,35 @@ function formatPrice(price) {
         </p>
       </form>
 
-      <section class="summary-card" aria-labelledby="summary-title">
-        <div class="section-heading">
-          <p>내 맞춤 요약</p>
-          <h2 id="summary-title">
-            설정한 조건에 가까운 거래를 우선 확인하세요
-          </h2>
-        </div>
-        <div class="summary-list">
-          <article
-            v-for="item in userSummary"
-            :key="item.label"
-            class="summary-item"
-          >
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-          </article>
-        </div>
-      </section>
-
       <section class="content-grid">
         <article
           ref="resultPanel"
           :class="[
             'panel',
-            'recommend-panel',
+            'tabbed-result-panel',
             { 'searched-panel': isResultHighlighted },
           ]"
         >
-          <div class="panel-title-row">
+          <div class="panel-title-row tabbed-title-row">
             <div>
-              <p class="result-kicker">
-                {{ hasSearched ? "Search Result" : "Recommendation" }}
-              </p>
-              <h2>{{ resultTitle }}</h2>
+              <h2>
+                {{
+                  homeResultTab === "recommendation"
+                    ? "맞춤 추천 결과"
+                    : resultTitle
+                }}
+              </h2>
             </div>
-            <div class="panel-actions">
-              <span>{{ resultCountText }}</span>
+            <div
+              v-if="homeResultTab === 'search'"
+              class="panel-actions"
+              :class="{ 'is-placeholder': !hasSearched }"
+            >
+              <span v-if="hasSearched">{{ resultCountText }}</span>
+              <span v-else aria-hidden="true">0건</span>
               <label
-                v-if="hasSearched"
                 class="sort-control compact-sort-control"
+                :class="{ 'is-hidden': !hasSearched }"
               >
                 <span>정렬</span>
                 <select
@@ -1646,106 +2131,185 @@ function formatPrice(price) {
                 </select>
               </label>
             </div>
-          </div>
-
-          <div
-            :class="[
-              'result-notice',
-              { 'is-searched': hasSearched, 'is-error': errorMessage },
-            ]"
-          >
-            <strong>{{ resultNotice }}</strong>
-            <div
-              v-if="appliedSearchSummary.length > 0"
-              class="condition-chips"
-              aria-label="적용된 검색 조건"
-            >
-              <span
-                v-for="condition in appliedSearchSummary"
-                :key="condition"
-                >{{ condition }}</span
+            <div v-else class="panel-actions">
+              <span v-if="isLoggedIn">
+                {{ recommendationCards.length.toLocaleString() }}건
+              </span>
+              <label class="sort-control compact-sort-control">
+                <span>정렬</span>
+                <select aria-label="맞춤 추천 정렬" disabled>
+                  <option>추천순</option>
+                </select>
+              </label>
+            </div>
+            <div class="home-result-tabs" role="tablist" aria-label="홈 결과 유형">
+              <button
+                v-for="tab in homeResultTabs"
+                :key="tab.value"
+                type="button"
+                role="tab"
+                :aria-selected="homeResultTab === tab.value"
+                :class="{ active: homeResultTab === tab.value }"
+                @click="homeResultTab = tab.value"
               >
+                {{ tab.label }}
+              </button>
             </div>
           </div>
 
-          <p
-            v-if="hasSearched && displayedHomes.length === 0"
-            class="empty-message"
-          >
-            조건에 맞는 실거래가 검색 결과가 없습니다.
-          </p>
+          <template v-if="homeResultTab === 'recommendation'">
+            <div v-if="!isLoggedIn" class="recommendation-login-panel">
+              <strong>로그인하면 맞춤 추천 주택을 확인할 수 있습니다.</strong>
+              <p>
+                저장한 예산, 면적, 지역, 주변시설 조건을 기준으로 어울리는
+                주택을 추천해드립니다.
+              </p>
+              <button
+                type="button"
+                class="secondary-button"
+                @click="goToLoginForRecommendation"
+              >
+                로그인하러가기
+              </button>
+            </div>
 
-          <div v-else class="recommend-list">
+            <p
+              v-else-if="isRecommendationListLoading"
+              class="empty-message compact-empty-message"
+            >
+              맞춤 추천 주택을 불러오고 있습니다.
+            </p>
+
+            <p
+              v-else-if="recommendationListErrorMessage"
+              class="form-message"
+              role="alert"
+            >
+              {{ recommendationListErrorMessage }}
+            </p>
+
+            <p
+              v-else-if="recommendationCards.length === 0"
+              class="empty-message compact-empty-message"
+            >
+              아직 추천할 주택이 없습니다. 맞춤 조건을 저장하거나 주택을 더
+              둘러보세요.
+            </p>
+
+            <ul v-else class="personalized-list">
+              <li
+                v-for="item in displayedRecommendationCards"
+                :key="item.id || `${item.rank}-${item.name}`"
+              >
+                <button
+                  :class="[
+                    'personalized-item',
+                    'property-card-button',
+                    { 'is-clickable': item.id },
+                  ]"
+                  type="button"
+                  :disabled="!item.id"
+                  @click="openPropertyDetail(item.id)"
+                >
+                  <div class="home-image personalized-image" aria-hidden="true">
+                    <span>{{ item.rank }}</span>
+                  </div>
+                  <div class="personalized-info">
+                    <h3>{{ item.name }}</h3>
+                    <p>{{ item.region }}</p>
+                    <strong>{{ item.price }}</strong>
+                  </div>
+                  <div class="personalized-meta">
+                    <span
+                      :class="[
+                        'score-pill',
+                        getRecommendationScoreLevelClass(item.score),
+                      ]"
+                    >
+                      {{ getRecommendationScoreLabel(item.score) }}
+                    </span>
+                    <em>{{ item.detail }}</em>
+                  </div>
+                </button>
+              </li>
+            </ul>
+
             <button
-              v-for="home in displayedHomes"
-              :key="`${home.rank}-${home.name}`"
-              :class="[
-                'home-card',
-                'property-card-button',
-                { 'is-clickable': home.id },
-              ]"
+              v-if="hasMoreRecommendations"
+              class="secondary-button full-result-button"
               type="button"
-              :disabled="!home.id"
-              @click="openPropertyDetail(home.id)"
+              @click="openRecommendationResultsView"
             >
-              <div class="home-image" aria-hidden="true">
-                <span>{{ home.rank }}</span>
-              </div>
-              <div>
-                <h3>{{ home.name }}</h3>
-                <p>{{ home.region }}</p>
-                <strong>{{ home.price }}</strong>
-              </div>
-              <em>{{ home.detail }}</em>
+              전체 결과 보기
             </button>
-          </div>
+          </template>
 
-          <button
-            v-if="hasMoreResults"
-            class="secondary-button full-result-button"
-            type="button"
-            @click="openResultsView"
-          >
-            전체 결과 보기
-          </button>
-        </article>
-
-        <article class="panel">
-          <div class="panel-title-row">
-            <h2>최근 실거래 하이라이트</h2>
-            <a href="#">전체 보기</a>
-          </div>
-
-          <ul class="deal-list">
-            <li v-for="deal in recentDeals" :key="deal.name">
-              <div>
-                <strong>{{ deal.name }}</strong>
-                <span>{{ deal.date }}</span>
-              </div>
-              <p>{{ deal.price }}</p>
-            </li>
-          </ul>
-        </article>
-
-        <article class="panel">
-          <div class="panel-title-row">
-            <h2>관심지역 동향</h2>
-            <a href="#">상세 보기</a>
-          </div>
-
-          <div class="trend-list">
-            <article
-              v-for="trend in regionTrends"
-              :key="trend.name"
-              class="trend-item"
+          <template v-else>
+            <div
+              v-if="hasSearched"
+              :class="[
+                'result-notice',
+                { 'is-searched': hasSearched, 'is-error': errorMessage },
+              ]"
             >
-              <div>
-                <strong>{{ trend.name }}</strong>
-                <span class="spark-line" aria-hidden="true"></span>
+              <strong>{{ resultNotice }}</strong>
+              <div
+                v-if="appliedSearchSummary.length > 0"
+                class="condition-chips"
+                aria-label="적용된 검색 조건"
+              >
+                <span
+                  v-for="condition in appliedSearchSummary"
+                  :key="condition"
+                  >{{ condition }}</span
+                >
               </div>
-              <p>{{ trend.change }}</p>
-            </article>
-          </div>
+            </div>
+
+            <p
+              v-if="hasSearched && displayedHomes.length === 0"
+              class="empty-message"
+            >
+              조건에 맞는 실거래가 검색 결과가 없습니다.
+            </p>
+            <p v-else-if="!hasSearched" class="empty-message compact-empty-message">
+              검색 조건을 선택하고 검색하면 실거래가 결과가 표시됩니다.
+            </p>
+
+            <div v-else class="recommend-list">
+              <button
+                v-for="home in displayedHomes"
+                :key="`${home.rank}-${home.name}`"
+                :class="[
+                  'home-card',
+                  'property-card-button',
+                  { 'is-clickable': home.id },
+                ]"
+                type="button"
+                :disabled="!home.id"
+                @click="openPropertyDetail(home.id)"
+              >
+                <div class="home-image" aria-hidden="true">
+                  <span>{{ home.rank }}</span>
+                </div>
+                <div>
+                  <h3>{{ home.name }}</h3>
+                  <p>{{ home.region }}</p>
+                  <strong>{{ home.price }}</strong>
+                </div>
+                <em>{{ home.detail }}</em>
+              </button>
+            </div>
+
+            <button
+              v-if="hasMoreResults"
+              class="secondary-button full-result-button"
+              type="button"
+              @click="openResultsView"
+            >
+              전체 결과 보기
+            </button>
+          </template>
         </article>
       </section>
     </template>
@@ -1825,6 +2389,99 @@ function formatPrice(price) {
       </div>
     </section>
 
+    <section
+      v-else-if="currentView === 'recommendations'"
+      class="result-page"
+      aria-labelledby="recommendation-result-title"
+    >
+      <div class="result-page-header">
+        <div>
+          <p class="result-kicker">Personalized Recommendations</p>
+          <h1 id="recommendation-result-title">맞춤 추천 전체 결과</h1>
+          <p>
+            저장한 맞춤 조건과 최근 확인한 주택을 반영한 추천 목록입니다.
+          </p>
+        </div>
+        <button class="secondary-button" type="button" @click="openHomeView">
+          홈으로 돌아가기
+        </button>
+      </div>
+
+      <div class="result-toolbar">
+        <div class="condition-chips" aria-label="추천 결과 요약">
+          <span>{{ recommendationCards.length.toLocaleString() }}건</span>
+          <span>추천순</span>
+        </div>
+
+        <label class="sort-control">
+          <span>정렬</span>
+          <select aria-label="맞춤 추천 정렬" disabled>
+            <option>추천순</option>
+          </select>
+        </label>
+      </div>
+
+      <div v-if="!isLoggedIn" class="recommendation-login-panel">
+        <strong>로그인하면 맞춤 추천 주택을 확인할 수 있습니다.</strong>
+        <p>
+          저장한 예산, 면적, 지역, 주변시설 조건을 기준으로 어울리는 주택을
+          추천해드립니다.
+        </p>
+        <button
+          type="button"
+          class="secondary-button"
+          @click="goToLoginForRecommendation"
+        >
+          로그인하러가기
+        </button>
+      </div>
+
+      <p
+        v-else-if="isRecommendationListLoading"
+        class="empty-message compact-empty-message"
+      >
+        맞춤 추천 주택을 불러오고 있습니다.
+      </p>
+      <p
+        v-else-if="recommendationListErrorMessage"
+        class="form-message"
+        role="alert"
+      >
+        {{ recommendationListErrorMessage }}
+      </p>
+      <p v-else-if="recommendationCards.length === 0" class="empty-message">
+        아직 추천할 주택이 없습니다. 맞춤 조건을 저장하거나 주택을 더
+        둘러보세요.
+      </p>
+
+      <div v-else class="all-result-list">
+        <button
+          v-for="home in recommendationCards"
+          :key="home.id || `${home.rank}-${home.name}`"
+          class="result-row recommendation-result-row property-card-button is-clickable"
+          type="button"
+          @click="openPropertyDetail(home.id)"
+        >
+          <div class="home-image result-image" aria-hidden="true">
+            <span>{{ home.rank }}</span>
+          </div>
+          <div>
+            <h2>{{ home.name }}</h2>
+            <p>{{ home.region }}</p>
+          </div>
+          <div>
+            <span>추천 점수</span>
+            <strong>{{ getRecommendationScoreLabel(home.score) }}</strong>
+          </div>
+          <div>
+            <span>가격</span>
+            <strong>{{ home.price }}</strong>
+          </div>
+          <em>{{ home.detail }}</em>
+        </button>
+      </div>
+    </section>
+
     <section v-else class="detail-page" aria-labelledby="deal-detail-title">
       <div
         v-if="isDetailLoading || detailErrorMessage || !selectedPropertyDetail"
@@ -1887,18 +2544,92 @@ function formatPrice(price) {
               </div>
             </div>
 
-            <aside class="guest-fit-panel" aria-label="비회원 조건 적합도 안내">
-              <div class="panel-title-row">
+            <aside class="fit-score-panel" aria-label="사용자 맞춤 조건 적합도">
+              <div class="fit-score-title-row">
                 <h2>내 조건 적합도</h2>
+                <button
+                  v-if="isLoggedIn && recommendationScore"
+                  class="fit-detail-button"
+                  type="button"
+                  @click="openRecommendationScoreDetail"
+                >
+                  적합도 상세 보기
+                </button>
               </div>
-              <div class="fit-login-content">
+
+              <div v-if="!isLoggedIn" class="fit-login-content">
                 <p>
                   로그인하면 예산, 선호 지역, 생활 편의 조건을 기준으로 이
                   거래가 내 조건에 맞는지 확인할 수 있습니다.
                 </p>
-                <button class="secondary-button" type="button">
+                <button
+                  class="secondary-button"
+                  type="button"
+                  @click="goToLoginForRecommendation"
+                >
                   로그인하러가기
                 </button>
+              </div>
+
+              <p
+                v-else-if="isRecommendationScoreLoading"
+                class="compact-empty-message"
+              >
+                맞춤 적합도를 계산하고 있습니다.
+              </p>
+
+              <p
+                v-else-if="recommendationScoreErrorMessage"
+                class="form-message"
+                role="alert"
+              >
+                {{ recommendationScoreErrorMessage }}
+              </p>
+
+              <div v-else-if="recommendationScore" class="fit-score-content">
+                <div
+                  :class="[
+                    'fit-score-circle',
+                    getRecommendationScoreLevelClass(),
+                    {
+                      muted:
+                        recommendationScore.recommendationStatus ===
+                        'NO_EVALUABLE_CONDITION',
+                    },
+                  ]"
+                  :style="getRecommendationScoreStyle()"
+                >
+                  <strong>{{
+                    recommendationScore.score === null
+                      ? "-"
+                      : recommendationScore.score
+                  }}</strong>
+                  <span>점</span>
+                </div>
+
+                <ul
+                  v-if="getRecommendationConditions().length > 0"
+                  class="fit-condition-list"
+                >
+                  <li
+                    v-for="condition in getVisibleRecommendationConditions()"
+                    :key="`${condition.code}-${condition.priority}`"
+                    :class="getConditionStatusClass(condition)"
+                  >
+                    <span class="fit-condition-icon" aria-hidden="true">
+                      {{ getConditionStatusIcon(condition) }}
+                    </span>
+                    <div>
+                      <strong>{{
+                        getRecommendationConditionTitle(condition)
+                      }}</strong>
+                    </div>
+                    <small class="fit-condition-preference">{{
+                      getConditionValueLabel(condition)
+                    }}</small>
+                  </li>
+                </ul>
+
               </div>
             </aside>
           </section>

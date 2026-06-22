@@ -25,7 +25,7 @@ class UserPreferenceServiceImplTest {
   @Test
   void findPreferences_맞춤_조건을_조회한다() {
     UserPreferenceResponse preference = new UserPreferenceResponse();
-    preference.setCode("BUDGET");
+    preference.setCode("SALE_PRICE");
     given(userPreferenceMapper.selectUserPreferencesByUserId(1L)).willReturn(List.of(preference));
 
     List<UserPreferenceResponse> result = service.findPreferences(1L);
@@ -47,7 +47,9 @@ class UserPreferenceServiceImplTest {
   void savePreferences_입력된_조건을_등록한다() {
     UserPreferenceRequest request = new UserPreferenceRequest();
     request.setPreferences(List.of(
-        preference("BUDGET", "500000000", 3),
+        preference("SALE_PRICE", "500000000", 3),
+        preference("DEPOSIT", "300000000", 6),
+        preference("MONTHLY_RENT", "800000", 7),
         preference("AREA", "84.50", 2),
         preference("REGION", " 부산광역시 해운대구 우동 ", 1),
         preference("BUS", "true", 5),
@@ -55,13 +57,15 @@ class UserPreferenceServiceImplTest {
     ));
 
     given(userPreferenceMapper.selectPreferenceTypesByCodes(List.of(
-        "BUDGET", "AREA", "REGION", "BUS", "CCTV"
+        "SALE_PRICE", "DEPOSIT", "MONTHLY_RENT", "AREA", "REGION", "BUS", "CCTV"
     ))).willReturn(List.of(
-        preferenceType(1L, "BUDGET"),
-        preferenceType(2L, "AREA"),
-        preferenceType(4L, "REGION"),
-        preferenceType(5L, "BUS"),
-        preferenceType(8L, "CCTV")
+        preferenceType(1L, "SALE_PRICE"),
+        preferenceType(2L, "DEPOSIT"),
+        preferenceType(3L, "MONTHLY_RENT"),
+        preferenceType(4L, "AREA"),
+        preferenceType(5L, "REGION"),
+        preferenceType(6L, "BUS"),
+        preferenceType(9L, "CCTV")
     ));
 
     service.savePreferences(1L, request);
@@ -74,10 +78,18 @@ class UserPreferenceServiceImplTest {
         captor.capture());
     assertThat(captor.getValue())
         .extracting("preferenceValue")
-        .containsExactly("500000000", "84.5", "부산광역시 해운대구 우동", "true", "false");
+        .containsExactly(
+            "500000000",
+            "300000000",
+            "800000",
+            "84.5",
+            "부산광역시 해운대구 우동",
+            "true",
+            "false"
+        );
     assertThat(captor.getValue())
         .extracting("priority")
-        .containsExactly(3, 2, 1, 5, 4);
+        .containsExactly(3, 6, 7, 2, 1, 5, 4);
   }
 
   @Test
@@ -117,8 +129,8 @@ class UserPreferenceServiceImplTest {
   void savePreferences_중복된_조건이면_INVALID_INPUT_VALUE_예외가_발생한다() {
     UserPreferenceRequest request = new UserPreferenceRequest();
     request.setPreferences(List.of(
-        preference("BUDGET", "500000000", 1),
-        preference("BUDGET", "600000000", 2)
+        preference("SALE_PRICE", "500000000", 1),
+        preference("SALE_PRICE", "600000000", 2)
     ));
 
     assertThatThrownBy(() -> service.savePreferences(1L, request))

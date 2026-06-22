@@ -40,7 +40,7 @@ zipdaum
 
 Before starting any task, review the following documents:
 
-1. docs/requirements/requirements.md
+1. docs/requirements/기획서.md
 2. docs/erd.png
 3. docs/api-spec.md
 4. docs/ground-rule.md
@@ -104,7 +104,7 @@ When generating code, always follow these principles:
 * Do not generate unnecessary example code.
 * Avoid over-engineering and excessive abstraction.
 * Do not add features that are not part of the requirements.
-* Interpret table relationships based on `docs/erd.md`.
+* Interpret table relationships based on `docs/erd.png`.
 * Implement APIs according to `docs/api-spec.md`.
 * Analyze existing code before making changes.
 * Follow the existing coding style whenever possible.
