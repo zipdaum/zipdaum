@@ -10,6 +10,10 @@ spring:
     password: ${MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  batch:
+    jdbc:
+      initialize-schema: always
+
   # ===== Redis 설정 추가 =====
   data:
     redis:
@@ -51,3 +55,5 @@ property:
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
+
+
