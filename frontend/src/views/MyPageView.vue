@@ -265,7 +265,6 @@ async function requestAiComparison() {
   try {
     comparisonResult.value = await comparePropertiesByAi({
       propertyIds: selectedPropertyIds.value,
-      selectedDealType: "UNKNOWN",
       comparisonPurpose: "사용자 선호 조건과 최근 본 주택을 참고한 실거주 관점 비교",
     });
     await nextTick();
@@ -468,7 +467,7 @@ function mapSearchProperty(property) {
     latestSalePrice: property.latestSalePrice,
     latestDeposit: property.latestDeposit,
     latestMonthlyRent: property.latestMonthlyRent,
-    source: "주택검색",
+    source: "검색결과",
   };
 }
 
@@ -619,7 +618,7 @@ function formatDateTime(value) {
             </section>
 
             <section class="mypage-panel recent-panel" aria-labelledby="recent-title">
-              <div class="panel-title-row">
+              <div class="panel-title-row compare-result-title-row">
                 <div>
                   <h2 id="recent-title">최근 본 주택</h2>
                 </div>
@@ -662,11 +661,80 @@ function formatDateTime(value) {
           </template>
 
           <template v-else>
+            <section class="compare-source-grid" aria-label="비교할 주택 선택">
+              <article class="mypage-panel compare-list-panel favorite-compare-panel">
+                <div class="panel-title-row">
+                  <div>
+                    <h2>관심목록</h2>
+                  </div>
+                  <span>{{ favoriteProperties.length.toLocaleString() }}개</span>
+                </div>
+
+                <p v-if="isLoadingFavoriteProperties" class="empty-message">관심 주택을 불러오는 중입니다.</p>
+                <p v-else-if="favoriteProperties.length === 0" class="empty-message">관심목록에 담은 주택이 없습니다.</p>
+
+                <div v-else class="compare-property-list">
+                  <button
+                    v-for="property in favoriteProperties"
+                    :key="`favorite-${property.propertyId}`"
+                    type="button"
+                    class="compare-property-card"
+                    :class="{ selected: isComparisonSelected(property.propertyId) }"
+                    @click="toggleComparisonSelection(property)"
+                  >
+                    <span>{{ property.source }}</span>
+                    <strong>{{ property.name }}</strong>
+                    <em>{{ getPropertyTypeLabel(property.propertyType) }} · {{ getComparablePropertyAddress(property) }}</em>
+                    <small>{{ getComparablePropertyPrice(property) }}</small>
+                  </button>
+                </div>
+              </article>
+
+              <article class="mypage-panel compare-list-panel search-compare-panel">
+                <div class="panel-title-row">
+                  <div>
+                    <h2>다른 집 찾아보기</h2>
+                  </div>
+                </div>
+
+                <form class="compare-search-form" @submit.prevent="handlePropertySearch">
+                  <input
+                    v-model.trim="propertySearchKeyword"
+                    type="search"
+                    placeholder="주택명으로 검색"
+                    autocomplete="off"
+                  />
+                  <button class="secondary-button" type="submit" :disabled="isSearchingProperties">
+                    {{ isSearchingProperties ? "검색 중" : "검색" }}
+                  </button>
+                </form>
+
+                <p v-if="propertySearchMessage" class="empty-message">{{ propertySearchMessage }}</p>
+
+                <div v-if="propertySearchResults.length > 0" class="compare-property-list">
+                  <button
+                    v-for="property in propertySearchResults"
+                    :key="`search-${property.propertyId}`"
+                    type="button"
+                    class="compare-property-card"
+                    :class="{ selected: isComparisonSelected(property.propertyId) }"
+                    @click="toggleComparisonSelection(property)"
+                  >
+                    <span>{{ property.source }}</span>
+                    <strong>{{ property.name }}</strong>
+                    <em>{{ getPropertyTypeLabel(property.propertyType) }} · {{ getComparablePropertyAddress(property) }}</em>
+                    <small>{{ getComparablePropertyPrice(property) }}</small>
+                  </button>
+                </div>
+                <div v-else class="compare-property-list compare-empty-list" aria-hidden="true"></div>
+              </article>
+            </section>
+
             <section class="mypage-panel compare-control-panel" aria-labelledby="compare-title">
               <div class="panel-title-row">
                 <div>
                   <h2 id="compare-title">집 비교하기</h2>
-                  <p>관심목록이나 검색 결과에서 주택 2개를 선택해 AI 비교를 요청합니다.</p>
+                  <p>선택한 주택 2개를 확인하고 AI 비교를 요청합니다.</p>
                 </div>
                 <span>{{ comparisonSelection.length }} / 2 선택</span>
               </div>
@@ -707,120 +775,82 @@ function formatDateTime(value) {
               </div>
             </section>
 
-            <section class="compare-source-grid" aria-label="비교할 주택 선택">
-              <article class="mypage-panel compare-list-panel favorite-compare-panel">
-                <div class="panel-title-row">
-                  <div>
-                    <h2>관심목록</h2>
-                  </div>
-                  <span>{{ favoriteProperties.length.toLocaleString() }}개</span>
-                </div>
-
-                <p v-if="isLoadingFavoriteProperties" class="empty-message">관심 주택을 불러오는 중입니다.</p>
-                <p v-else-if="favoriteProperties.length === 0" class="empty-message">관심목록에 담은 주택이 없습니다.</p>
-
-                <div v-else class="compare-property-list">
-                  <button
-                    v-for="property in favoriteProperties"
-                    :key="`favorite-${property.propertyId}`"
-                    type="button"
-                    class="compare-property-card"
-                    :class="{ selected: isComparisonSelected(property.propertyId) }"
-                    @click="toggleComparisonSelection(property)"
-                  >
-                    <span>{{ property.source }}</span>
-                    <strong>{{ property.name }}</strong>
-                    <em>{{ getPropertyTypeLabel(property.propertyType) }} · {{ getComparablePropertyAddress(property) }}</em>
-                    <small>{{ getComparablePropertyPrice(property) }}</small>
-                  </button>
-                </div>
-              </article>
-
-              <article class="mypage-panel compare-list-panel search-compare-panel">
-                <div class="panel-title-row">
-                  <div>
-                    <h2>주택 검색</h2>
-                  </div>
-                </div>
-
-                <form class="compare-search-form" @submit.prevent="handlePropertySearch">
-                  <input
-                    v-model.trim="propertySearchKeyword"
-                    type="search"
-                    placeholder="주택명으로 검색"
-                    autocomplete="off"
-                  />
-                  <button class="secondary-button" type="submit" :disabled="isSearchingProperties">
-                    {{ isSearchingProperties ? "검색 중" : "검색" }}
-                  </button>
-                </form>
-
-                <p v-if="propertySearchMessage" class="empty-message">{{ propertySearchMessage }}</p>
-
-                <div v-if="propertySearchResults.length > 0" class="compare-property-list">
-                  <button
-                    v-for="property in propertySearchResults"
-                    :key="`search-${property.propertyId}`"
-                    type="button"
-                    class="compare-property-card"
-                    :class="{ selected: isComparisonSelected(property.propertyId) }"
-                    @click="toggleComparisonSelection(property)"
-                  >
-                    <span>{{ property.source }}</span>
-                    <strong>{{ property.name }}</strong>
-                    <em>{{ getPropertyTypeLabel(property.propertyType) }} · {{ getComparablePropertyAddress(property) }}</em>
-                    <small>{{ getComparablePropertyPrice(property) }}</small>
-                  </button>
-                </div>
-              </article>
-            </section>
-
             <section
               v-if="comparisonResult"
               ref="comparisonResultPanel"
               class="mypage-panel compare-result-panel"
               aria-labelledby="compare-result-title"
             >
-              <div class="panel-title-row">
-                <div>
+              <div class="panel-title-row compare-result-title-row">
+                <div class="compare-result-heading">
                   <h2 id="compare-result-title">AI 비교 결과</h2>
+                  <span>
+                    AI는 {{ comparisonResult.recommendedProperty || "판단 보류" }}{{ comparisonResult.recommendedProperty ? "를 더 추천합니다" : "로 안내합니다" }}
+                  </span>
                 </div>
-                <span>{{ comparisonResult.recommendedProperty || "판단 보류" }}</span>
               </div>
 
-              <p class="compare-summary">{{ comparisonResult.oneLineSummary }}</p>
-              <p class="compare-reason">{{ comparisonResult.recommendationReason }}</p>
+              <div class="compare-result-hero">
+                <p class="compare-summary">{{ comparisonResult.oneLineSummary }}</p>
+                <p class="compare-reason">{{ comparisonResult.recommendationReason }}</p>
+              </div>
 
               <div v-if="comparisonResult.comparisonTable?.length" class="compare-result-table">
+                <div class="compare-table-header">
+                  <strong>기준</strong>
+                  <span>A 주택</span>
+                  <span>B 주택</span>
+                </div>
                 <div v-for="item in comparisonResult.comparisonTable" :key="item.criterion">
                   <strong>{{ item.criterion }}</strong>
-                  <span>{{ item.propertyA }}</span>
-                  <span>{{ item.propertyB }}</span>
+                  <span>
+                    {{ item.propertyA }}
+                    <small v-if="item.better === 'A'">추천</small>
+                  </span>
+                  <span>
+                    {{ item.propertyB }}
+                    <small v-if="item.better === 'B'">추천</small>
+                  </span>
+                  <em v-if="item.reason">{{ item.reason }}</em>
                 </div>
               </div>
 
               <div class="compare-insight-grid">
-                <article>
+                <article class="positive-insight">
                   <h3>A 주택 장점</h3>
-                  <p>{{ comparisonResult.propertyAPros?.join(", ") || "-" }}</p>
+                  <ul v-if="comparisonResult.propertyAPros?.length">
+                    <li v-for="item in comparisonResult.propertyAPros" :key="`a-pro-${item}`">{{ item }}</li>
+                  </ul>
+                  <p v-else>-</p>
                 </article>
-                <article>
+                <article class="caution-insight">
                   <h3>A 주택 주의점</h3>
-                  <p>{{ comparisonResult.propertyACons?.join(", ") || "-" }}</p>
+                  <ul v-if="comparisonResult.propertyACons?.length">
+                    <li v-for="item in comparisonResult.propertyACons" :key="`a-con-${item}`">{{ item }}</li>
+                  </ul>
+                  <p v-else>-</p>
                 </article>
-                <article>
+                <article class="positive-insight">
                   <h3>B 주택 장점</h3>
-                  <p>{{ comparisonResult.propertyBPros?.join(", ") || "-" }}</p>
+                  <ul v-if="comparisonResult.propertyBPros?.length">
+                    <li v-for="item in comparisonResult.propertyBPros" :key="`b-pro-${item}`">{{ item }}</li>
+                  </ul>
+                  <p v-else>-</p>
                 </article>
-                <article>
+                <article class="caution-insight">
                   <h3>B 주택 주의점</h3>
-                  <p>{{ comparisonResult.propertyBCons?.join(", ") || "-" }}</p>
+                  <ul v-if="comparisonResult.propertyBCons?.length">
+                    <li v-for="item in comparisonResult.propertyBCons" :key="`b-con-${item}`">{{ item }}</li>
+                  </ul>
+                  <p v-else>-</p>
                 </article>
               </div>
 
               <div v-if="comparisonResult.cautions?.length" class="compare-cautions">
                 <strong>확인 필요</strong>
-                <span>{{ comparisonResult.cautions.join(", ") }}</span>
+                <ul>
+                  <li v-for="item in comparisonResult.cautions" :key="`caution-${item}`">{{ item }}</li>
+                </ul>
               </div>
             </section>
           </template>

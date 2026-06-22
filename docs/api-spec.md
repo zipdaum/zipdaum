@@ -109,13 +109,11 @@ Notion에서 내보낸 API 명세 CSV를 Markdown 표로 정리한 문서이다.
 ```json
 {
   "propertyIds": [1, 2],
-  "selectedDealType": "SALE",
   "comparisonPurpose": "실거주 관점의 주택 비교"
 }
 ```
 
 - `propertyIds`는 서로 다른 주택 ID 2개를 전달한다.
-- `selectedDealType`은 `SALE`, `JEONSE`, `MONTHLY_RENT`, `UNKNOWN` 중 하나이다.
 - 외부 AI API 키는 서버 환경 변수 `GMS_KEY`로 관리한다.
 
 응답 예시:

@@ -40,6 +40,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private static final int HISTORY_SIZE = 3;
   private static final int SURROUNDING_RADIUS_METERS = 1000;
   private static final int RECENT_CONTEXT_SIZE = 5;
+  private static final String DEFAULT_RENT_DEAL_TYPE = "JEONSE";
   private static final String DEVELOPER_PROMPT = """
       너는 ZipDaum의 주택 비교 도우미다. 반드시 한국어로 답한다.
       입력으로 제공된 데이터만 근거로 두 주택을 비교한다.
@@ -141,7 +142,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     List<RecentPropertyResponse> recentProperties = recentPropertyService.findRecentProperties(userId);
 
     return new UserComparisonContext(
-        normalizeDealType(request.getSelectedDealType()),
         normalizeComparisonPurpose(request.getComparisonPurpose()),
         preferences,
         recentProperties,
@@ -170,7 +170,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     PropertyDetailResponse detail = propertyService.findPropertyDetail(propertyId);
     PropertyDealHistoryResponse histories = propertyService.findPropertyDealHistories(
         propertyId,
-        toRentDealType(userContext.selectedDealType()),
+        DEFAULT_RENT_DEAL_TYPE,
         SALE_HISTORY_PAGE,
         RENT_HISTORY_PAGE,
         HISTORY_SIZE
@@ -255,7 +255,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
 
   private UserComparisonContextSummary summarizeUserContext(UserComparisonContext userContext) {
     return new UserComparisonContextSummary(
-        userContext.selectedDealType(),
         userContext.comparisonPurpose(),
         userContext.preferences(),
         userContext.recentProperties().stream()
@@ -339,17 +338,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     );
   }
 
-  private String toRentDealType(String selectedDealType) {
-    return "MONTHLY_RENT".equals(selectedDealType) ? "MONTHLY_RENT" : "JEONSE";
-  }
-
-  private String normalizeDealType(String selectedDealType) {
-    if (selectedDealType == null || selectedDealType.isBlank()) {
-      return "UNKNOWN";
-    }
-    return selectedDealType.trim().toUpperCase();
-  }
-
   private String normalizeComparisonPurpose(String comparisonPurpose) {
     if (comparisonPurpose == null || comparisonPurpose.isBlank()) {
       return "실거주 관점의 주택 비교";
@@ -402,7 +390,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   }
 
   private record UserComparisonContext(
-      String selectedDealType,
       String comparisonPurpose,
       List<UserPreferenceResponse> preferences,
       List<RecentPropertyResponse> recentProperties,
@@ -410,7 +397,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   }
 
   private record UserComparisonContextSummary(
-      String selectedDealType,
       String comparisonPurpose,
       List<UserPreferenceResponse> preferences,
       List<RecentPropertySummary> recentProperties,
