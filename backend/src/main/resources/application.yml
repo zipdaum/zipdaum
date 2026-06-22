@@ -57,5 +57,4 @@ jwt:
 
 app:
   cors:
-    # TODO: Vercel 배포 URL이 나오면 Railway 백엔드 Variables의 FRONTEND_ORIGINS에 추가한다.
-    allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173}
+    allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,https://zipdaum.vercel.app}
