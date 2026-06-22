@@ -1,3 +1,6 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   config:
     import:
@@ -56,4 +59,6 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}
 
-
+app:
+  cors:
+    allowed-origins: ${FRONTEND_ORIGINS:http://localhost:5173,https://zipdaum.vercel.app}
