@@ -14,6 +14,8 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   batch:
+    job:
+      enabled: false
     jdbc:
       initialize-schema: always
 
@@ -22,6 +24,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
   # ===== 메일 설정 추가 =====
   mail:
