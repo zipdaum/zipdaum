@@ -357,4 +357,60 @@
           AND newer.deal_date > #{dealDate}
       )
   </update>
+
+  <insert id="bulkInsertSaleDeals" parameterType="java.util.List">
+    INSERT IGNORE INTO sale_deal (
+    property_id, exclusive_area, land_area, deal_amount, floor,
+    deal_date, buyer_gbn, seller_gbn
+    ) VALUES
+    <foreach collection="list" item="deal" separator=",">
+      (
+      #{deal.propertyId}, #{deal.exclusiveArea}, #{deal.landArea}, #{deal.dealAmount}, #{deal.floor},
+      #{deal.dealDate}, #{deal.buyerGbn}, #{deal.sellerGbn}
+      )
+    </foreach>
+  </insert>
+
+  <insert id="bulkInsertRentDeals" parameterType="java.util.List">
+    INSERT IGNORE INTO rent_deal (
+    property_id, exclusive_area, land_area, deposit, monthly_rent, floor,
+    contract_term, contract_type, use_rr_right, pre_deposit, pre_monthly_rent, deal_date
+    ) VALUES
+    <foreach collection="list" item="deal" separator=",">
+      (
+      #{deal.propertyId}, #{deal.exclusiveArea}, #{deal.landArea}, #{deal.deposit}, #{deal.monthlyRent}, #{deal.floor},
+      #{deal.contractTerm}, #{deal.contractType}, #{deal.useRrRight}, #{deal.preDeposit}, #{deal.preMonthlyRent}, #{deal.dealDate}
+      )
+    </foreach>
+  </insert>
+
+  <update id="syncAllLatestSalePrices">
+    UPDATE property p
+    JOIN (
+    SELECT property_id, deal_amount
+    FROM sale_deal
+    WHERE (property_id, deal_date) IN (
+    SELECT property_id, MAX(deal_date)
+    FROM sale_deal
+    GROUP BY property_id
+    )
+    ) latest_deal ON p.id = latest_deal.property_id
+    SET p.latest_sale_price = latest_deal.deal_amount;
+  </update>
+
+  <update id="syncAllLatestRentPrices">
+    UPDATE property p
+    JOIN (
+    SELECT property_id, deposit, monthly_rent
+    FROM rent_deal
+    WHERE (property_id, deal_date) IN (
+    SELECT property_id, MAX(deal_date)
+    FROM rent_deal
+    GROUP BY property_id
+    )
+    ) latest_deal ON p.id = latest_deal.property_id
+    SET p.latest_deposit = latest_deal.deposit,
+    p.latest_monthly_rent = latest_deal.monthly_rent;
+  </update>
+
 </mapper>

@@ -2,6 +2,7 @@ package com.ssafy.zipdaum.user.dto;
 
 import com.ssafy.zipdaum.global.dto.BaseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,4 +18,6 @@ public class UserDto extends BaseDto {
   private String password;
   @Schema(description = "이름", example = "홍길동")
   private String name;
+  @Schema(description = "회원 정보 물리 삭제 예정 시각")
+  private LocalDateTime deletionScheduledAt;
 }

@@ -34,7 +34,9 @@ function handleLogout() {
       <RouterLink :to="{ name: 'favorites' }" active-class="active">
         관심목록
       </RouterLink>
-      <a href="#">마이페이지</a>
+      <RouterLink :to="{ name: 'mypage' }" active-class="active">
+        마이페이지
+      </RouterLink>
     </nav>
 
     <div v-if="isLoggedIn" class="account-actions">
@@ -48,7 +50,9 @@ function handleLogout() {
       <RouterLink class="ghost-button" :to="{ name: 'login' }">
         로그인
       </RouterLink>
-      <button class="primary-button" type="button">회원가입</button>
+      <RouterLink class="primary-button" :to="{ name: 'signup' }">
+        회원가입
+      </RouterLink>
     </div>
   </header>
 </template>
