@@ -146,6 +146,7 @@ const surroundingsErrorMessage = ref("");
 const recommendationScore = ref(null);
 const isRecommendationScoreLoading = ref(false);
 const recommendationScoreErrorMessage = ref("");
+const hasNoRecommendationConditions = ref(false);
 const propertyAiSummary = ref("");
 const isPropertyAiSummaryLoading = ref(false);
 const propertyAiSummaryErrorMessage = ref("");
@@ -158,6 +159,14 @@ const isFavoritePropertyLoading = ref(false);
 const resultPanel = ref(null);
 const appliedSearchSummary = ref([]);
 const historyPageSize = 5;
+const LOCKED_RECOMMENDATION_MESSAGE =
+  "원하는 조건을 설정하면 확인할 수 있습니다.";
+const lockedRecommendationTitle = computed(() =>
+  isLoggedIn.value ? "맞춤 조건을 설정해주세요" : "로그인이 필요합니다",
+);
+const isRecommendationFeatureLocked = computed(
+  () => !isLoggedIn.value || hasNoRecommendationConditions.value,
+);
 const emptyHistoryMeta = {
   salePage: 1,
   saleSize: historyPageSize,
@@ -358,6 +367,7 @@ watch(isLoggedIn, (loggedIn) => {
 
   recommendationResults.value = [];
   recommendationListErrorMessage.value = "";
+  hasNoRecommendationConditions.value = false;
   favoritePropertyIds.value = [];
 });
 
@@ -728,8 +738,8 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       }),
       loadSurroundings(selectedPropertyDetail.value),
       loadRecommendationScore(normalizedPropertyId),
-      loadPropertyAiSummary(normalizedPropertyId),
     ]);
+    await loadPropertyAiSummary(normalizedPropertyId);
 
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
       await loadHistories(selectedPropertyDetail.value.id, {
@@ -770,6 +780,7 @@ function createPropertyDetailState(detail, propertyId) {
 async function loadRecommendationScore(propertyId) {
   recommendationScore.value = null;
   recommendationScoreErrorMessage.value = "";
+  hasNoRecommendationConditions.value = false;
 
   if (!isLoggedIn.value) {
     return;
@@ -778,15 +789,20 @@ async function loadRecommendationScore(propertyId) {
   isRecommendationScoreLoading.value = true;
 
   try {
-    recommendationScore.value = await fetchPropertyRecommendationScore(
+    const score = await fetchPropertyRecommendationScore(
       propertyId,
     );
+    recommendationScore.value = score;
+    hasNoRecommendationConditions.value =
+      score?.recommendationStatus === "NO_EVALUABLE_CONDITION";
   } catch (error) {
     const status = error.response?.status;
+    if (status === 404) {
+      hasNoRecommendationConditions.value = true;
+      return;
+    }
     recommendationScoreErrorMessage.value =
-      status === 404
-        ? "등록된 맞춤 조건이 없어 적합도를 계산하지 못했습니다."
-        : "맞춤 적합도 정보를 불러오지 못했습니다.";
+      "맞춤 적합도 정보를 불러오지 못했습니다.";
   } finally {
     isRecommendationScoreLoading.value = false;
   }
@@ -796,7 +812,7 @@ async function loadPropertyAiSummary(propertyId) {
   propertyAiSummary.value = "";
   propertyAiSummaryErrorMessage.value = "";
 
-  if (!isLoggedIn.value) {
+  if (isRecommendationFeatureLocked.value) {
     return;
   }
 
@@ -2769,8 +2785,23 @@ function formatPrice(price) {
               <p class="detail-address">
                 {{ getPropertyAddress(selectedPropertyDetail) }}
               </p>
+              <div
+                v-if="isRecommendationFeatureLocked"
+                class="locked-recommendation-message property-ai-summary-lock"
+              >
+                <span class="locked-recommendation-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="5" y="10" width="14" height="10" rx="3"></rect>
+                    <path d="M8 10V8a4 4 0 0 1 8 0v2"></path>
+                  </svg>
+                </span>
+                <div>
+                  <strong>{{ lockedRecommendationTitle }}</strong>
+                  <p>{{ LOCKED_RECOMMENDATION_MESSAGE }}</p>
+                </div>
+              </div>
               <p
-                v-if="isPropertyAiSummaryLoading"
+                v-else-if="isPropertyAiSummaryLoading"
                 class="property-ai-summary loading"
               >
                 <span class="property-ai-summary-spinner" aria-hidden="true"></span>
@@ -2801,7 +2832,10 @@ function formatPrice(price) {
               </div>
             </div>
 
-            <aside class="fit-score-panel" aria-label="사용자 맞춤 조건 적합도">
+            <aside
+              class="fit-score-panel"
+              aria-label="사용자 맞춤 조건 적합도"
+            >
               <div class="fit-score-title-row">
                 <h2>내 조건 적합도</h2>
                 <button
@@ -2814,12 +2848,22 @@ function formatPrice(price) {
                 </button>
               </div>
 
-              <div v-if="!isLoggedIn" class="fit-login-content">
-                <p>
-                  로그인하면 예산, 선호 지역, 생활 편의 조건을 기준으로 이
-                  거래가 내 조건에 맞는지 확인할 수 있습니다.
-                </p>
+              <div
+                v-if="isRecommendationFeatureLocked"
+                class="fit-login-content locked-recommendation-message"
+              >
+                <span class="locked-recommendation-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <rect x="5" y="10" width="14" height="10" rx="3"></rect>
+                    <path d="M8 10V8a4 4 0 0 1 8 0v2"></path>
+                  </svg>
+                </span>
+                <div>
+                  <strong>{{ lockedRecommendationTitle }}</strong>
+                  <p>{{ LOCKED_RECOMMENDATION_MESSAGE }}</p>
+                </div>
                 <button
+                  v-if="!isLoggedIn"
                   class="secondary-button"
                   type="button"
                   @click="goToLoginForRecommendation"
