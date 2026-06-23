@@ -42,6 +42,7 @@ public class GmsOpenAiClient {
 
   public String chatCompletion(String developerPrompt, String userPrompt, String logName) {
     if (!properties.hasApiKey()) {
+      log.warn("AI API key is missing logName={}", logName);
       throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
     }
 
@@ -90,12 +91,14 @@ public class GmsOpenAiClient {
           : response.path("candidates").path(0).path("content").path("parts").path(0)
               .path("text").asText(null);
       if (content == null || content.isBlank()) {
+        log.warn("AI API 응답 본문에 content text가 없습니다.");
         throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
       }
       return content;
     } catch (BusinessException e) {
       throw e;
     } catch (Exception e) {
+      log.warn("AI API 응답 파싱 실패", e);
       throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
     }
   }
