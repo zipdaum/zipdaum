@@ -18,6 +18,7 @@ public interface PropertyMapper {
 
   boolean existsPropertyById(Long propertyId);
 
+  long countProperties(PropertySearchRequest request);
   List<PropertySearchResponse> selectProperties(PropertySearchRequest request);
 
   PropertyDetailResponse selectPropertyById(@Param("propertyId") Long propertyId);

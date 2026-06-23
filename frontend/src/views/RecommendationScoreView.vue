@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
+  getPropertyAiSummary as fetchPropertyAiSummary,
   getPropertyDetail as fetchPropertyDetail,
   getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
@@ -39,11 +40,16 @@ const property = ref(null);
 const recommendationScore = ref(null);
 const surroundings = ref(null);
 const histories = ref(null);
+const propertyAiSummary = ref("");
+const isPropertyAiSummaryLoading = ref(false);
+const propertyAiSummaryErrorMessage = ref("");
+const isPropertyAiSummaryHighlighted = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref("");
 const allowHomeNavigation = ref(false);
 const conditionPage = ref(1);
 const conditionPageSize = 3;
+let propertyAiSummaryHighlightTimer = null;
 
 const propertyId = computed(() => Number(route.params.propertyId));
 const recommendationConditions = computed(
@@ -92,6 +98,8 @@ watch(conditionTotalPages, (totalPages) => {
 });
 
 onBeforeRouteLeave((to) => {
+  clearPropertyAiSummaryHighlightTimer();
+
   if (allowHomeNavigation.value || to.name !== "home") {
     return true;
   }
@@ -117,6 +125,9 @@ async function loadRecommendationScoreDetail() {
 
   isLoading.value = true;
   errorMessage.value = "";
+  propertyAiSummary.value = "";
+  propertyAiSummaryErrorMessage.value = "";
+  isPropertyAiSummaryHighlighted.value = false;
 
   try {
     const [propertyDetail, scoreDetail] = await Promise.all([
@@ -127,7 +138,7 @@ async function loadRecommendationScoreDetail() {
     property.value = propertyDetail;
     recommendationScore.value = scoreDetail;
 
-    await Promise.all([loadSurroundings(), loadHistories()]);
+    await Promise.all([loadSurroundings(), loadHistories(), loadPropertyAiSummary()]);
   } catch (error) {
     const status = error.response?.status;
     errorMessage.value =
@@ -137,6 +148,43 @@ async function loadRecommendationScoreDetail() {
   } finally {
     isLoading.value = false;
   }
+}
+
+async function loadPropertyAiSummary() {
+  isPropertyAiSummaryLoading.value = true;
+
+  try {
+    const response = await fetchPropertyAiSummary(propertyId.value);
+    propertyAiSummary.value = response?.summary || "";
+    if (propertyAiSummary.value) {
+      highlightPropertyAiSummary();
+    }
+  } catch (error) {
+    propertyAiSummaryErrorMessage.value = "AI 요약을 불러오지 못했습니다.";
+  } finally {
+    isPropertyAiSummaryLoading.value = false;
+  }
+}
+
+function highlightPropertyAiSummary() {
+  if (propertyAiSummaryHighlightTimer) {
+    clearPropertyAiSummaryHighlightTimer();
+  }
+
+  isPropertyAiSummaryHighlighted.value = true;
+  propertyAiSummaryHighlightTimer = window.setTimeout(() => {
+    isPropertyAiSummaryHighlighted.value = false;
+    propertyAiSummaryHighlightTimer = null;
+  }, 1800);
+}
+
+function clearPropertyAiSummaryHighlightTimer() {
+  if (!propertyAiSummaryHighlightTimer) {
+    return;
+  }
+
+  clearTimeout(propertyAiSummaryHighlightTimer);
+  propertyAiSummaryHighlightTimer = null;
 }
 
 async function loadSurroundings() {
@@ -582,8 +630,19 @@ function formatDistance(distanceMeters) {
           <p class="detail-breadcrumb">홈 &gt; 거래 상세 &gt; 적합도 상세</p>
           <h1>적합도 상세 보기</h1>
           <p>{{ property.name || "주택명 미상" }} · {{ getPropertyAddress(property) }}</p>
-          <p class="recommendation-page-summary">
-            {{ getRecommendationSummaryText() }}
+          <p
+            :class="[
+              'recommendation-page-summary',
+              { 'ai-summary-highlighted': isPropertyAiSummaryHighlighted },
+            ]"
+          >
+            <template v-if="isPropertyAiSummaryLoading">
+              <span class="property-ai-summary-spinner" aria-hidden="true"></span>
+              <span>AI가 이 집의 적합도를 요약하고 있습니다.</span>
+            </template>
+            <template v-else>
+              {{ propertyAiSummary || getRecommendationSummaryText() }}
+            </template>
           </p>
         </div>
 

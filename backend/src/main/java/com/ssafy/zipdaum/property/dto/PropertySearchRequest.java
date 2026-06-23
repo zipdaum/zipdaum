@@ -24,4 +24,11 @@ public class PropertySearchRequest {
   private String sortBy;
   @Pattern(regexp = "^$|ASC|DESC", flags = Pattern.Flag.CASE_INSENSITIVE)
   private String sortDirection;
+
+  private Integer page = 1;
+  private Integer size = 10;
+
+  public int getOffset() {
+    return (Math.max(1, this.page) - 1) * Math.max(1, this.size);
+  }
 }
