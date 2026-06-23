@@ -16,7 +16,7 @@ spring:
   batch:
     job:
       enabled: false
-    JDBC:
+    jdbc:
       initialize-schema: always
 
   # ===== Redis 설정 추가 =====
@@ -24,6 +24,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
   # ===== 메일 설정 추가 =====
   mail:
