@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const backendUrl = 'https://zipdaum.up.railway.app'
+const backendUrl = 'http://127.0.0.1:8080'
+// TODO: 배포 환경 확인 시 Railway 백엔드로 전환
+// const backendUrl = 'https://zipdaum.up.railway.app'
 
 export default defineConfig({
   plugins: [vue()],

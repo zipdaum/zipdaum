@@ -34,7 +34,16 @@ function handleLogout() {
       <RouterLink :to="{ name: 'favorites' }" active-class="active">
         관심목록
       </RouterLink>
-      <RouterLink :to="{ name: 'mypage' }" active-class="active">
+      <RouterLink
+        :to="{ name: 'mypage', query: { tab: 'compare' } }"
+        :class="{ active: route.name === 'mypage' && route.query.tab === 'compare' }"
+      >
+        집 비교하기
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'mypage' }"
+        :class="{ active: route.name === 'mypage' && route.query.tab !== 'compare' }"
+      >
         마이페이지
       </RouterLink>
     </nav>
