@@ -151,6 +151,9 @@ const isPropertyAiSummaryLoading = ref(false);
 const propertyAiSummaryErrorMessage = ref("");
 const isPropertyAiSummaryHighlighted = ref(false);
 const detailInteraction = ref(null);
+const mapZoom = ref(1);
+const mapPan = ref({ x: 0, y: 0 });
+const isMapDragging = ref(false);
 const saleHistoryPage = ref(1);
 const rentHistoryPage = ref(1);
 const favoritePropertyIds = ref([]);
@@ -173,136 +176,14 @@ const emptyHistoryMeta = {
   saleServerPaged: false,
   rentServerPaged: false,
 };
-
 let resultHighlightTimer = null;
 let propertyAiSummaryHighlightTimer = null;
+let mapDragStart = null;
 
 const searchPage = ref(1);
 const searchTotalPages = ref(1);
 const searchTotalElements = ref(0);
 const searchPageSize = 10;
-
-const mapContainer = ref(null);
-let kakaoMap = null;
-let mapMarkers = [];
-
-const loadKakaoMapScript = () => {
-  return new Promise((resolve, reject) => {
-    // 이미 스크립트가 로드되어 있다면 바로 통과
-    if (window.kakao && window.kakao.maps) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement("script");
-    const appKey = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
-    
-    // autoload=false 속성을 반드시 넣어야 합니다.
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
-    
-    script.onload = () => {
-      // 스크립트 로드 완료 후 카카오맵 내부적으로 로딩이 끝나면 resolve 호출
-      window.kakao.maps.load(resolve);
-    };
-    script.onerror = () => {
-      reject(new Error("카카오맵 스크립트를 불러오지 못했습니다."));
-    };
-
-    document.head.appendChild(script);
-  });
-};
-
-// 3. 지도 객체 생성 및 마커 렌더링 함수
-const initKakaoMap = async () => {
-  await nextTick(); // DOM 컨테이너가 확실히 렌더링 된 후 실행
-  
-  if (!mapContainer.value || !window.kakao || !window.kakao.maps) return;
-
-  const property = selectedPropertyDetail.value;
-  const centerLat = Number(property?.latitude);
-  const centerLng = Number(property?.longitude);
-
-  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) return;
-
-  // 집의 좌표 (지도의 중심점)
-  const centerPosition = new window.kakao.maps.LatLng(centerLat, centerLng);
-
-  // 지도 객체가 없으면 새로 생성, 이미 있으면 중심 좌표만 갱신
-  if (!kakaoMap) {
-    const mapOptions = {
-      center: centerPosition,
-      level: 4, // 확대 레벨 (작을수록 확대됨)
-    };
-    kakaoMap = new window.kakao.maps.Map(mapContainer.value, mapOptions);
-    
-    // 일반 지도와 스카이뷰로 지도 타입을 전환할 수 있는 컨트롤 추가
-    const mapTypeControl = new window.kakao.maps.MapTypeControl();
-    kakaoMap.addControl(mapTypeControl, window.kakao.maps.ControlPosition.TOPRIGHT);
-
-    // 줌 컨트롤 추가
-    const zoomControl = new window.kakao.maps.ZoomControl();
-    kakaoMap.addControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT);
-  } else {
-    kakaoMap.setCenter(centerPosition);
-  }
-
-  // 기존 화면에 찍혀있던 마커들 초기화
-  mapMarkers.forEach(marker => marker.setMap(null));
-  mapMarkers = [];
-
-  // [메인 마커] 선택된 주택 위치 핀 찍기
-  const homeMarker = new window.kakao.maps.Marker({
-    position: centerPosition,
-    map: kakaoMap,
-    title: property.name || '선택한 집'
-  });
-  mapMarkers.push(homeMarker);
-
-  // [주변 마커] 편의 시설들 핀 찍기
-  const facilities = getMapFacilities(); 
-  facilities.forEach((facility) => {
-    const facPosition = new window.kakao.maps.LatLng(
-      Number(facility.latitude),
-      Number(facility.longitude)
-    );
-
-    // 1. 왼쪽 리스트와 똑같이 보이도록 기존 함수로 클래스와 텍스트 가져오기
-    const cssClasses = getFacilityMarkerClass(facility).join(" ");
-    const text = getFacilityMarkerText(facility);
-    const tooltip = `${getFacilityTypeLabel(facility.type)} - ${facility.name}`;
-
-    // 2. 마커로 쓸 HTML 생성 (지도 위에서 잘 보이게 하얀색 테두리와 그림자 살짝 추가)
-    const content = `<span class="${cssClasses}" title="${tooltip}" style="cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1.5px solid #fff; transform: scale(0.85); display: inline-block;">${text}</span>`;
-
-    // 3. 기본 Marker 대신 CustomOverlay 객체 사용
-    const customOverlay = new window.kakao.maps.CustomOverlay({
-      position: facPosition,
-      content: content,
-      map: kakaoMap,
-      xAnchor: 0.5, // 가로 기준점 (0.5는 정중앙)
-      yAnchor: 0.5  // 세로 기준점 (0.5는 정중앙)
-    });
-    
-    mapMarkers.push(customOverlay);
-  });
-};
-
-// 4. 데이터 로드 시 지도 초기화 트리거
-watch(
-  () => surroundings.value, // 주변 시설 데이터가 변경/로드될 때 실행
-  async (newVal) => {
-    if (newVal && selectedPropertyDetail.value) {
-      try {
-        await loadKakaoMapScript(); // 스크립트가 없다면 불러오고
-        initKakaoMap();             // 지도를 그림
-      } catch (error) {
-        console.error(error);
-        surroundingsErrorMessage.value = "지도를 불러오는 데 실패했습니다.";
-      }
-    }
-  },
-  { immediate: true }
-);
 
 function createEmptyRentDealsByType() {
   return {
@@ -356,6 +237,7 @@ onUnmounted(() => {
   saveDetailInteraction();
   clearResultHighlightTimer();
   clearPropertyAiSummaryHighlightTimer();
+  stopMapDrag();
   window.removeEventListener("scroll", updateDetailScrollDepth);
   window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.removeEventListener("popstate", handleBrowserBack);
@@ -676,6 +558,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   propertyAiSummary.value = "";
   propertyAiSummaryErrorMessage.value = "";
   isPropertyAiSummaryHighlighted.value = false;
+  resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
   hoveredTrendDot.value = null;
@@ -1586,8 +1469,7 @@ function getDetailSummaryItems(property) {
   return [
     getPropertyTypeLabel(property.propertyType),
     representativeDeal?.floor,
-    // 💡 수정된 부분: representativeDeal이 존재할 때만 area 값을 확인하도록 안전하게 처리
-    representativeDeal?.area && representativeDeal.area !== "-"
+    representativeDeal?.area !== "-"
       ? `전용면적 ${representativeDeal.area}`
       : null,
     getBuildYearLabel(property.buildYear),
@@ -2153,6 +2035,101 @@ function getFacilityMoveLabel(facility) {
   }
 
   return `도보 ${Math.max(Math.round(distance / 70), 1)}분`;
+}
+
+function getMapMarkers() {
+  const facilities = getMapFacilities();
+  const centerLat = Number(selectedPropertyDetail.value?.latitude);
+  const centerLng = Number(selectedPropertyDetail.value?.longitude);
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
+    return [];
+  }
+
+  const points = [
+    { latitude: centerLat, longitude: centerLng },
+    ...facilities,
+  ].filter(
+    (point) =>
+      Number.isFinite(Number(point.latitude)) &&
+      Number.isFinite(Number(point.longitude)),
+  );
+  const latitudes = points.map((point) => Number(point.latitude));
+  const longitudes = points.map((point) => Number(point.longitude));
+  const minLat = Math.min(...latitudes);
+  const maxLat = Math.max(...latitudes);
+  const minLng = Math.min(...longitudes);
+  const maxLng = Math.max(...longitudes);
+  const latRange = Math.max(maxLat - minLat, 0.002);
+  const lngRange = Math.max(maxLng - minLng, 0.002);
+
+  return facilities
+    .filter(
+      (facility) =>
+        Number.isFinite(Number(facility.latitude)) &&
+        Number.isFinite(Number(facility.longitude)),
+    )
+    .map((facility) => ({
+      ...facility,
+      top: `${Math.min(Math.max(8 + ((maxLat - Number(facility.latitude)) / latRange) * 84, 8), 92)}%`,
+      left: `${Math.min(Math.max(8 + ((Number(facility.longitude) - minLng) / lngRange) * 84, 8), 92)}%`,
+    }));
+}
+
+function getFacilityMapTransform() {
+  return {
+    transform: `translate(${mapPan.value.x}px, ${mapPan.value.y}px) scale(${mapZoom.value})`,
+  };
+}
+
+function changeMapZoom(delta) {
+  mapZoom.value = Math.min(
+    Math.max(Number((mapZoom.value + delta).toFixed(1)), 0.8),
+    1.8,
+  );
+}
+
+function resetFacilityMap() {
+  mapZoom.value = 1;
+  mapPan.value = { x: 0, y: 0 };
+  stopMapDrag();
+}
+
+function startMapDrag(event) {
+  if (event.button !== undefined && event.button !== 0) {
+    return;
+  }
+
+  isMapDragging.value = true;
+  mapDragStart = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    panX: mapPan.value.x,
+    panY: mapPan.value.y,
+  };
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+}
+
+function moveMapDrag(event) {
+  if (!isMapDragging.value || !mapDragStart) {
+    return;
+  }
+
+  mapPan.value = {
+    x: Math.min(
+      Math.max(mapDragStart.panX + event.clientX - mapDragStart.x, -180),
+      180,
+    ),
+    y: Math.min(
+      Math.max(mapDragStart.panY + event.clientY - mapDragStart.y, -120),
+      120,
+    ),
+  };
+}
+
+function stopMapDrag() {
+  isMapDragging.value = false;
+  mapDragStart = null;
 }
 
 function getBuildYearLabel(buildYear) {
@@ -3068,13 +3045,56 @@ function formatPrice(price) {
                   </span>
                 </div>
                 <div
-                  class="facility-map"
+                  :class="['facility-map', { dragging: isMapDragging }]"
                   aria-label="주택과 주변 편의시설 지도"
                 >
                   <div
-                    ref="mapContainer"
-                    style="width: 100%; height: 100%; min-height: 400px; border-radius: 8px;"
-                  ></div>
+                    class="facility-map-canvas"
+                    :style="getFacilityMapTransform()"
+                    @pointerdown="startMapDrag"
+                    @pointermove="moveMapDrag"
+                    @pointerup="stopMapDrag"
+                    @pointercancel="stopMapDrag"
+                    @pointerleave="stopMapDrag"
+                  >
+                    <span
+                      class="home-map-marker"
+                      :style="{ top: '50%', left: '50%' }"
+                      >집</span
+                    >
+                    <span
+                      v-for="marker in getMapMarkers()"
+                      :key="`${marker.type}-${marker.name}-${marker.latitude}-${marker.longitude}`"
+                      :class="getFacilityMarkerClass(marker)"
+                      :style="{ top: marker.top, left: marker.left }"
+                      :title="`${getFacilityTypeLabel(marker.type)} · ${marker.name}`"
+                    >
+                      {{ getFacilityMarkerText(marker) }}
+                    </span>
+                  </div>
+                  <div class="map-controls" aria-label="지도 조작">
+                    <button
+                      type="button"
+                      aria-label="지도 확대"
+                      @click="changeMapZoom(0.2)"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="지도 축소"
+                      @click="changeMapZoom(-0.2)"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="지도 위치 초기화"
+                      @click="resetFacilityMap"
+                    >
+                      ⟲
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
