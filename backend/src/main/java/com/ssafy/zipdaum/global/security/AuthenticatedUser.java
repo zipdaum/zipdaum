@@ -8,4 +8,5 @@ import lombok.RequiredArgsConstructor;
 public class AuthenticatedUser {
   private final Long id;
   private final String email;
+  private final String role;
 }

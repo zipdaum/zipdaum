@@ -3,8 +3,10 @@ package com.ssafy.zipdaum.recommendation.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@NoArgsConstructor
 @AllArgsConstructor
 @Schema(description = "주택 AI 적합도 요약 응답")
 public class PropertyAiSummaryResponse {
