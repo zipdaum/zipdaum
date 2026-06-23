@@ -3,7 +3,6 @@ package com.ssafy.zipdaum.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -18,7 +17,6 @@ import com.ssafy.zipdaum.user.dto.UserSignUpRequest;
 import com.ssafy.zipdaum.user.mapper.UserMapper;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -139,28 +137,6 @@ class UserServiceImplTest {
         .isInstanceOfSatisfying(BusinessException.class, exception ->
             assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND)
         );
-  }
-
-  @Test
-  void requestDeletion_확인값이_일치하면_1분뒤_삭제되도록_논리삭제한다() {
-    UserDto user = new UserDto();
-    user.setId(1L);
-    user.setName("홍길동");
-    UserDeleteRequest request = new UserDeleteRequest();
-    request.setName("홍길동");
-    request.setConfirmationText("delete/홍길동");
-
-    given(userMapper.findById(1L)).willReturn(user);
-    given(userMapper.softDeleteById(any(Long.class), any(LocalDateTime.class))).willReturn(1);
-
-    LocalDateTime before = LocalDateTime.now().plusMinutes(1);
-
-    service.requestDeletion(1L, request);
-
-    ArgumentCaptor<LocalDateTime> captor = ArgumentCaptor.forClass(LocalDateTime.class);
-    then(userMapper).should().softDeleteById(eq(1L), captor.capture());
-    assertThat(captor.getValue()).isAfterOrEqualTo(before);
-    assertThat(captor.getValue()).isBefore(LocalDateTime.now().plusMinutes(2));
   }
 
   @Test

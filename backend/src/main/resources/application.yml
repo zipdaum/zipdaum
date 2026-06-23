@@ -65,7 +65,10 @@ ai:
     api-key: ${GMS_KEY:}
     model: ${GMS_OPENAI_MODEL:gpt-5.5}
     connect-timeout: ${GMS_OPENAI_CONNECT_TIMEOUT:5s}
-    read-timeout: ${GMS_OPENAI_READ_TIMEOUT:30s}
+    read-timeout: ${GMS_OPENAI_READ_TIMEOUT:1h}
+    cache:
+      version: ${AI_SUMMARY_CACHE_VERSION:v1}
+      ttl: ${AI_SUMMARY_CACHE_TTL:60s}
   gms:
     base-url: ${GMS_GENERATIVE_LANGUAGE_BASE_URL:https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com}
     generate-content-path: ${GMS_GENERATE_CONTENT_PATH:/v1beta/models/%s:generateContent}

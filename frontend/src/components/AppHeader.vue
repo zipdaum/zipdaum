@@ -29,6 +29,10 @@ async function goHome() {
 }
 
 function handleLogout() {
+  if (!confirm("로그아웃 하시겠습니까?")) {
+    return;
+  }
+
   clearAuth();
   goHome();
 }
@@ -46,7 +50,7 @@ function goFavorites() {
 }
 
 function goCompare() {
-  navigateTo({ name: "mypage", query: { tab: "compare" } });
+  navigateTo({ name: "comparison" });
 }
 
 function goMyPage() {
@@ -82,14 +86,14 @@ function goMyPage() {
         관심목록
       </button>
       <button
-        :class="{ active: route.name === 'mypage' && route.query.tab === 'compare' }"
+        :class="{ active: route.name === 'comparison' }"
         type="button"
         @click="goCompare"
       >
         집 비교하기
       </button>
       <button
-        :class="{ active: route.name === 'mypage' && route.query.tab !== 'compare' }"
+        :class="{ active: route.name === 'mypage' }"
         type="button"
         @click="goMyPage"
       >

@@ -45,11 +45,12 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            .requestMatchers("/properties/compare/ai").authenticated()
-            .requestMatchers("/properties/recommendations").authenticated()
-            .requestMatchers("/properties/*/recommendation-score").authenticated()
-            .requestMatchers("/properties/*/interactions").authenticated()
-            .requestMatchers("/users/info", "/users/info/**").authenticated()
+            .requestMatchers("/properties/compare/ai").hasRole("USER")
+            .requestMatchers("/properties/recommendations").hasRole("USER")
+            .requestMatchers("/properties/*/recommendation-score").hasRole("USER")
+            .requestMatchers("/properties/*/interactions").hasRole("USER")
+            .requestMatchers("/users/info", "/users/info/**").hasRole("USER")
+                .requestMatchers("/api/admin/batch/**").hasRole("ADMIN")
             .anyRequest().permitAll()
         )
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
