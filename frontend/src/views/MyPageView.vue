@@ -194,11 +194,15 @@ async function handlePropertySearch() {
   propertySearchMessage.value = "";
 
   try {
-    const properties = await searchProperties({
+    const response = await searchProperties({
       name: keyword,
+      sortBy: "NAME",
+      sortDirection: "ASC",
       page: 1,
       size: MAX_PROPERTY_SEARCH_RESULTS,
     });
+    const properties = Array.isArray(response) ? response : response.content || [];
+
     propertySearchResults.value = properties.map(mapSearchProperty);
     propertySearchMessage.value =
       propertySearchResults.value.length === 0 ? "검색 결과가 없습니다." : "";
