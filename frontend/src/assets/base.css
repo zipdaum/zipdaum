@@ -39,6 +39,29 @@ a {
   padding: 20px 0 56px;
 }
 
+.view-panel {
+  min-width: 0;
+}
+
+.view-switch-enter-active,
+.view-switch-leave-active {
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+}
+
+.view-switch-enter-from,
+.view-switch-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.view-switch-enter-to,
+.view-switch-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .top-bar {
   display: flex;
   align-items: center;
@@ -500,6 +523,10 @@ a {
 .property-card-button {
   width: 100%;
   text-align: left;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .property-card-button:disabled {
@@ -511,6 +538,7 @@ a {
   border-color: #9fb8f2;
   box-shadow: 0 10px 24px rgba(39, 83, 150, 0.14);
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .home-image {
@@ -2198,6 +2226,21 @@ a {
   color: #53617c;
   font-size: 13px;
   font-weight: 900;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-switch-enter-active,
+  .view-switch-leave-active,
+  .property-card-button {
+    transition: none;
+  }
+
+  .view-switch-enter-from,
+  .view-switch-leave-to,
+  .property-card-button.is-clickable:hover,
+  .property-card-button.is-clickable:focus-visible {
+    transform: none;
+  }
 }
 
 @media (max-width: 900px) {

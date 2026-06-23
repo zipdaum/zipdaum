@@ -2159,7 +2159,8 @@ function formatPrice(price) {
   <main class="app-shell">
     <AppHeader @home="openHomeView" />
 
-    <template v-if="currentView === 'home'">
+    <Transition name="view-switch" mode="out-in" appear>
+    <div v-if="currentView === 'home'" class="view-panel home-view-panel">
       <section class="hero-section" aria-labelledby="home-title">
         <div class="hero-copy">
           <h1 id="home-title">내 조건에 맞는 주거 정보를 찾아보세요</h1>
@@ -2478,7 +2479,7 @@ function formatPrice(price) {
           </template>
         </article>
       </section>
-    </template>
+    </div>
 
     <section
       v-else-if="currentView === 'results'"
@@ -2685,7 +2686,7 @@ function formatPrice(price) {
       </div>
     </section>
 
-    <section v-else class="detail-page" aria-label="거래 상세">
+    <section v-else class="detail-page" aria-label="집 상세 정보">
       <p v-if="isDetailLoading" id="deal-detail-title" class="empty-message">
         거래 상세 정보를 불러오는 중입니다.
       </p>
@@ -2697,7 +2698,7 @@ function formatPrice(price) {
         <template v-if="currentView !== 'deal-history'">
           <section class="detail-hero">
             <div>
-              <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 거래 상세</p>
+              <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 집 상세 정보</p>
               <div class="detail-title-row">
                 <h1 id="deal-detail-title">
                   {{ selectedPropertyDetail.name }}
@@ -3104,7 +3105,7 @@ function formatPrice(price) {
           <section class="detail-header history-page-header">
             <div>
               <p class="detail-breadcrumb">
-                홈 &gt; 검색 결과 &gt; 거래 상세 &gt; 거래 이력
+                홈 &gt; 검색 결과 &gt; 집 상세 정보 &gt; 거래 이력
               </p>
               <h1>전체 거래 이력</h1>
               <p>
@@ -3377,5 +3378,6 @@ function formatPrice(price) {
         </template>
       </template>
     </section>
+    </Transition>
   </main>
 </template>
