@@ -1,15 +1,14 @@
 package com.ssafy.zipdaum.property.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.zipdaum.favorite.dto.FavoritePropertyResponse;
 import com.ssafy.zipdaum.favorite.service.FavoritePropertyService;
+import com.ssafy.zipdaum.global.ai.GmsOpenAiClient;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.preference.service.UserPreferenceService;
-import com.ssafy.zipdaum.property.config.PropertyAiProperties;
 import com.ssafy.zipdaum.property.dto.PropertyAiComparisonRequest;
 import com.ssafy.zipdaum.property.dto.PropertyAiComparisonResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDealHistoryResponse;
@@ -17,17 +16,11 @@ import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.service.RecommendationService;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 @Service
 @Slf4j
@@ -53,31 +46,28 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
       응답은 반드시 유효한 JSON 객체로만 작성한다.
       """;
 
-  private final PropertyAiProperties properties;
   private final PropertyService propertyService;
   private final SurroundingService surroundingService;
   private final RecommendationService recommendationService;
   private final UserPreferenceService userPreferenceService;
   private final FavoritePropertyService favoritePropertyService;
-  private final RestClient restClient;
+  private final GmsOpenAiClient gmsOpenAiClient;
   private final ObjectMapper objectMapper;
 
   public PropertyAiComparisonServiceImpl(
-      PropertyAiProperties properties,
       PropertyService propertyService,
       SurroundingService surroundingService,
       RecommendationService recommendationService,
       UserPreferenceService userPreferenceService,
       FavoritePropertyService favoritePropertyService,
-      @Qualifier("propertyAiRestClient") RestClient restClient,
+      GmsOpenAiClient gmsOpenAiClient,
       ObjectMapper objectMapper) {
-    this.properties = properties;
     this.propertyService = propertyService;
     this.surroundingService = surroundingService;
     this.recommendationService = recommendationService;
     this.userPreferenceService = userPreferenceService;
     this.favoritePropertyService = favoritePropertyService;
-    this.restClient = restClient;
+    this.gmsOpenAiClient = gmsOpenAiClient;
     this.objectMapper = objectMapper;
   }
 
@@ -85,8 +75,8 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   public PropertyAiComparisonResponse compareProperties(
       Long userId,
       PropertyAiComparisonRequest request) {
+    long startedAt = System.nanoTime();
     validateRequest(request);
-    validateApiKey();
 
     List<Long> propertyIds = request.getPropertyIds();
     UserComparisonContext userContext = buildUserContext(userId, request);
@@ -104,9 +94,11 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     try {
       String content = requestAiComparison(input);
       PropertyAiComparisonResponse response =
-          objectMapper.readValue(content, PropertyAiComparisonResponse.class);
+          objectMapper.readValue(extractJsonObject(content), PropertyAiComparisonResponse.class);
       log.info("AI 주택 비교 생성 완료 propertyA={}, propertyB={}",
           propertyIds.get(0), propertyIds.get(1));
+      log.info("AI property comparison total elapsedMs={}, userId={}, propertyIds={}",
+          elapsedMillis(startedAt), userId, propertyIds);
       return response;
     } catch (JsonProcessingException e) {
       log.warn("AI 주택 비교 응답 파싱 실패 propertyA={}, propertyB={}",
@@ -124,13 +116,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     Long right = request.getPropertyIds().get(1);
     if (left == null || right == null || left < 1 || right < 1 || left.equals(right)) {
       throw new BusinessException(ErrorCode.INVALID_PROPERTY_ID);
-    }
-  }
-
-  private void validateApiKey() {
-    if (!properties.hasApiKey()) {
-      log.warn("AI 주택 비교 실패 - GMS API 키 누락");
-      throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
     }
   }
 
@@ -207,36 +192,37 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   }
 
   private String requestAiComparison(PropertyComparisonInput input) throws JsonProcessingException {
-    ChatCompletionRequest request = new ChatCompletionRequest(
-        properties.getModel(),
-        List.of(
-            new ChatMessage("developer", DEVELOPER_PROMPT),
-            new ChatMessage("user", objectMapper.writeValueAsString(input))
-        )
+    return gmsOpenAiClient.chatCompletion(
+        DEVELOPER_PROMPT,
+        objectMapper.writeValueAsString(input),
+        "property comparison"
     );
+  }
 
-    try {
-      byte[] rawResponse = restClient.post()
-          .uri(properties.getGmsUrl())
-          .contentType(MediaType.APPLICATION_JSON)
-          .accept(MediaType.APPLICATION_JSON)
-          .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getApiKey())
-          .body(request)
-          .retrieve()
-          .body(byte[].class);
-
-      JsonNode response = objectMapper.readTree(new String(rawResponse, StandardCharsets.UTF_8));
-      String content = response == null
-          ? null
-          : response.path("choices").path(0).path("message").path("content").asText(null);
-      if (content == null || content.isBlank()) {
-        throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
-      }
-      return content;
-    } catch (RestClientException e) {
-      log.warn("AI 주택 비교 외부 API 호출 실패", e);
+  private String extractJsonObject(String content) {
+    if (content == null) {
       throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
     }
+
+    String trimmed = content.trim();
+    if (trimmed.startsWith("```")) {
+      int firstLineEnd = trimmed.indexOf('\n');
+      int lastFenceStart = trimmed.lastIndexOf("```");
+      if (firstLineEnd >= 0 && lastFenceStart > firstLineEnd) {
+        trimmed = trimmed.substring(firstLineEnd + 1, lastFenceStart).trim();
+      }
+    }
+
+    int objectStart = trimmed.indexOf('{');
+    int objectEnd = trimmed.lastIndexOf('}');
+    if (objectStart < 0 || objectEnd < objectStart) {
+      throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+    }
+    return trimmed.substring(objectStart, objectEnd + 1);
+  }
+
+  private long elapsedMillis(long startedAt) {
+    return (System.nanoTime() - startedAt) / 1_000_000;
   }
 
   private UserComparisonContextSummary summarizeUserContext(UserComparisonContext userContext) {
@@ -345,13 +331,6 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
         "JSON을 반환하기 전에 recommendedProperty 값과 필수 필드 누락 여부를 내부적으로 검증한다."
     );
   }
-
-  private record ChatCompletionRequest(String model, List<ChatMessage> messages) {
-  }
-
-  private record ChatMessage(String role, String content) {
-  }
-
   private record PropertyComparisonInput(
       String task,
       OutputFormat outputFormat,

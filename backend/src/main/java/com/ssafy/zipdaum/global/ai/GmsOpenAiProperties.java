@@ -1,13 +1,13 @@
-package com.ssafy.zipdaum.recommendation.config;
+package com.ssafy.zipdaum.global.ai;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "ai.summary")
-public class AiSummaryProperties {
+@ConfigurationProperties(prefix = "ai.gms")
+public class GmsOpenAiProperties {
 
   private String baseUrl;
-  private String chatCompletionsPath;
+  private String generateContentPath;
   private String apiKey;
   private String model;
   private Duration connectTimeout;
@@ -21,12 +21,12 @@ public class AiSummaryProperties {
     this.baseUrl = baseUrl;
   }
 
-  public String getChatCompletionsPath() {
-    return chatCompletionsPath;
+  public String getGenerateContentPath() {
+    return generateContentPath;
   }
 
-  public void setChatCompletionsPath(String chatCompletionsPath) {
-    this.chatCompletionsPath = chatCompletionsPath;
+  public void setGenerateContentPath(String generateContentPath) {
+    this.generateContentPath = generateContentPath;
   }
 
   public String getApiKey() {
