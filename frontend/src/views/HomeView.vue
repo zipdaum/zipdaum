@@ -250,7 +250,7 @@ const initKakaoMap = async () => {
   mapMarkers = [];
 
   // [메인 마커] 선택된 주택 위치 핀 찍기
-  const homeContent = `<span class="home-map-marker" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #000; color: #fff; border-radius: 50%; font-weight: bold; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">집</span>`;
+  const homeContent = `<span class="home-map-marker" aria-label="선택한 주택 위치" role="img"></span>`;
   
   const homeMarker = new window.kakao.maps.CustomOverlay({
     position: centerPosition,
