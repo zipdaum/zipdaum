@@ -388,13 +388,22 @@ async function handleSearch() {
 }
 
 async function runSearch() {
+  return runSearchWithOptions();
+}
+
+async function runSearchWithOptions({
+  highlight = true,
+  scroll = true,
+} = {}) {
   isLoading.value = true;
-  isResultHighlighted.value = true;
+  isResultHighlighted.value = highlight;
   errorMessage.value = "";
   hasSearched.value = true;
   appliedSearchSummary.value = getSearchSummary();
   clearResultHighlightTimer();
-  await scrollToResults();
+  if (scroll) {
+    await scrollToResults();
+  }
 
   try {
     const selectedPriceRange = priceRanges[searchForm.value.priceRangeIndex];
@@ -425,11 +434,17 @@ async function runSearch() {
       "실거래가 검색 결과를 불러오지 못했습니다. 백엔드 서버와 검색 조건을 확인해주세요.";
   } finally {
     isLoading.value = false;
-    resultHighlightTimer = window.setTimeout(() => {
+    if (highlight) {
+      resultHighlightTimer = window.setTimeout(() => {
+        isResultHighlighted.value = false;
+        resultHighlightTimer = null;
+      }, 1600);
+    } else {
       isResultHighlighted.value = false;
-      resultHighlightTimer = null;
-    }, 1600);
-    await scrollToResults();
+    }
+    if (scroll) {
+      await scrollToResults();
+    }
   }
 }
 
@@ -957,6 +972,7 @@ async function handleBrowserBack(event) {
   }
 
   openHomeView({ updateHistory: false });
+  await loadInitialSearchResults();
 }
 
 async function restoreViewFromUrl() {
@@ -985,6 +1001,7 @@ async function restoreViewFromUrl() {
   }
 
   openHomeView({ updateHistory: false });
+  await loadInitialSearchResults();
 }
 
 function getCurrentRoute() {
@@ -1078,6 +1095,12 @@ async function loadRecommendationResultsView() {
   historiesErrorMessage.value = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
   await loadPropertyRecommendations();
+}
+
+async function loadInitialSearchResults() {
+  homeResultTab.value = "search";
+  searchPage.value = 1;
+  await runSearchWithOptions({ highlight: false, scroll: false });
 }
 
 function startDetailInteraction(propertyId) {
