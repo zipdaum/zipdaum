@@ -1,31 +1,25 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-const backendUrl = 'http://127.0.0.1:8080'
-// TODO: 배포 환경 확인 시 Railway 백엔드로 전환
-// const backendUrl = 'https://zipdaum.up.railway.app'
+const apiPaths = ['/properties', '/auth', '/users', '/api']
 
-export default defineConfig({
-  plugins: [vue()],
-  server: {
-    port: 5173,
-    proxy: {
-      '/properties': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/auth': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/users': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      },
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true
-      }
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const backendUrl = env.VITE_API_PROXY_TARGET || env.VITE_API_BASE_URL || 'http://localhost:8080'
+
+  return {
+    plugins: [vue()],
+    server: {
+      port: 5173,
+      proxy: Object.fromEntries(
+        apiPaths.map((path) => [
+          path,
+          {
+            target: backendUrl,
+            changeOrigin: true
+          }
+        ])
+      )
     }
   }
 })
