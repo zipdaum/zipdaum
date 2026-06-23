@@ -117,7 +117,11 @@ const searchForm = ref({
   sortIndex: 0,
 });
 
-const currentView = ref("home");
+const initialRoute = getCurrentRoute();
+const isInitialDetailRoute =
+  initialRoute.view === "detail" || initialRoute.view === "deal-history";
+
+const currentView = ref(initialRoute.view);
 const homeResultTab = ref("search");
 const searchResults = ref([]);
 const recommendationResults = ref([]);
@@ -127,7 +131,7 @@ const isRecommendationListLoading = ref(false);
 const isResultHighlighted = ref(false);
 const errorMessage = ref("");
 const recommendationListErrorMessage = ref("");
-const isDetailLoading = ref(false);
+const isDetailLoading = ref(isInitialDetailRoute);
 const detailErrorMessage = ref("");
 const isSaleHistoryLoading = ref(false);
 const isRentHistoryLoading = ref(false);
@@ -2681,24 +2685,8 @@ function formatPrice(price) {
       </div>
     </section>
 
-    <section v-else class="detail-page" aria-labelledby="deal-detail-title">
-      <div
-        v-if="isDetailLoading || detailErrorMessage || !selectedPropertyDetail"
-        class="detail-header"
-      >
-        <div v-if="selectedPropertyDetail">
-          <p class="result-kicker">Deal Detail</p>
-          <h1 id="deal-detail-title">{{ selectedPropertyDetail.name }}</h1>
-          <p>{{ getPropertyAddress(selectedPropertyDetail) }}</p>
-        </div>
-        <div v-else>
-          <p class="result-kicker">Deal Detail</p>
-          <h1 id="deal-detail-title">거래 상세 조회</h1>
-          <p>선택한 거래의 상세 정보를 불러오고 있습니다.</p>
-        </div>
-      </div>
-
-      <p v-if="isDetailLoading" class="empty-message">
+    <section v-else class="detail-page" aria-label="거래 상세">
+      <p v-if="isDetailLoading" id="deal-detail-title" class="empty-message">
         거래 상세 정보를 불러오는 중입니다.
       </p>
       <p v-else-if="detailErrorMessage" class="form-message" role="alert">
