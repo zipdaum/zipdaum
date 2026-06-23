@@ -35,6 +35,7 @@ public class JwtTokenProvider {
     return Jwts.builder()
         .subject(user.getEmail())
         .claim("userId", user.getId())
+            .claim("role", user.getRole())
         .issuedAt(now)
         .expiration(expiration)
         .signWith(secretKey)
@@ -47,8 +48,9 @@ public class JwtTokenProvider {
 
     Long userId = Long.valueOf(String.valueOf(userIdClaim));
     String email = claims.getSubject();
+    String role = claims.get("role").toString();
 
-    return new AuthenticatedUser(userId, email);
+    return new AuthenticatedUser(userId, email, role);
   }
 
   private Claims parseClaims(String token) {
