@@ -10,22 +10,13 @@ import org.springframework.web.client.RestClient;
 @Configuration
 @EnableConfigurationProperties({
     PropertyApiProperties.class,
-    KakaoApiProperties.class,
-    PropertyAiProperties.class
+    KakaoApiProperties.class
 })
 public class PropertyApiConfig {
 
   @Bean
   @Primary
   public RestClient restClient(RestClient.Builder builder, PropertyApiProperties properties) {
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(properties.getConnectTimeout());
-    requestFactory.setReadTimeout(properties.getReadTimeout());
-    return builder.requestFactory(requestFactory).build();
-  }
-
-  @Bean
-  public RestClient propertyAiRestClient(RestClient.Builder builder, PropertyAiProperties properties) {
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(properties.getConnectTimeout());
     requestFactory.setReadTimeout(properties.getReadTimeout());
