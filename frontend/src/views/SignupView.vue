@@ -172,6 +172,10 @@ function clearCodeMessage() {
 }
 
 function getErrorMessage(error, fallbackMessage) {
+  if (!error.response && error.request) {
+    return '로컬 백엔드 서버에 연결하지 못했습니다. 백엔드가 8080 포트에서 실행 중인지 확인해주세요.'
+  }
+
   return error.response?.data?.message || error.response?.data || fallbackMessage
 }
 </script>
