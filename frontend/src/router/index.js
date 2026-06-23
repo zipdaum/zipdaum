@@ -5,6 +5,7 @@ import AdminBatchView from "../views/admin/AdminBatchView.vue";
 import SignupView from "../views/SignupView.vue";
 import FavoriteView from "../views/FavoriteView.vue";
 import MyPageView from "../views/MyPageView.vue";
+import ComparisonView from "../views/ComparisonView.vue";
 import PreferenceSettingView from "../views/PreferenceSettingView.vue";
 import RecommendationScoreView from "../views/RecommendationScoreView.vue";
 import { isLoggedIn, userRole } from "../stores/auth";
@@ -43,6 +44,12 @@ const router = createRouter({
       path: "/mypage",
       name: "mypage",
       component: MyPageView,
+      meta: { requiresAuth: true, roles: ["ROLE_USER"] },
+    },
+    {
+      path: "/comparison",
+      name: "comparison",
+      component: ComparisonView,
       meta: { requiresAuth: true, roles: ["ROLE_USER"] },
     },
     {
