@@ -9,19 +9,19 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/properties': {
-        target: backendUrl,
+        target: 'http://localhost:8080',
         changeOrigin: true
       },
       '/auth': {
-        target: backendUrl,
+        target: 'http://localhost:8080',
         changeOrigin: true
       },
       '/users': {
-        target: backendUrl,
+        target: 'http://localhost:8080',
         changeOrigin: true
       },
       '/api': {
-        target: backendUrl,
+        target: 'http://localhost:8080',
         changeOrigin: true
       }
     }
