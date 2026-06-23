@@ -8,6 +8,7 @@ import com.ssafy.zipdaum.user.mapper.UserMapper;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class EmailService {
 
     private final JavaMailSender mailSender;
@@ -48,7 +50,7 @@ public class EmailService {
                 + "  <div style=\"background-color: #2a2a2a; padding: 30px; margin-top: 30px; margin-bottom: 40px; border-radius: 8px; text-align: center;\">"
                 + "    <span style=\"font-size: 32px; font-weight: bold; letter-spacing: 3px; color: white;\">" + authCode + "</span>"
                 + "  </div>"
-                + "  <p style=\"font-size: 14px; color: #ccc;\">감사합니다.<br>집다음 담당 드림</p>"
+                + "  <p style=\"font-size: 14px; color: #ccc;\">감사합니다.<br>집다음 담당자 드림</p>"
                 + "</div>";
         message.setText(msg, "utf-8", "html");
 
@@ -74,6 +76,7 @@ public class EmailService {
             MimeMessage emailForm = createEmailForm(toEmail, authCode);
             mailSender.send(emailForm);
         } catch (Exception e) {
+            log.error("이메일 인증코드 발송 실패. toEmail={}", toEmail, e);
             redisUtil.delete(toEmail);
             throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
         }
