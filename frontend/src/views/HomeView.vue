@@ -212,7 +212,6 @@ const loadKakaoMapScript = () => {
   });
 };
 
-// 3. 지도 객체 생성 및 마커 렌더링 함수
 const initKakaoMap = async () => {
   await nextTick(); // DOM 컨테이너가 확실히 렌더링 된 후 실행
   
@@ -227,8 +226,8 @@ const initKakaoMap = async () => {
   // 집의 좌표 (지도의 중심점)
   const centerPosition = new window.kakao.maps.LatLng(centerLat, centerLng);
 
-  // 지도 객체가 없으면 새로 생성, 이미 있으면 중심 좌표만 갱신
-  if (!kakaoMap) {
+  // 💡수정된 부분: 지도 객체가 없거나, div 안이 텅 비어있으면(새로 렌더링되면) 지도를 무조건 새로 그림
+  if (!kakaoMap || mapContainer.value.children.length === 0) {
     const mapOptions = {
       center: centerPosition,
       level: 4, // 확대 레벨 (작을수록 확대됨)
@@ -251,10 +250,14 @@ const initKakaoMap = async () => {
   mapMarkers = [];
 
   // [메인 마커] 선택된 주택 위치 핀 찍기
-  const homeMarker = new window.kakao.maps.Marker({
+  const homeContent = `<span class="home-map-marker" style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #000; color: #fff; border-radius: 50%; font-weight: bold; border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">집</span>`;
+  
+  const homeMarker = new window.kakao.maps.CustomOverlay({
     position: centerPosition,
+    content: homeContent,
     map: kakaoMap,
-    title: property.name || '선택한 집'
+    xAnchor: 0.5,
+    yAnchor: 0.5
   });
   mapMarkers.push(homeMarker);
 
@@ -271,7 +274,7 @@ const initKakaoMap = async () => {
     const text = getFacilityMarkerText(facility);
     const tooltip = `${getFacilityTypeLabel(facility.type)} - ${facility.name}`;
 
-    // 2. 마커로 쓸 HTML 생성 (지도 위에서 잘 보이게 하얀색 테두리와 그림자 살짝 추가)
+    // 2. 마커로 쓸 HTML 생성 (지도 위에서 잘 보이게 하얀색 테두리와 그림자 살짝 추가, 85% 크기 축소)
     const content = `<span class="${cssClasses}" title="${tooltip}" style="cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1.5px solid #fff; transform: scale(0.85); display: inline-block;">${text}</span>`;
 
     // 3. 기본 Marker 대신 CustomOverlay 객체 사용
@@ -288,10 +291,12 @@ const initKakaoMap = async () => {
 };
 
 // 4. 데이터 로드 시 지도 초기화 트리거
+// 4. 데이터 로드 시 지도 초기화 트리거
 watch(
-  () => surroundings.value, // 주변 시설 데이터가 변경/로드될 때 실행
-  async (newVal) => {
-    if (newVal && selectedPropertyDetail.value) {
+  [surroundings, mapContainer], // 💡수정된 부분: 데이터뿐만 아니라 지도가 들어갈 div도 감시함
+  async ([newSurroundings, container]) => {
+    // DOM이 확실히 존재하고 데이터가 있을 때만 실행
+    if (newSurroundings && container && selectedPropertyDetail.value) {
       try {
         await loadKakaoMapScript(); // 스크립트가 없다면 불러오고
         initKakaoMap();             // 지도를 그림
@@ -616,7 +621,7 @@ function openRecommendationResultsView() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function openHomeView({ updateHistory = true } = {}) {
+async function openHomeView({ updateHistory = true, reset = false } = {}) {
   saveDetailInteraction();
   if (updateHistory) {
     window.history.pushState({ view: "home" }, "", getViewUrl("home"));
@@ -626,6 +631,20 @@ function openHomeView({ updateHistory = true } = {}) {
   detailErrorMessage.value = "";
   isDetailLoading.value = false;
   window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // ✨ 핵심 추가: 헤더 로고를 클릭(reset)했거나, 아직 한 번도 검색을 안 했다면 초기화 후 부산 전체 검색 실행
+  if (reset || !hasSearched.value) {
+    searchForm.value = {
+      sggCd: null,
+      umdNm: "",
+      name: "",
+      propertyType: "",
+      dealType: "",
+      priceRangeIndex: 0,
+      sortIndex: 0,
+    };
+    await loadInitialSearchResults();
+  }
 }
 
 async function openPropertyDetail(propertyId) {
@@ -2180,7 +2199,7 @@ function formatPrice(price) {
 
 <template>
   <main class="app-shell">
-    <AppHeader @home="openHomeView" />
+    <AppHeader @home="openHomeView({ reset: true })" />
 
     <Transition name="view-switch" mode="out-in" appear>
     <div v-if="currentView === 'home'" class="view-panel home-view-panel">
