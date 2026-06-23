@@ -106,7 +106,11 @@
         AND umd_nm = #{umdNm}
       </if>
       <if test="name != null">
-        AND name LIKE CONCAT('%', #{name}, '%')
+        AND (
+          name LIKE CONCAT('%', #{name}, '%')
+          OR umd_nm LIKE CONCAT('%', #{name}, '%')
+          OR jibun LIKE CONCAT('%', #{name}, '%')
+        )
       </if>
       <if test="propertyType != null">
         AND property_type = #{propertyType}
@@ -196,7 +200,13 @@
     <where>
       <if test="sggCd != null"> AND sgg_cd = #{sggCd} </if>
       <if test="umdNm != null"> AND umd_nm = #{umdNm} </if>
-      <if test="name != null"> AND name LIKE CONCAT('%', #{name}, '%') </if>
+      <if test="name != null">
+        AND (
+          name LIKE CONCAT('%', #{name}, '%')
+          OR umd_nm LIKE CONCAT('%', #{name}, '%')
+          OR jibun LIKE CONCAT('%', #{name}, '%')
+        )
+      </if>
       <if test="propertyType != null"> AND property_type = #{propertyType} </if>
     </where>
   </select>

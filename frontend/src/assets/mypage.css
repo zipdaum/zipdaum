@@ -24,51 +24,8 @@
 
 .mypage-layout {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-}
-
-.mypage-layout.compare-layout {
-  grid-template-columns: 1fr;
-}
-
-.mypage-side-nav {
-  position: sticky;
-  top: 18px;
-  display: grid;
-  gap: 8px;
-  border: 1px solid #dbe7ff;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(39, 83, 150, 0.08);
-  padding: 10px;
-}
-
-.mypage-side-nav button {
-  min-height: 42px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: #53617c;
-  padding: 0 12px;
-  text-align: left;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.mypage-side-nav button:hover,
-.mypage-side-nav button:focus-visible {
-  border-color: #b9ccf8;
-  background: #f6f9ff;
-  color: #0b5cff;
-  outline: 0;
-}
-
-.mypage-side-nav button.active {
-  border-color: #9fb8f2;
-  background: #eef4ff;
-  color: #0b5cff;
 }
 
 .mypage-content {
@@ -899,14 +856,6 @@
     grid-template-columns: 1fr;
   }
 
-  .mypage-side-nav {
-    position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .mypage-side-nav button {
-    text-align: center;
-  }
 }
 
 @media (max-width: 640px) {

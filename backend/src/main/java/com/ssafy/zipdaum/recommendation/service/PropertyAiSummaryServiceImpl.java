@@ -1,10 +1,10 @@
 package com.ssafy.zipdaum.recommendation.service;
 
+import com.ssafy.zipdaum.global.ai.GmsOpenAiClient;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.property.service.SurroundingService;
-import com.ssafy.zipdaum.recommendation.api.GmsOpenAiClient;
 import com.ssafy.zipdaum.recommendation.dto.PropertyAiSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCandidate;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationCondition;
@@ -39,7 +39,11 @@ public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
     PropertyRecommendationScore score =
         recommendationService.findPropertyRecommendationScore(userId, propertyId);
     SurroundingSummaryResponse surroundingSummary = findSurroundingSummary(property);
-    String summary = gmsOpenAiClient.summarize(createPrompt(property, score, surroundingSummary));
+    String summary = gmsOpenAiClient.chatCompletion(
+        "Answer in Korean. Keep the answer to one natural sentence.",
+        createPrompt(property, score, surroundingSummary),
+        "property summary"
+    );
     return new PropertyAiSummaryResponse(summary);
   }
 

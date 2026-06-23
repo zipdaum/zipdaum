@@ -117,7 +117,11 @@ const searchForm = ref({
   sortIndex: 0,
 });
 
-const currentView = ref("home");
+const initialRoute = getCurrentRoute();
+const isInitialDetailRoute =
+  initialRoute.view === "detail" || initialRoute.view === "deal-history";
+
+const currentView = ref(initialRoute.view);
 const homeResultTab = ref("search");
 const searchResults = ref([]);
 const recommendationResults = ref([]);
@@ -127,7 +131,7 @@ const isRecommendationListLoading = ref(false);
 const isResultHighlighted = ref(false);
 const errorMessage = ref("");
 const recommendationListErrorMessage = ref("");
-const isDetailLoading = ref(false);
+const isDetailLoading = ref(isInitialDetailRoute);
 const detailErrorMessage = ref("");
 const isSaleHistoryLoading = ref(false);
 const isRentHistoryLoading = ref(false);
@@ -147,9 +151,6 @@ const isPropertyAiSummaryLoading = ref(false);
 const propertyAiSummaryErrorMessage = ref("");
 const isPropertyAiSummaryHighlighted = ref(false);
 const detailInteraction = ref(null);
-const mapZoom = ref(1);
-const mapPan = ref({ x: 0, y: 0 });
-const isMapDragging = ref(false);
 const saleHistoryPage = ref(1);
 const rentHistoryPage = ref(1);
 const favoritePropertyIds = ref([]);
@@ -172,14 +173,145 @@ const emptyHistoryMeta = {
   saleServerPaged: false,
   rentServerPaged: false,
 };
+
 let resultHighlightTimer = null;
 let propertyAiSummaryHighlightTimer = null;
-let mapDragStart = null;
 
 const searchPage = ref(1);
 const searchTotalPages = ref(1);
 const searchTotalElements = ref(0);
 const searchPageSize = 10;
+
+const mapContainer = ref(null);
+let kakaoMap = null;
+let mapMarkers = [];
+
+const loadKakaoMapScript = () => {
+  return new Promise((resolve, reject) => {
+    // 이미 스크립트가 로드되어 있다면 바로 통과
+    if (window.kakao && window.kakao.maps) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement("script");
+    const appKey = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+    
+    // autoload=false 속성을 반드시 넣어야 합니다.
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
+    
+    script.onload = () => {
+      // 스크립트 로드 완료 후 카카오맵 내부적으로 로딩이 끝나면 resolve 호출
+      window.kakao.maps.load(resolve);
+    };
+    script.onerror = () => {
+      reject(new Error("카카오맵 스크립트를 불러오지 못했습니다."));
+    };
+
+    document.head.appendChild(script);
+  });
+};
+
+const initKakaoMap = async () => {
+  await nextTick(); // DOM 컨테이너가 확실히 렌더링 된 후 실행
+  
+  if (!mapContainer.value || !window.kakao || !window.kakao.maps) return;
+
+  const property = selectedPropertyDetail.value;
+  const centerLat = Number(property?.latitude);
+  const centerLng = Number(property?.longitude);
+
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) return;
+
+  // 집의 좌표 (지도의 중심점)
+  const centerPosition = new window.kakao.maps.LatLng(centerLat, centerLng);
+
+  // 💡수정된 부분: 지도 객체가 없거나, div 안이 텅 비어있으면(새로 렌더링되면) 지도를 무조건 새로 그림
+  if (!kakaoMap || mapContainer.value.children.length === 0) {
+    const mapOptions = {
+      center: centerPosition,
+      level: 4, // 확대 레벨 (작을수록 확대됨)
+    };
+    kakaoMap = new window.kakao.maps.Map(mapContainer.value, mapOptions);
+    
+    // 일반 지도와 스카이뷰로 지도 타입을 전환할 수 있는 컨트롤 추가
+    const mapTypeControl = new window.kakao.maps.MapTypeControl();
+    kakaoMap.addControl(mapTypeControl, window.kakao.maps.ControlPosition.TOPRIGHT);
+
+    // 줌 컨트롤 추가
+    const zoomControl = new window.kakao.maps.ZoomControl();
+    kakaoMap.addControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT);
+  } else {
+    kakaoMap.setCenter(centerPosition);
+  }
+
+  // 기존 화면에 찍혀있던 마커들 초기화
+  mapMarkers.forEach(marker => marker.setMap(null));
+  mapMarkers = [];
+
+  // [메인 마커] 선택된 주택 위치 핀 찍기
+  const homeContent = `<span class="home-map-marker" aria-label="선택한 주택 위치" role="img"></span>`;
+  
+  const homeMarker = new window.kakao.maps.CustomOverlay({
+    position: centerPosition,
+    content: homeContent,
+    map: kakaoMap,
+    xAnchor: 0.5,
+    yAnchor: 0.5
+  });
+  mapMarkers.push(homeMarker);
+
+  // [주변 마커] 편의 시설들 핀 찍기
+  const facilities = getMapFacilities(); 
+  facilities.forEach((facility) => {
+    const facPosition = new window.kakao.maps.LatLng(
+      Number(facility.latitude),
+      Number(facility.longitude)
+    );
+
+    // 1. 왼쪽 리스트와 똑같이 보이도록 기존 함수로 클래스 가져오기
+    const cssClasses = [
+      ...getFacilityMarkerClass(facility),
+      "facility-map-marker",
+    ].join(" ");
+    const tooltip = escapeHtml(
+      `${getFacilityTypeLabel(facility.type)} - ${facility.name}`
+    );
+
+    // 2. 마커로 쓸 HTML 생성
+    const content = `<span class="${cssClasses}" title="${tooltip}" aria-label="${tooltip}" role="img"></span>`;
+
+    // 3. 기본 Marker 대신 CustomOverlay 객체 사용
+    const customOverlay = new window.kakao.maps.CustomOverlay({
+      position: facPosition,
+      content: content,
+      map: kakaoMap,
+      xAnchor: 0.5, // 가로 기준점 (0.5는 정중앙)
+      yAnchor: 0.5  // 세로 기준점 (0.5는 정중앙)
+    });
+    
+    mapMarkers.push(customOverlay);
+  });
+};
+
+// 4. 데이터 로드 시 지도 초기화 트리거
+// 4. 데이터 로드 시 지도 초기화 트리거
+watch(
+  [surroundings, mapContainer], // 💡수정된 부분: 데이터뿐만 아니라 지도가 들어갈 div도 감시함
+  async ([newSurroundings, container]) => {
+    // DOM이 확실히 존재하고 데이터가 있을 때만 실행
+    if (newSurroundings && container && selectedPropertyDetail.value) {
+      try {
+        await loadKakaoMapScript(); // 스크립트가 없다면 불러오고
+        initKakaoMap();             // 지도를 그림
+      } catch (error) {
+        console.error(error);
+        surroundingsErrorMessage.value = "지도를 불러오는 데 실패했습니다.";
+      }
+    }
+  },
+  { immediate: true }
+);
 
 function createEmptyRentDealsByType() {
   return {
@@ -233,7 +365,6 @@ onUnmounted(() => {
   saveDetailInteraction();
   clearResultHighlightTimer();
   clearPropertyAiSummaryHighlightTimer();
-  stopMapDrag();
   window.removeEventListener("scroll", updateDetailScrollDepth);
   window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
   window.removeEventListener("popstate", handleBrowserBack);
@@ -388,13 +519,22 @@ async function handleSearch() {
 }
 
 async function runSearch() {
+  return runSearchWithOptions();
+}
+
+async function runSearchWithOptions({
+  highlight = true,
+  scroll = true,
+} = {}) {
   isLoading.value = true;
-  isResultHighlighted.value = true;
+  isResultHighlighted.value = highlight;
   errorMessage.value = "";
   hasSearched.value = true;
   appliedSearchSummary.value = getSearchSummary();
   clearResultHighlightTimer();
-  await scrollToResults();
+  if (scroll) {
+    await scrollToResults();
+  }
 
   try {
     const selectedPriceRange = priceRanges[searchForm.value.priceRangeIndex];
@@ -425,11 +565,17 @@ async function runSearch() {
       "실거래가 검색 결과를 불러오지 못했습니다. 백엔드 서버와 검색 조건을 확인해주세요.";
   } finally {
     isLoading.value = false;
-    resultHighlightTimer = window.setTimeout(() => {
+    if (highlight) {
+      resultHighlightTimer = window.setTimeout(() => {
+        isResultHighlighted.value = false;
+        resultHighlightTimer = null;
+      }, 1600);
+    } else {
       isResultHighlighted.value = false;
-      resultHighlightTimer = null;
-    }, 1600);
-    await scrollToResults();
+    }
+    if (scroll) {
+      await scrollToResults();
+    }
   }
 }
 
@@ -479,7 +625,7 @@ function openRecommendationResultsView() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function openHomeView({ updateHistory = true } = {}) {
+async function openHomeView({ updateHistory = true, reset = false } = {}) {
   saveDetailInteraction();
   if (updateHistory) {
     window.history.pushState({ view: "home" }, "", getViewUrl("home"));
@@ -489,6 +635,20 @@ function openHomeView({ updateHistory = true } = {}) {
   detailErrorMessage.value = "";
   isDetailLoading.value = false;
   window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // ✨ 핵심 추가: 헤더 로고를 클릭(reset)했거나, 아직 한 번도 검색을 안 했다면 초기화 후 부산 전체 검색 실행
+  if (reset || !hasSearched.value) {
+    searchForm.value = {
+      sggCd: null,
+      umdNm: "",
+      name: "",
+      propertyType: "",
+      dealType: "",
+      priceRangeIndex: 0,
+      sortIndex: 0,
+    };
+    await loadInitialSearchResults();
+  }
 }
 
 async function openPropertyDetail(propertyId) {
@@ -539,7 +699,6 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   propertyAiSummary.value = "";
   propertyAiSummaryErrorMessage.value = "";
   isPropertyAiSummaryHighlighted.value = false;
-  resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
   hoveredTrendDot.value = null;
@@ -957,6 +1116,7 @@ async function handleBrowserBack(event) {
   }
 
   openHomeView({ updateHistory: false });
+  await loadInitialSearchResults();
 }
 
 async function restoreViewFromUrl() {
@@ -985,6 +1145,7 @@ async function restoreViewFromUrl() {
   }
 
   openHomeView({ updateHistory: false });
+  await loadInitialSearchResults();
 }
 
 function getCurrentRoute() {
@@ -1078,6 +1239,12 @@ async function loadRecommendationResultsView() {
   historiesErrorMessage.value = "";
   window.scrollTo({ top: 0, behavior: "smooth" });
   await loadPropertyRecommendations();
+}
+
+async function loadInitialSearchResults() {
+  homeResultTab.value = "search";
+  searchPage.value = 1;
+  await runSearchWithOptions({ highlight: false, scroll: false });
 }
 
 function startDetailInteraction(propertyId) {
@@ -1442,7 +1609,8 @@ function getDetailSummaryItems(property) {
   return [
     getPropertyTypeLabel(property.propertyType),
     representativeDeal?.floor,
-    representativeDeal?.area !== "-"
+    // 💡 수정된 부분: representativeDeal이 존재할 때만 area 값을 확인하도록 안전하게 처리
+    representativeDeal?.area && representativeDeal.area !== "-"
       ? `전용면적 ${representativeDeal.area}`
       : null,
     getBuildYearLabel(property.buildYear),
@@ -1982,15 +2150,12 @@ function getFacilityMarkerClass(facility) {
   ];
 }
 
-function getFacilityMarkerText(facility) {
-  const markerTextByType = {
-    BUS: "버",
-    SUBWAY: "역",
-    HOSPITAL: "+",
-    CCTV: "C",
-    PARK: "공",
-  };
-  return markerTextByType[facility.type] || "F";
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function getFacilityMoveLabel(facility) {
@@ -2008,101 +2173,6 @@ function getFacilityMoveLabel(facility) {
   }
 
   return `도보 ${Math.max(Math.round(distance / 70), 1)}분`;
-}
-
-function getMapMarkers() {
-  const facilities = getMapFacilities();
-  const centerLat = Number(selectedPropertyDetail.value?.latitude);
-  const centerLng = Number(selectedPropertyDetail.value?.longitude);
-  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
-    return [];
-  }
-
-  const points = [
-    { latitude: centerLat, longitude: centerLng },
-    ...facilities,
-  ].filter(
-    (point) =>
-      Number.isFinite(Number(point.latitude)) &&
-      Number.isFinite(Number(point.longitude)),
-  );
-  const latitudes = points.map((point) => Number(point.latitude));
-  const longitudes = points.map((point) => Number(point.longitude));
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
-  const latRange = Math.max(maxLat - minLat, 0.002);
-  const lngRange = Math.max(maxLng - minLng, 0.002);
-
-  return facilities
-    .filter(
-      (facility) =>
-        Number.isFinite(Number(facility.latitude)) &&
-        Number.isFinite(Number(facility.longitude)),
-    )
-    .map((facility) => ({
-      ...facility,
-      top: `${Math.min(Math.max(8 + ((maxLat - Number(facility.latitude)) / latRange) * 84, 8), 92)}%`,
-      left: `${Math.min(Math.max(8 + ((Number(facility.longitude) - minLng) / lngRange) * 84, 8), 92)}%`,
-    }));
-}
-
-function getFacilityMapTransform() {
-  return {
-    transform: `translate(${mapPan.value.x}px, ${mapPan.value.y}px) scale(${mapZoom.value})`,
-  };
-}
-
-function changeMapZoom(delta) {
-  mapZoom.value = Math.min(
-    Math.max(Number((mapZoom.value + delta).toFixed(1)), 0.8),
-    1.8,
-  );
-}
-
-function resetFacilityMap() {
-  mapZoom.value = 1;
-  mapPan.value = { x: 0, y: 0 };
-  stopMapDrag();
-}
-
-function startMapDrag(event) {
-  if (event.button !== undefined && event.button !== 0) {
-    return;
-  }
-
-  isMapDragging.value = true;
-  mapDragStart = {
-    pointerId: event.pointerId,
-    x: event.clientX,
-    y: event.clientY,
-    panX: mapPan.value.x,
-    panY: mapPan.value.y,
-  };
-  event.currentTarget.setPointerCapture?.(event.pointerId);
-}
-
-function moveMapDrag(event) {
-  if (!isMapDragging.value || !mapDragStart) {
-    return;
-  }
-
-  mapPan.value = {
-    x: Math.min(
-      Math.max(mapDragStart.panX + event.clientX - mapDragStart.x, -180),
-      180,
-    ),
-    y: Math.min(
-      Math.max(mapDragStart.panY + event.clientY - mapDragStart.y, -120),
-      120,
-    ),
-  };
-}
-
-function stopMapDrag() {
-  isMapDragging.value = false;
-  mapDragStart = null;
 }
 
 function getBuildYearLabel(buildYear) {
@@ -2130,14 +2200,15 @@ function formatPrice(price) {
 
 <template>
   <main class="app-shell">
-    <AppHeader @home="openHomeView" />
+    <AppHeader @home="openHomeView({ reset: true })" />
 
-    <template v-if="currentView === 'home'">
+    <Transition name="view-switch" mode="out-in" appear>
+    <div v-if="currentView === 'home'" class="view-panel home-view-panel">
       <section class="hero-section" aria-labelledby="home-title">
         <div class="hero-copy">
-          <h1 id="home-title">내 조건에 맞는 주거 정보를 찾아보세요</h1>
+          <h1 id="home-title">내게 맞는 부산 집 찾기</h1>
           <p>
-            부산 지역 실거래가를 기준으로 관심 지역과 주택 후보를 비교합니다.
+            실거래가를 살펴보며 관심 지역과 집 후보를 가볍게 비교해보세요.
           </p>
         </div>
       </section>
@@ -2451,7 +2522,7 @@ function formatPrice(price) {
           </template>
         </article>
       </section>
-    </template>
+    </div>
 
     <section
       v-else-if="currentView === 'results'"
@@ -2460,7 +2531,6 @@ function formatPrice(price) {
     >
       <div class="result-page-header">
         <div>
-          <p class="result-kicker">All Search Results</p>
           <h1 id="all-result-title">실거래가 전체 검색 결과</h1>
           <p>{{ resultNotice }}</p>
         </div>
@@ -2658,24 +2728,8 @@ function formatPrice(price) {
       </div>
     </section>
 
-    <section v-else class="detail-page" aria-labelledby="deal-detail-title">
-      <div
-        v-if="isDetailLoading || detailErrorMessage || !selectedPropertyDetail"
-        class="detail-header"
-      >
-        <div v-if="selectedPropertyDetail">
-          <p class="result-kicker">Deal Detail</p>
-          <h1 id="deal-detail-title">{{ selectedPropertyDetail.name }}</h1>
-          <p>{{ getPropertyAddress(selectedPropertyDetail) }}</p>
-        </div>
-        <div v-else>
-          <p class="result-kicker">Deal Detail</p>
-          <h1 id="deal-detail-title">거래 상세 조회</h1>
-          <p>선택한 거래의 상세 정보를 불러오고 있습니다.</p>
-        </div>
-      </div>
-
-      <p v-if="isDetailLoading" class="empty-message">
+    <section v-else class="detail-page" aria-label="집 상세 정보">
+      <p v-if="isDetailLoading" id="deal-detail-title" class="empty-message">
         거래 상세 정보를 불러오는 중입니다.
       </p>
       <p v-else-if="detailErrorMessage" class="form-message" role="alert">
@@ -2686,7 +2740,7 @@ function formatPrice(price) {
         <template v-if="currentView !== 'deal-history'">
           <section class="detail-hero">
             <div>
-              <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 거래 상세</p>
+              <p class="detail-breadcrumb">홈 &gt; 검색 결과 &gt; 집 상세 정보</p>
               <div class="detail-title-row">
                 <h1 id="deal-detail-title">
                   {{ selectedPropertyDetail.name }}
@@ -3004,9 +3058,11 @@ function formatPrice(price) {
                     :key="`${facility.type}-${facility.name}-${facility.distanceMeters || 'missing'}`"
                     :class="{ missing: facility.missing }"
                   >
-                    <span :class="getFacilityMarkerClass(facility)">
-                      {{ getFacilityMarkerText(facility) }}
-                    </span>
+                    <span
+                      :class="getFacilityMarkerClass(facility)"
+                      :aria-label="getFacilityTypeLabel(facility.type)"
+                      role="img"
+                    ></span>
                     <div>
                       <strong>{{ facility.name }}</strong>
                       <p>{{ getFacilityCategoryLabel(facility) }}</p>
@@ -3033,56 +3089,13 @@ function formatPrice(price) {
                   </span>
                 </div>
                 <div
-                  :class="['facility-map', { dragging: isMapDragging }]"
+                  class="facility-map"
                   aria-label="주택과 주변 편의시설 지도"
                 >
                   <div
-                    class="facility-map-canvas"
-                    :style="getFacilityMapTransform()"
-                    @pointerdown="startMapDrag"
-                    @pointermove="moveMapDrag"
-                    @pointerup="stopMapDrag"
-                    @pointercancel="stopMapDrag"
-                    @pointerleave="stopMapDrag"
-                  >
-                    <span
-                      class="home-map-marker"
-                      :style="{ top: '50%', left: '50%' }"
-                      >집</span
-                    >
-                    <span
-                      v-for="marker in getMapMarkers()"
-                      :key="`${marker.type}-${marker.name}-${marker.latitude}-${marker.longitude}`"
-                      :class="getFacilityMarkerClass(marker)"
-                      :style="{ top: marker.top, left: marker.left }"
-                      :title="`${getFacilityTypeLabel(marker.type)} · ${marker.name}`"
-                    >
-                      {{ getFacilityMarkerText(marker) }}
-                    </span>
-                  </div>
-                  <div class="map-controls" aria-label="지도 조작">
-                    <button
-                      type="button"
-                      aria-label="지도 확대"
-                      @click="changeMapZoom(0.2)"
-                    >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="지도 축소"
-                      @click="changeMapZoom(-0.2)"
-                    >
-                      -
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="지도 위치 초기화"
-                      @click="resetFacilityMap"
-                    >
-                      ⟲
-                    </button>
-                  </div>
+                    ref="mapContainer"
+                    style="width: 100%; height: 100%; min-height: 400px; border-radius: 8px;"
+                  ></div>
                 </div>
               </div>
             </div>
@@ -3093,7 +3106,7 @@ function formatPrice(price) {
           <section class="detail-header history-page-header">
             <div>
               <p class="detail-breadcrumb">
-                홈 &gt; 검색 결과 &gt; 거래 상세 &gt; 거래 이력
+                홈 &gt; 검색 결과 &gt; 집 상세 정보 &gt; 거래 이력
               </p>
               <h1>전체 거래 이력</h1>
               <p>
@@ -3366,5 +3379,6 @@ function formatPrice(price) {
         </template>
       </template>
     </section>
+    </Transition>
   </main>
 </template>

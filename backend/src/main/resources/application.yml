@@ -17,6 +17,7 @@ spring:
     job:
       enabled: false
     jdbc:
+      platform: mysql
       initialize-schema: always
 
   # ===== Redis 설정 추가 =====
@@ -65,6 +66,13 @@ ai:
     model: ${GMS_OPENAI_MODEL:gpt-5.5}
     connect-timeout: ${GMS_OPENAI_CONNECT_TIMEOUT:5s}
     read-timeout: ${GMS_OPENAI_READ_TIMEOUT:30s}
+  gms:
+    base-url: ${GMS_GENERATIVE_LANGUAGE_BASE_URL:https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com}
+    generate-content-path: ${GMS_GENERATE_CONTENT_PATH:/v1beta/models/%s:generateContent}
+    api-key: ${GMS_KEY:}
+    model: ${GMS_GENERATIVE_LANGUAGE_MODEL:gemini-2.5-flash-lite}
+    connect-timeout: ${GMS_OPENAI_CONNECT_TIMEOUT:${GMS_CONNECT_TIMEOUT:5s}}
+    read-timeout: ${GMS_OPENAI_READ_TIMEOUT:${GMS_READ_TIMEOUT:180s}}
 
 jwt:
   secret: ${JWT_SECRET}
