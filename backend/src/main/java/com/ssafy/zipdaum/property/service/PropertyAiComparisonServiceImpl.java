@@ -228,8 +228,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private UserComparisonContextSummary summarizeUserContext(UserComparisonContext userContext) {
     return new UserComparisonContextSummary(
         userContext.comparisonPurpose(),
-        userContext.preferences(),
-        userContext.favoritePropertyIds()
+        userContext.preferences()
     );
   }
 
@@ -347,8 +346,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
 
   private record UserComparisonContextSummary(
       String comparisonPurpose,
-      List<UserPreferenceResponse> preferences,
-      Set<Long> favoritePropertyIds) {
+      List<UserPreferenceResponse> preferences) {
   }
 
   private record PropertyComparisonTargetSummary(
