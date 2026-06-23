@@ -7,6 +7,7 @@ import com.ssafy.zipdaum.favorite.service.FavoritePropertyService;
 import com.ssafy.zipdaum.global.ai.GmsOpenAiClient;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
+import com.ssafy.zipdaum.global.util.RedisUtil;
 import com.ssafy.zipdaum.preference.dto.UserPreferenceResponse;
 import com.ssafy.zipdaum.preference.service.UserPreferenceService;
 import com.ssafy.zipdaum.property.dto.PropertyAiComparisonRequest;
@@ -16,6 +17,10 @@ import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.SurroundingSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
 import com.ssafy.zipdaum.recommendation.service.RecommendationService;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,6 +36,9 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private static final int HISTORY_SIZE = 3;
   private static final int SURROUNDING_RADIUS_METERS = 1000;
   private static final String DEFAULT_RENT_DEAL_TYPE = "JEONSE";
+  private static final String AI_COMPARISON_CACHE_KEY_FORMAT =
+      "property-ai-comparison:v1:%d:%d:%d:%s";
+  private static final long AI_COMPARISON_CACHE_TTL_SECONDS = 60 * 60;
   private static final String DEVELOPER_PROMPT = """
       너는 ZipDaum의 주택 비교 도우미다. 반드시 한국어로 답한다.
       입력으로 제공된 데이터만 근거로 두 주택을 비교한다.
@@ -53,6 +61,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private final FavoritePropertyService favoritePropertyService;
   private final GmsOpenAiClient gmsOpenAiClient;
   private final ObjectMapper objectMapper;
+  private final RedisUtil redisUtil;
 
   public PropertyAiComparisonServiceImpl(
       PropertyService propertyService,
@@ -61,7 +70,8 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
       UserPreferenceService userPreferenceService,
       FavoritePropertyService favoritePropertyService,
       GmsOpenAiClient gmsOpenAiClient,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      RedisUtil redisUtil) {
     this.propertyService = propertyService;
     this.surroundingService = surroundingService;
     this.recommendationService = recommendationService;
@@ -69,6 +79,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     this.favoritePropertyService = favoritePropertyService;
     this.gmsOpenAiClient = gmsOpenAiClient;
     this.objectMapper = objectMapper;
+    this.redisUtil = redisUtil;
   }
 
   @Override
@@ -92,9 +103,21 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     );
 
     try {
-      String content = requestAiComparison(input);
+      String inputJson = objectMapper.writeValueAsString(input);
+      String cacheKey = buildCacheKey(userId, propertyIds.get(0), propertyIds.get(1), inputJson);
+      PropertyAiComparisonResponse cachedResponse = findCachedResponse(cacheKey);
+      if (cachedResponse != null) {
+        log.info("AI 주택 비교 캐시 조회 완료 propertyA={}, propertyB={}",
+            propertyIds.get(0), propertyIds.get(1));
+        log.info("AI property comparison cache hit elapsedMs={}, userId={}, propertyIds={}",
+            elapsedMillis(startedAt), userId, propertyIds);
+        return cachedResponse;
+      }
+
+      String content = requestAiComparison(inputJson);
       PropertyAiComparisonResponse response =
           objectMapper.readValue(extractJsonObject(content), PropertyAiComparisonResponse.class);
+      saveCachedResponse(cacheKey, response);
       log.info("AI 주택 비교 생성 완료 propertyA={}, propertyB={}",
           propertyIds.get(0), propertyIds.get(1));
       log.info("AI property comparison total elapsedMs={}, userId={}, propertyIds={}",
@@ -191,12 +214,71 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
     }
   }
 
-  private String requestAiComparison(PropertyComparisonInput input) throws JsonProcessingException {
+  private String requestAiComparison(String inputJson) {
     return gmsOpenAiClient.chatCompletion(
         DEVELOPER_PROMPT,
-        objectMapper.writeValueAsString(input),
+        inputJson,
         "property comparison"
     );
+  }
+
+  private String buildCacheKey(Long userId, Long propertyAId, Long propertyBId, String inputJson) {
+    return String.format(
+        AI_COMPARISON_CACHE_KEY_FORMAT,
+        userId,
+        propertyAId,
+        propertyBId,
+        sha256(inputJson)
+    );
+  }
+
+  private String sha256(String value) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hashed = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+      return HexFormat.of().formatHex(hashed);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 algorithm is not available", e);
+    }
+  }
+
+  private PropertyAiComparisonResponse findCachedResponse(String cacheKey) {
+    try {
+      String cachedValue = redisUtil.getData(cacheKey);
+      if (cachedValue == null || cachedValue.isBlank()) {
+        return null;
+      }
+      return objectMapper.readValue(cachedValue, PropertyAiComparisonResponse.class);
+    } catch (JsonProcessingException e) {
+      log.warn("AI 주택 비교 캐시 파싱 실패 cacheKey={}", cacheKey, e);
+      deleteCachedResponse(cacheKey);
+      return null;
+    } catch (RuntimeException e) {
+      log.warn("AI 주택 비교 캐시 조회 실패 cacheKey={}", cacheKey, e);
+      return null;
+    }
+  }
+
+  private void saveCachedResponse(String cacheKey, PropertyAiComparisonResponse response) {
+    try {
+      redisUtil.setDataWithTTL(
+          cacheKey,
+          objectMapper.writeValueAsString(response),
+          AI_COMPARISON_CACHE_TTL_SECONDS
+      );
+    } catch (JsonProcessingException e) {
+      log.warn("AI 주택 비교 캐시 직렬화 실패 cacheKey={}", cacheKey, e);
+    } catch (RuntimeException e) {
+      log.warn("AI 주택 비교 캐시 저장 실패 cacheKey={}", cacheKey, e);
+    }
+  }
+
+  private void deleteCachedResponse(String cacheKey) {
+    try {
+      redisUtil.delete(cacheKey);
+    } catch (RuntimeException e) {
+      log.warn("AI 주택 비교 캐시 삭제 실패 cacheKey={}", cacheKey, e);
+    }
   }
 
   private String extractJsonObject(String content) {
@@ -228,8 +310,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
   private UserComparisonContextSummary summarizeUserContext(UserComparisonContext userContext) {
     return new UserComparisonContextSummary(
         userContext.comparisonPurpose(),
-        userContext.preferences(),
-        userContext.favoritePropertyIds()
+        userContext.preferences()
     );
   }
 
@@ -347,8 +428,7 @@ public class PropertyAiComparisonServiceImpl implements PropertyAiComparisonServ
 
   private record UserComparisonContextSummary(
       String comparisonPurpose,
-      List<UserPreferenceResponse> preferences,
-      Set<Long> favoritePropertyIds) {
+      List<UserPreferenceResponse> preferences) {
   }
 
   private record PropertyComparisonTargetSummary(
