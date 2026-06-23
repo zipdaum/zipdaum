@@ -386,11 +386,11 @@ a {
 }
 
 .panel-actions {
-  display: grid;
-  grid-template-columns: 74px 1fr;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  min-width: 0;
 }
 
 .panel-actions > span,
@@ -403,6 +403,8 @@ a {
   font-size: 13px;
   font-weight: 900;
   text-align: center;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .sort-control.is-hidden {
@@ -762,10 +764,18 @@ a {
   color: #5e6b85;
   font-size: 13px;
   font-weight: 900;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.sort-control > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .sort-control select {
   min-width: 150px;
+  flex: 0 0 auto;
   min-height: 38px;
   border: 1px solid #d8e4fb;
   border-radius: 6px;
