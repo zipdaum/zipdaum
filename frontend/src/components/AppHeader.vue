@@ -1,51 +1,100 @@
 <script setup>
-import { RouterLink, useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { clearAuth, currentUser, isLoggedIn } from "../stores/auth";
 
 const emit = defineEmits(["home"]);
 const route = useRoute();
+const router = useRouter();
+
+function getCurrentHref() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+async function navigateTo(target) {
+  const targetHref = router.resolve(target).href;
+  const failure = await router.push(target).catch((error) => error);
+
+  if (failure && getCurrentHref() !== targetHref) {
+    window.location.assign(targetHref);
+  }
+}
+
+async function goHome() {
+  if (route.name === "home") {
+    emit("home");
+    return;
+  }
+
+  await navigateTo({ name: "home" });
+}
 
 function handleLogout() {
   clearAuth();
-  emit("home");
+  goHome();
+}
+
+function goLogin() {
+  navigateTo({ name: "login" });
+}
+
+function goSignup() {
+  navigateTo({ name: "signup" });
+}
+
+function goFavorites() {
+  navigateTo({ name: "favorites" });
+}
+
+function goCompare() {
+  navigateTo({ name: "mypage", query: { tab: "compare" } });
+}
+
+function goMyPage() {
+  navigateTo({ name: "mypage" });
 }
 </script>
 
 <template>
   <header class="top-bar">
-    <a
+    <button
       class="brand"
-      href="#"
       aria-label="집다움 홈"
-      @click.prevent="emit('home')"
+      type="button"
+      @click="goHome"
     >
       <span class="brand-mark">Z</span>
       <span>집다움</span>
-    </a>
+    </button>
 
     <nav class="main-nav" aria-label="주요 메뉴">
-      <a
+      <button
         :class="{ active: route.name === 'home' }"
-        href="#"
-        @click.prevent="emit('home')"
+        type="button"
+        @click="goHome"
       >
         실거래가 검색
-      </a>
-      <RouterLink :to="{ name: 'favorites' }" active-class="active">
+      </button>
+      <button
+        :class="{ active: route.name === 'favorites' }"
+        type="button"
+        @click="goFavorites"
+      >
         관심목록
-      </RouterLink>
-      <RouterLink
-        :to="{ name: 'mypage', query: { tab: 'compare' } }"
+      </button>
+      <button
         :class="{ active: route.name === 'mypage' && route.query.tab === 'compare' }"
+        type="button"
+        @click="goCompare"
       >
         집 비교하기
-      </RouterLink>
-      <RouterLink
-        :to="{ name: 'mypage' }"
+      </button>
+      <button
         :class="{ active: route.name === 'mypage' && route.query.tab !== 'compare' }"
+        type="button"
+        @click="goMyPage"
       >
         마이페이지
-      </RouterLink>
+      </button>
     </nav>
 
     <div v-if="isLoggedIn" class="account-actions">
@@ -56,12 +105,12 @@ function handleLogout() {
     </div>
 
     <div v-else class="account-actions">
-      <RouterLink class="ghost-button" :to="{ name: 'login' }">
+      <button class="ghost-button" type="button" @click="goLogin">
         로그인
-      </RouterLink>
-      <RouterLink class="primary-button" :to="{ name: 'signup' }">
+      </button>
+      <button class="primary-button" type="button" @click="goSignup">
         회원가입
-      </RouterLink>
+      </button>
     </div>
   </header>
 </template>

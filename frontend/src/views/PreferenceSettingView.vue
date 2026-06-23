@@ -36,15 +36,17 @@ const selectedFacilityCount = computed(() =>
 const shouldShowRegionSearchPanel = computed(() =>
   regionKeyword.value.trim().length >= 2 || regionCandidates.value.length > 0,
 );
-const hasNoRegionSearchResult = computed(() =>
-  hasSearchedRegions.value &&
-  !isSearchingRegions.value &&
-  regionKeyword.value.trim().length >= 2 &&
-  regionCandidates.value.length === 0,
-);
-const toastLabel = computed(() =>
-  toastVariant.value === "error" ? "오류" : "완료",
-);
+const toastLabel = computed(() => {
+  if (toastVariant.value === "error") {
+    return "오류";
+  }
+
+  if (toastVariant.value === "notice") {
+    return "안내";
+  }
+
+  return "완료";
+});
 
 onMounted(loadPreferences);
 onBeforeUnmount(() => {
@@ -283,6 +285,10 @@ async function fetchRegionCandidates(keyword, seq) {
       (candidate) => !isExcludedRegionCandidate(candidate),
     );
     hasSearchedRegions.value = true;
+
+    if (regionCandidates.value.length === 0) {
+      showToast("검색 결과가 없습니다.", "notice");
+    }
   } catch (error) {
     if (seq === regionSearchSeq) {
       regionCandidates.value = [];
@@ -624,9 +630,6 @@ function getErrorMessage(error, fallbackMessage) {
                 </div>
                 <p v-else-if="isSearchingRegions" class="region-search-state">
                   지역을 검색하는 중입니다.
-                </p>
-                <p v-else-if="hasNoRegionSearchResult" class="region-search-state">
-                  검색 결과가 없습니다.
                 </p>
               </div>
             </div>

@@ -324,9 +324,9 @@
 
 .preference-toast {
   position: fixed;
-  top: 24px;
   right: 24px;
-  z-index: 30;
+  bottom: 24px;
+  z-index: 1100;
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
@@ -384,10 +384,24 @@
   color: #b91c1c;
 }
 
+.preference-toast-notice {
+  border-color: #bfdbfe;
+  border-left-color: #2563eb;
+}
+
+.preference-toast-notice::before {
+  background: #2563eb;
+  content: "!";
+}
+
+.preference-toast-notice strong {
+  color: #1d4ed8;
+}
+
 @keyframes preference-toast-enter {
   from {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(8px);
   }
 
   to {
@@ -444,7 +458,7 @@
   }
 
   .preference-toast {
-    top: 16px;
     right: 16px;
+    bottom: 16px;
   }
 }

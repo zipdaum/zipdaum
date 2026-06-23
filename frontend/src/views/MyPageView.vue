@@ -37,10 +37,6 @@ const isComparing = ref(false);
 const MAX_PREFERENCE_SUMMARY_ITEMS = 5;
 const DELETE_CONFIRMATION_PREFIX = "delete/";
 const MAX_PROPERTY_SEARCH_RESULTS = 8;
-const myPageTabs = [
-  { value: "profile", label: "마이페이지" },
-  { value: "compare", label: "집 비교하기" },
-];
 
 const displayedUser = computed(() => userInfo.value || currentUser.value || {});
 const deleteTargetName = computed(() => displayedUser.value.name || "");
@@ -88,22 +84,6 @@ function goHome() {
 
 function openPreferenceSettings() {
   router.push({ name: "preferences" });
-}
-
-function selectMyPageTab(tab) {
-  activeMyPageTab.value = tab;
-
-  const nextQuery = { ...route.query };
-  if (tab === "compare") {
-    nextQuery.tab = "compare";
-  } else {
-    delete nextQuery.tab;
-  }
-
-  router.replace({
-    name: "mypage",
-    query: nextQuery,
-  });
 }
 
 function openDeleteConfirm() {
@@ -544,23 +524,7 @@ function formatDateTime(value) {
     <p v-if="isLoading" class="empty-message">마이페이지 정보를 불러오는 중입니다.</p>
 
     <template v-else>
-      <div class="mypage-layout" :class="{ 'compare-layout': activeMyPageTab === 'compare' }">
-        <nav
-          v-if="activeMyPageTab !== 'compare'"
-          class="mypage-side-nav"
-          aria-label="마이페이지 메뉴"
-        >
-          <button
-            v-for="tab in myPageTabs"
-            :key="tab.value"
-            type="button"
-            :class="{ active: activeMyPageTab === tab.value }"
-            @click="selectMyPageTab(tab.value)"
-          >
-            {{ tab.label }}
-          </button>
-        </nav>
-
+      <div class="mypage-layout">
         <div class="mypage-content">
           <template v-if="activeMyPageTab === 'profile'">
             <section class="mypage-summary-grid" aria-label="마이페이지 요약">

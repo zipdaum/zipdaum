@@ -21,7 +21,6 @@ const isLoadingRegions = ref(true);
 const isLoadingProperties = ref(true);
 const errorMessage = ref("");
 const regionMessage = ref("");
-const propertyMessage = ref("");
 const toastMessage = ref("");
 const toastVariant = ref("success");
 const toastKey = ref(0);
@@ -199,23 +198,27 @@ async function handleAddRegion(candidate) {
 
 async function handleSearchPropertyCandidates() {
   const keyword = propertySearchKeyword.value.trim();
-  propertyMessage.value = "";
   errorMessage.value = "";
 
   if (!keyword) {
     propertyCandidates.value = [];
-    propertyMessage.value = "검색어를 입력해주세요.";
+    showToast("검색어를 입력해주세요.", "notice");
     return;
   }
 
   isSearchingProperties.value = true;
 
   try {
-    propertyCandidates.value = (await searchProperties({
+    const response = await searchProperties({
       name: keyword,
       sortBy: "NAME",
       sortDirection: "ASC",
-    }))
+      page: 1,
+      size: 20,
+    });
+    const properties = Array.isArray(response) ? response : response.content || [];
+
+    propertyCandidates.value = properties
       .map(mapPropertyCandidate)
       .slice(0, 20);
 
@@ -223,17 +226,17 @@ async function handleSearchPropertyCandidates() {
       showToast("검색 결과가 없습니다.", "notice");
     }
   } catch (error) {
-    propertyMessage.value = getErrorMessage(
+    const message = getErrorMessage(
       error,
       "관심 주택 후보를 검색하지 못했습니다.",
     );
+    showToast(message, "notice");
   } finally {
     isSearchingProperties.value = false;
   }
 }
 
 async function handleAddProperty(candidate) {
-  propertyMessage.value = "";
   errorMessage.value = "";
 
   try {
@@ -253,7 +256,7 @@ async function handleAddProperty(candidate) {
       return;
     }
 
-    propertyMessage.value = message;
+    showToast(message, "notice");
   }
 }
 
@@ -263,7 +266,6 @@ function handlePropertySearchInput(event) {
   }
 
   propertyCandidates.value = [];
-  propertyMessage.value = "";
 }
 
 function handleFavoriteSearchOutsideClick(event) {
@@ -323,7 +325,6 @@ async function handleDeleteRegion(region) {
 }
 
 async function handleDeleteProperty(property) {
-  propertyMessage.value = "";
   errorMessage.value = "";
 
   try {
@@ -331,10 +332,11 @@ async function handleDeleteProperty(property) {
     showToast("관심 주택을 해제했습니다.");
     await loadFavoriteProperties();
   } catch (error) {
-    propertyMessage.value = getErrorMessage(
+    const message = getErrorMessage(
       error,
       "관심 주택을 해제하지 못했습니다.",
     );
+    showToast(message, "notice");
   }
 }
 
@@ -736,15 +738,6 @@ function isFavoriteAlreadyExistsError(error, message) {
             </button>
           </div>
         </div>
-
-        <p
-          v-if="propertyMessage"
-          class="favorite-message"
-          :class="{ error: propertyMessage.includes('못했습니다') }"
-          role="status"
-        >
-          {{ propertyMessage }}
-        </p>
 
         <p v-if="isLoadingProperties" class="empty-message">
           관심 주택을 불러오는 중입니다.
