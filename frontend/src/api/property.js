@@ -37,6 +37,11 @@ export async function getPropertyRecommendationScore(propertyId) {
   return response.data
 }
 
+export async function comparePropertiesByAi(payload) {
+  const response = await client.post('/properties/compare/ai', payload)
+  return response.data
+}
+
 export async function savePropertyInteraction(propertyId, payload) {
   await client.post(`/properties/${propertyId}/interactions`, payload)
 }
