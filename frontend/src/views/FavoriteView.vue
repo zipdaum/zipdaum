@@ -136,7 +136,7 @@ async function handleSearchRegionCandidates() {
 
   if (!keyword) {
     regionCandidates.value = [];
-    regionMessage.value = "검색어를 입력해주세요.";
+    showToast("검색어를 입력해주세요.", "notice");
     return;
   }
 
