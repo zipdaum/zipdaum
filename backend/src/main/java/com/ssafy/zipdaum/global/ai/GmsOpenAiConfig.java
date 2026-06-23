@@ -1,9 +1,9 @@
-package com.ssafy.zipdaum.recommendation.config;
+package com.ssafy.zipdaum.global.ai;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(AiSummaryProperties.class)
-public class AiSummaryConfig {
+@EnableConfigurationProperties(GmsOpenAiProperties.class)
+public class GmsOpenAiConfig {
 }
