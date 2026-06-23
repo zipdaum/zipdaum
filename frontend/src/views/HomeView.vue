@@ -269,13 +269,17 @@ const initKakaoMap = async () => {
       Number(facility.longitude)
     );
 
-    // 1. 왼쪽 리스트와 똑같이 보이도록 기존 함수로 클래스와 텍스트 가져오기
-    const cssClasses = getFacilityMarkerClass(facility).join(" ");
-    const text = getFacilityMarkerText(facility);
-    const tooltip = `${getFacilityTypeLabel(facility.type)} - ${facility.name}`;
+    // 1. 왼쪽 리스트와 똑같이 보이도록 기존 함수로 클래스 가져오기
+    const cssClasses = [
+      ...getFacilityMarkerClass(facility),
+      "facility-map-marker",
+    ].join(" ");
+    const tooltip = escapeHtml(
+      `${getFacilityTypeLabel(facility.type)} - ${facility.name}`
+    );
 
-    // 2. 마커로 쓸 HTML 생성 (지도 위에서 잘 보이게 하얀색 테두리와 그림자 살짝 추가, 85% 크기 축소)
-    const content = `<span class="${cssClasses}" title="${tooltip}" style="cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1.5px solid #fff; transform: scale(0.85); display: inline-block;">${text}</span>`;
+    // 2. 마커로 쓸 HTML 생성
+    const content = `<span class="${cssClasses}" title="${tooltip}" aria-label="${tooltip}" role="img"></span>`;
 
     // 3. 기본 Marker 대신 CustomOverlay 객체 사용
     const customOverlay = new window.kakao.maps.CustomOverlay({
@@ -2146,15 +2150,12 @@ function getFacilityMarkerClass(facility) {
   ];
 }
 
-function getFacilityMarkerText(facility) {
-  const markerTextByType = {
-    BUS: "버",
-    SUBWAY: "역",
-    HOSPITAL: "+",
-    CCTV: "C",
-    PARK: "공",
-  };
-  return markerTextByType[facility.type] || "F";
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function getFacilityMoveLabel(facility) {
@@ -3058,9 +3059,11 @@ function formatPrice(price) {
                     :key="`${facility.type}-${facility.name}-${facility.distanceMeters || 'missing'}`"
                     :class="{ missing: facility.missing }"
                   >
-                    <span :class="getFacilityMarkerClass(facility)">
-                      {{ getFacilityMarkerText(facility) }}
-                    </span>
+                    <span
+                      :class="getFacilityMarkerClass(facility)"
+                      :aria-label="getFacilityTypeLabel(facility.type)"
+                      role="img"
+                    ></span>
                     <div>
                       <strong>{{ facility.name }}</strong>
                       <p>{{ getFacilityCategoryLabel(facility) }}</p>
