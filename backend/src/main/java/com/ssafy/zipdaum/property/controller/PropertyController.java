@@ -56,29 +56,6 @@ public class PropertyController {
   private final RecommendationService recommendationService;
   private final RecentPropertyService recentPropertyService;
 
-//  @GetMapping
-//  @Operation(
-//      summary = "주택 실거래가 조회",
-//      description = "지역, 주택명, 주택 유형, 거래 유형, 가격 조건으로 주택 실거래가 목록을 조회합니다."
-//  )
-//  @ApiResponses({
-//      @ApiResponse(
-//          responseCode = "200",
-//          description = "주택 실거래가 조회 성공",
-//          content = @Content(schema = @Schema(implementation = PropertySearchResponse.class))
-//      ),
-//      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content)
-//  })
-//  public ResponseEntity<List<PropertySearchResponse>> searchProperties(
-//      @Valid @ModelAttribute PropertySearchRequest request
-//  ) {
-//    log.info("GET /properties 요청 sggCd={}, dealType={}, minPrice={}, maxPrice={}, sortBy={}, sortDirection={}",
-//        request.getSggCd(), request.getDealType(), request.getMinPrice(), request.getMaxPrice(),
-//        request.getSortBy(), request.getSortDirection());
-//
-//    return ResponseEntity.ok(propertyService.searchProperties(request));
-//  }
-
   @GetMapping
   @Operation(
           summary = "주택 실거래가 조회(Paging 처리)",
