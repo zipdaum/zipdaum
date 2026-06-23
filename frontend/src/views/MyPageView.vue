@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppHeader from "../components/AppHeader.vue";
 import { deleteUserInfo, getUserInfo } from "../api/user";
@@ -16,7 +16,9 @@ const userInfo = ref(null);
 const preferences = ref([]);
 const recentProperties = ref([]);
 const favoriteProperties = ref([]);
-const isLoading = ref(true);
+const isLoading = ref(false);
+const hasLoadedMyPage = ref(false);
+const hasLoadedFavoriteProperties = ref(false);
 const errorMessage = ref("");
 const activeMyPageTab = ref("profile");
 const deleteTextInput = ref("");
@@ -67,13 +69,26 @@ const comparisonRecommendationText = computed(() => {
   }
   return "AI는 판단을 보류합니다";
 });
-
-onMounted(loadMyPage);
+const pageLoadingMessage = computed(() =>
+  activeMyPageTab.value === "compare"
+    ? "집 비교하기 화면을 준비하는 중입니다."
+    : "마이페이지 정보를 불러오는 중입니다.",
+);
+const shouldShowInitialLoading = computed(
+  () => activeMyPageTab.value === "profile" && isLoading.value,
+);
 
 watch(
-  () => route.query.tab,
-  (tab) => {
-    activeMyPageTab.value = tab === "compare" ? "compare" : "profile";
+  () => [route.name, route.query.tab],
+  ([routeName, tab]) => {
+    activeMyPageTab.value = routeName === "comparison" || tab === "compare" ? "compare" : "profile";
+
+    if (activeMyPageTab.value === "compare") {
+      loadFavoriteProperties();
+      return;
+    }
+
+    loadMyPage();
   },
   { immediate: true },
 );
@@ -133,6 +148,10 @@ async function requestUserDeletion() {
 }
 
 async function loadMyPage() {
+  if (hasLoadedMyPage.value || isLoading.value) {
+    return;
+  }
+
   isLoading.value = true;
   errorMessage.value = "";
 
@@ -165,11 +184,14 @@ async function loadMyPage() {
   }
 
   isLoading.value = false;
-
-  loadFavoriteProperties();
+  hasLoadedMyPage.value = true;
 }
 
 async function loadFavoriteProperties() {
+  if (hasLoadedFavoriteProperties.value || isLoadingFavoriteProperties.value) {
+    return;
+  }
+
   isLoadingFavoriteProperties.value = true;
 
   try {
@@ -178,6 +200,7 @@ async function loadFavoriteProperties() {
     favoriteProperties.value = [];
   } finally {
     isLoadingFavoriteProperties.value = false;
+    hasLoadedFavoriteProperties.value = true;
   }
 }
 
@@ -521,11 +544,11 @@ function formatDateTime(value) {
   <main class="app-shell mypage-page">
     <AppHeader @home="goHome" />
 
-    <p v-if="errorMessage" class="form-message" role="alert">
+    <p v-if="activeMyPageTab === 'profile' && errorMessage" class="form-message" role="alert">
       {{ errorMessage }}
     </p>
 
-    <p v-if="isLoading" class="empty-message">마이페이지 정보를 불러오는 중입니다.</p>
+    <p v-if="shouldShowInitialLoading" class="empty-message">{{ pageLoadingMessage }}</p>
 
     <template v-else>
       <div class="mypage-layout">
