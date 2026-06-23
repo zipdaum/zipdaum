@@ -2206,9 +2206,9 @@ function formatPrice(price) {
     <div v-if="currentView === 'home'" class="view-panel home-view-panel">
       <section class="hero-section" aria-labelledby="home-title">
         <div class="hero-copy">
-          <h1 id="home-title">내 조건에 맞는 주거 정보를 찾아보세요</h1>
+          <h1 id="home-title">내게 맞는 부산 집 찾기</h1>
           <p>
-            부산 지역 실거래가를 기준으로 관심 지역과 주택 후보를 비교합니다.
+            실거래가를 살펴보며 관심 지역과 집 후보를 가볍게 비교해보세요.
           </p>
         </div>
       </section>
@@ -2531,7 +2531,6 @@ function formatPrice(price) {
     >
       <div class="result-page-header">
         <div>
-          <p class="result-kicker">All Search Results</p>
           <h1 id="all-result-title">실거래가 전체 검색 결과</h1>
           <p>{{ resultNotice }}</p>
         </div>

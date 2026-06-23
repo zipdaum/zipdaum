@@ -182,7 +182,7 @@ a {
 
 .hero-section {
   overflow: hidden;
-  min-height: 220px;
+  min-height: 176px;
   margin-top: 20px;
   border: 1px solid #dbe7ff;
   border-radius: 8px;
@@ -197,7 +197,7 @@ a {
   right: 44px;
   bottom: 0;
   width: min(420px, 45%);
-  height: 150px;
+  height: 118px;
   background:
     linear-gradient(to top, #4673a8 0 42%, transparent 42%),
     linear-gradient(to top, #5b86bd 0 58%, transparent 58%),
@@ -206,7 +206,7 @@ a {
     linear-gradient(to top, #164a88 0 84%, transparent 84%);
   background-position: 0 0, 82px 0, 164px 0, 246px 0, 328px 0;
   background-repeat: no-repeat;
-  background-size: 64px 150px;
+  background-size: 64px 118px;
   opacity: 0.72;
   content: "";
 }
@@ -215,7 +215,7 @@ a {
   position: relative;
   z-index: 1;
   max-width: 580px;
-  padding: 42px 36px;
+  padding: 34px 36px;
 }
 
 .hero-copy h1 {
@@ -223,6 +223,7 @@ a {
   color: #111f3f;
   font-size: 32px;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .hero-copy p {
@@ -2445,7 +2446,7 @@ a {
   }
 
   .hero-copy {
-    padding: 32px 20px 56px;
+    padding: 28px 20px 44px;
   }
 
   .hero-copy h1 {
