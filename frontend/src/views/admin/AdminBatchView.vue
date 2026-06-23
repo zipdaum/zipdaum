@@ -1,6 +1,10 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { runPropertyBatchByRange } from '../../api/admin'
+import { clearAuth } from '../../stores/auth' // ⭐ 로그아웃 처리를 위해 가져오기
+
+const router = useRouter()
 
 const startMonth = ref('')
 const endMonth = ref('')
@@ -15,7 +19,6 @@ const isValidRange = computed(() => {
   if (!validStartMonth.value || !validEndMonth.value) {
     return false
   }
-
   return validStartMonth.value <= validEndMonth.value
 })
 
@@ -28,6 +31,14 @@ const hasInvalidMonthFormat = computed(
     (startMonth.value && !validStartMonth.value) ||
     (endMonth.value && !validEndMonth.value),
 )
+
+// ⭐ 로그아웃 함수 추가
+function handleLogout() {
+  if (confirm('로그아웃 하시겠습니까?')) {
+    clearAuth() // 스토어(로컬스토리지)에서 토큰 및 유저 정보 삭제
+    router.replace({ name: 'login' }) // 로그인 페이지로 이동
+  }
+}
 
 async function triggerBatch() {
   if (!isValidRange.value) {
@@ -89,6 +100,16 @@ function getValidMonth(value) {
 
 <template>
   <main class="app-shell admin-batch-page">
+    <header class="admin-header">
+      <div class="admin-header-title">
+        <span class="brand-mark">Z</span>
+        <h1>집다움 관리자</h1>
+      </div>
+      <button @click="handleLogout" class="secondary-button logout-button">
+        로그아웃
+      </button>
+    </header>
+
     <section class="admin-batch-grid" aria-label="배치 작업 설정">
       <article class="panel admin-control-panel">
         <div class="panel-title-row">
@@ -179,6 +200,62 @@ function getValidMonth(value) {
   gap: 18px;
 }
 
+/* ⭐ 추가된 헤더 및 로그아웃 버튼 스타일 */
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2ebfb;
+}
+
+.admin-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-header-title .brand-mark {
+  background: #0b5cff;
+  color: #fff;
+  font-weight: 900;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 16px;
+}
+
+.admin-header h1 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #17233f;
+  margin: 0;
+}
+
+.logout-button {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #53617c;
+  background-color: #f1f5fb;
+  border: 1px solid #d8e4fb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+  background-color: #e2ebfb;
+  color: #17233f;
+}
+
+/* 기존 스타일 유지 */
 .admin-batch-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.62fr) minmax(320px, 0.38fr);
@@ -310,6 +387,16 @@ function getValidMonth(value) {
 @media (max-width: 640px) {
   .month-range-fields {
     grid-template-columns: 1fr;
+  }
+  
+  .admin-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .logout-button {
+    width: 100%;
   }
 }
 </style>

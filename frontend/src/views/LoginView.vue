@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { login } from '../api/auth'
-import { saveAuth } from '../stores/auth'
+import { saveAuth, userRole } from '../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,9 +50,19 @@ async function handleLogin() {
 
 function getRedirectPath() {
   const redirect = route.query.redirect
-  return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
-    ? redirect
-    : '/'
+
+  // 1. 로그인 전 원래 가려던 페이지(redirect 쿼리)가 있다면 그곳으로 우선 이동
+  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+
+  // 2. 가려던 페이지가 없다면(단순 로그인 진입 시), 권한(Role)에 따라 분기
+  if (userRole.value === 'ROLE_ADMIN') {
+    return { name: 'adminBatch' } // 관리자는 배치 작업 페이지로
+  }
+
+  // 3. 일반 유저(ROLE_USER)의 기본 페이지는 홈
+  return '/' 
 }
 </script>
 

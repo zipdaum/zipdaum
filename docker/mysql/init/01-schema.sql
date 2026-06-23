@@ -9,6 +9,7 @@ CREATE TABLE users (
   deletion_scheduled_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  role varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ROLE_USER',
   PRIMARY KEY (id),
   KEY idx_users_deletion_scheduled_at (is_deleted, deletion_scheduled_at),
   UNIQUE KEY uk_users_email_deleted (email, is_deleted)

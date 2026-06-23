@@ -40,6 +40,6 @@ public class AuthServiceImpl implements AuthService {
     String accessToken = jwtTokenProvider.createAccessToken(user);
 
     log.info("로그인 완료 userId={}", user.getId());
-    return new AuthResponse(accessToken, user.getId(), user.getEmail(), user.getName());
+    return new AuthResponse(accessToken, user.getId(), user.getEmail(), user.getName(), user.getRole());
   }
 }

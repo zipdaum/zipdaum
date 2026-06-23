@@ -16,4 +16,6 @@ public class AuthResponse {
   private final String email;
   @Schema(description = "이름", example = "홍길동")
   private final String name;
+  @Schema(description = "권한", example = "ROLE_USER")
+  private final String role;
 }
