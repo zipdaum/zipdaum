@@ -5,6 +5,7 @@ import AppHeader from "../components/AppHeader.vue";
 import {
   getPropertyDealHistories as fetchPropertyDealHistories,
   getPropertyDetail as fetchPropertyDetail,
+  getPropertyAiSummary as fetchPropertyAiSummary,
   getPropertyRecommendations as fetchPropertyRecommendations,
   getPropertyRecommendationScore as fetchPropertyRecommendationScore,
   getSurroundings as fetchSurroundings,
@@ -29,6 +30,7 @@ const dealTypes = [
 ];
 
 const regions = [
+  { label: "부산광역시 전체", value: null },
   { label: "부산광역시 해운대구", value: "26350" },
   { label: "부산광역시 부산진구", value: "26230" },
   { label: "부산광역시 동래구", value: "26260" },
@@ -106,7 +108,7 @@ const preferenceTypeLabels = {
 };
 
 const searchForm = ref({
-  sggCd: "26350",
+  sggCd: null,
   umdNm: "",
   name: "",
   propertyType: "",
@@ -140,6 +142,10 @@ const surroundingsErrorMessage = ref("");
 const recommendationScore = ref(null);
 const isRecommendationScoreLoading = ref(false);
 const recommendationScoreErrorMessage = ref("");
+const propertyAiSummary = ref("");
+const isPropertyAiSummaryLoading = ref(false);
+const propertyAiSummaryErrorMessage = ref("");
+const isPropertyAiSummaryHighlighted = ref(false);
 const detailInteraction = ref(null);
 const mapZoom = ref(1);
 const mapPan = ref({ x: 0, y: 0 });
@@ -167,7 +173,13 @@ const emptyHistoryMeta = {
   rentServerPaged: false,
 };
 let resultHighlightTimer = null;
+let propertyAiSummaryHighlightTimer = null;
 let mapDragStart = null;
+
+const searchPage = ref(1);
+const searchTotalPages = ref(1);
+const searchTotalElements = ref(0);
+const searchPageSize = 10;
 
 function createEmptyRentDealsByType() {
   return {
@@ -220,6 +232,7 @@ watch(isLoggedIn, (loggedIn) => {
 onUnmounted(() => {
   saveDetailInteraction();
   clearResultHighlightTimer();
+  clearPropertyAiSummaryHighlightTimer();
   stopMapDrag();
   window.removeEventListener("scroll", updateDetailScrollDepth);
   window.removeEventListener("pagehide", saveDetailInteractionOnPageHide);
@@ -328,8 +341,8 @@ const resultCountText = computed(() => {
     return "검색 중";
   }
 
-  if (searchResults.value.length > 0) {
-    return `${searchResults.value.length.toLocaleString()}건`;
+  if (searchTotalElements.value > 0) {
+    return `${searchTotalElements.value.toLocaleString()}건`;
   }
 
   if (hasSearched.value) {
@@ -370,6 +383,7 @@ function selectDealType(dealType) {
 async function handleSearch() {
   homeResultTab.value = "search";
   searchForm.value.sortIndex = 0;
+  searchPage.value = 1;
   await runSearch();
 }
 
@@ -395,10 +409,16 @@ async function runSearch() {
       maxPrice: selectedPriceRange.maxPrice,
       sortBy: selectedSort.sortBy,
       sortDirection: selectedSort.sortDirection,
+      page: searchPage.value,
+      size: searchPageSize,
     });
 
-    const properties = await searchProperties(params);
-    searchResults.value = sortProperties(properties, selectedSort);
+    const response = await searchProperties(params);
+
+    searchResults.value = sortProperties(response.content || [], selectedSort);
+    searchTotalPages.value = response.totalPages || 1;
+    searchTotalElements.value = response.totalElements || 0;
+
   } catch (error) {
     searchResults.value = [];
     errorMessage.value =
@@ -413,11 +433,27 @@ async function runSearch() {
   }
 }
 
+async function changeSearchPage(newPage) {
+  if (newPage < 1 || newPage > searchTotalPages.value || isLoading.value || newPage === searchPage.value) {
+    return;
+  }
+  searchPage.value = newPage;
+  await runSearch();
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function getVisibleSearchPages() {
+  const start = Math.floor((searchPage.value - 1) / 5) * 5 + 1;
+  const end = Math.min(start + 4, searchTotalPages.value);
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
 async function handleSortChange() {
   if (!hasSearched.value) {
     return;
   }
-
+  searchPage.value = 1;
   await runSearch();
 }
 
@@ -500,6 +536,9 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   surroundingsErrorMessage.value = "";
   recommendationScore.value = null;
   recommendationScoreErrorMessage.value = "";
+  propertyAiSummary.value = "";
+  propertyAiSummaryErrorMessage.value = "";
+  isPropertyAiSummaryHighlighted.value = false;
   resetFacilityMap();
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
@@ -530,6 +569,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       }),
       loadSurroundings(selectedPropertyDetail.value),
       loadRecommendationScore(normalizedPropertyId),
+      loadPropertyAiSummary(normalizedPropertyId),
     ]);
 
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
@@ -591,6 +631,50 @@ async function loadRecommendationScore(propertyId) {
   } finally {
     isRecommendationScoreLoading.value = false;
   }
+}
+
+async function loadPropertyAiSummary(propertyId) {
+  propertyAiSummary.value = "";
+  propertyAiSummaryErrorMessage.value = "";
+
+  if (!isLoggedIn.value) {
+    return;
+  }
+
+  isPropertyAiSummaryLoading.value = true;
+
+  try {
+    const response = await fetchPropertyAiSummary(propertyId);
+    propertyAiSummary.value = response?.summary || "";
+    if (propertyAiSummary.value) {
+      highlightPropertyAiSummary();
+    }
+  } catch (error) {
+    propertyAiSummaryErrorMessage.value = "AI 요약을 불러오지 못했습니다.";
+  } finally {
+    isPropertyAiSummaryLoading.value = false;
+  }
+}
+
+function highlightPropertyAiSummary() {
+  if (propertyAiSummaryHighlightTimer) {
+    clearPropertyAiSummaryHighlightTimer();
+  }
+
+  isPropertyAiSummaryHighlighted.value = true;
+  propertyAiSummaryHighlightTimer = window.setTimeout(() => {
+    isPropertyAiSummaryHighlighted.value = false;
+    propertyAiSummaryHighlightTimer = null;
+  }, 1800);
+}
+
+function clearPropertyAiSummaryHighlightTimer() {
+  if (!propertyAiSummaryHighlightTimer) {
+    return;
+  }
+
+  clearTimeout(propertyAiSummaryHighlightTimer);
+  propertyAiSummaryHighlightTimer = null;
 }
 
 function goToLoginForRecommendation() {
@@ -2442,6 +2526,43 @@ function formatPrice(price) {
           <em>{{ home.buildYearLabel }}</em>
         </button>
       </div>
+
+      <div
+        v-if="hasSearched && searchTotalPages > 1"
+        class="history-pagination"
+        aria-label="검색 결과 페이지"
+        :aria-busy="isLoading"
+        style="margin-top: 2rem; justify-content: center;"
+      >
+        <button
+          type="button"
+          :disabled="searchPage === 1"
+          @click="changeSearchPage(searchPage - 1)"
+        >
+          이전
+        </button>
+
+        <button
+          v-for="page in getVisibleSearchPages()"
+          :key="`search-page-${page}`"
+          :class="{ active: searchPage === page }"
+          type="button"
+          :aria-current="searchPage === page ? 'page' : undefined"
+          @click="changeSearchPage(page)"
+        >
+           {{ page }}
+        </button>
+
+        <button
+           type="button"
+           :disabled="searchPage === searchTotalPages"
+           @click="changeSearchPage(searchPage + 1)"
+        >
+          다음
+        </button>
+      </div>
+
+
     </section>
 
     <section
@@ -2593,6 +2714,28 @@ function formatPrice(price) {
               </div>
               <p class="detail-address">
                 {{ getPropertyAddress(selectedPropertyDetail) }}
+              </p>
+              <p
+                v-if="isPropertyAiSummaryLoading"
+                class="property-ai-summary loading"
+              >
+                <span class="property-ai-summary-spinner" aria-hidden="true"></span>
+                <span>AI가 이 집의 적합도를 요약하고 있습니다.</span>
+              </p>
+              <p
+                v-else-if="propertyAiSummary"
+                :class="[
+                  'property-ai-summary',
+                  { highlighted: isPropertyAiSummaryHighlighted },
+                ]"
+              >
+                {{ propertyAiSummary }}
+              </p>
+              <p
+                v-else-if="propertyAiSummaryErrorMessage"
+                class="property-ai-summary muted"
+              >
+                {{ propertyAiSummaryErrorMessage }}
               </p>
               <div class="detail-tags">
                 <span

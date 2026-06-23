@@ -37,6 +37,7 @@ class PropertyServiceImplTest {
     then(propertyMapper).should(never()).countSaleDealsByPropertyId(propertyId);
   }
 
+
   @Test
   void findPropertyDealHistories_전체_거래이력을_조회한다() {
     Long propertyId = 1L;

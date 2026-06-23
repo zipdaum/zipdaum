@@ -1,6 +1,9 @@
 package com.ssafy.zipdaum.property.controller;
 
+import com.ssafy.zipdaum.global.dto.PageResponse;
 import com.ssafy.zipdaum.property.domain.DealApiType;
+import com.ssafy.zipdaum.property.dto.PropertyAiComparisonRequest;
+import com.ssafy.zipdaum.property.dto.PropertyAiComparisonResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDealHistoryResponse;
 import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
@@ -10,10 +13,13 @@ import com.ssafy.zipdaum.property.dto.SurroundingRequest;
 import com.ssafy.zipdaum.property.dto.SurroundingResponse;
 import com.ssafy.zipdaum.global.security.AuthenticatedUser;
 import com.ssafy.zipdaum.property.service.PropertyFetchService;
+import com.ssafy.zipdaum.property.service.PropertyAiComparisonService;
 import com.ssafy.zipdaum.property.service.PropertyService;
 import com.ssafy.zipdaum.property.service.SurroundingService;
+import com.ssafy.zipdaum.recommendation.dto.PropertyAiSummaryResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationResponse;
 import com.ssafy.zipdaum.recommendation.dto.PropertyRecommendationScore;
+import com.ssafy.zipdaum.recommendation.service.PropertyAiSummaryService;
 import com.ssafy.zipdaum.recommendation.service.RecommendationService;
 import com.ssafy.zipdaum.recent.service.RecentPropertyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +43,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,30 +60,32 @@ public class PropertyController {
   private final PropertyService propertyService;
   private final SurroundingService surroundingService;
   private final RecommendationService recommendationService;
+  private final PropertyAiSummaryService propertyAiSummaryService;
   private final RecentPropertyService recentPropertyService;
+  private final PropertyAiComparisonService propertyAiComparisonService;
 
   @GetMapping
   @Operation(
-      summary = "주택 실거래가 조회",
-      description = "지역, 주택명, 주택 유형, 거래 유형, 가격 조건으로 주택 실거래가 목록을 조회합니다."
+          summary = "주택 실거래가 조회(Paging 처리)",
+          description = "지역, 주택명, 주택 유형, 거래 유형, 가격 조건으로 주택 실거래가 목록을 조회합니다."
   )
   @ApiResponses({
-      @ApiResponse(
-          responseCode = "200",
-          description = "주택 실거래가 조회 성공",
-          content = @Content(schema = @Schema(implementation = PropertySearchResponse.class))
-      ),
-      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content)
+          @ApiResponse(
+                  responseCode = "200",
+                  description = "주택 실거래가 조회 성공",
+                  content = @Content(schema = @Schema(implementation = PropertySearchResponse.class))
+          ),
+          @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content)
   })
-  public ResponseEntity<List<PropertySearchResponse>> searchProperties(
-      @Valid @ModelAttribute PropertySearchRequest request
+  public ResponseEntity<PageResponse<PropertySearchResponse>> searchPropertiesByPage(
+          @Valid @ModelAttribute PropertySearchRequest request
   ) {
-    log.info("GET /properties 요청 sggCd={}, dealType={}, minPrice={}, maxPrice={}, sortBy={}, sortDirection={}",
-        request.getSggCd(), request.getDealType(), request.getMinPrice(), request.getMaxPrice(),
-        request.getSortBy(), request.getSortDirection());
+    log.info("GET /properties 요청 sggCd={}, page={}, size={}",
+            request.getSggCd(), request.getPage(), request.getSize());
 
-    return ResponseEntity.ok(propertyService.searchProperties(request));
+    return ResponseEntity.ok(propertyService.searchPropertiesByPage(request));
   }
+
 
   @GetMapping("/recommendations")
   @Operation(
@@ -100,6 +109,33 @@ public class PropertyController {
     log.info("GET /properties/recommendations 요청");
     return ResponseEntity.ok(
         recommendationService.findPropertyRecommendations(authenticatedUser.getId())
+    );
+  }
+
+  @PostMapping("/compare/ai")
+  @Operation(
+      summary = "AI 주택 비교",
+      description = "로그인한 사용자가 선택한 두 주택과 사용자 맞춤 조건, 최근 본 주택, 관심 주택 정보를 기반으로 AI 비교 결과를 생성합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "AI 주택 비교 성공",
+          content = @Content(schema = @Schema(implementation = PropertyAiComparisonResponse.class))
+      ),
+      @ApiResponse(responseCode = "400", description = "요청 본문 오류", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "주택 정보 없음", content = @Content),
+      @ApiResponse(responseCode = "500", description = "외부 AI API 연동 오류", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<PropertyAiComparisonResponse> comparePropertiesByAi(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @Valid @RequestBody PropertyAiComparisonRequest request
+  ) {
+    log.info("POST /properties/compare/ai 요청");
+    return ResponseEntity.ok(
+        propertyAiComparisonService.compareProperties(authenticatedUser.getId(), request)
     );
   }
 
@@ -222,6 +258,37 @@ public class PropertyController {
     log.info("GET /properties/{}/recommendation-score 요청", propertyId);
     return ResponseEntity.ok(
         recommendationService.findPropertyRecommendationScore(
+            authenticatedUser.getId(),
+            propertyId
+        )
+    );
+  }
+
+  @GetMapping("/{propertyId}/ai-summary")
+  @Operation(
+      summary = "주택 AI 적합도 요약 조회",
+      description = "현재 로그인 사용자의 맞춤 조건과 주택 정보를 바탕으로 상세 제목 하단에 표시할 AI 요약 문장을 생성합니다."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "주택 AI 적합도 요약 조회 성공",
+          content = @Content(schema = @Schema(implementation = PropertyAiSummaryResponse.class))
+      ),
+      @ApiResponse(responseCode = "400", description = "요청 파라미터 오류", content = @Content),
+      @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
+      @ApiResponse(responseCode = "404", description = "주택 또는 맞춤 조건 정보 없음", content = @Content),
+      @ApiResponse(responseCode = "500", description = "AI API 연동 오류", content = @Content)
+  })
+  @SecurityRequirement(name = "bearerAuth")
+  public ResponseEntity<PropertyAiSummaryResponse> getPropertyAiSummary(
+      @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+      @Parameter(description = "주택 ID", example = "1", required = true)
+      @PathVariable @Positive Long propertyId
+  ) {
+    log.info("GET /properties/{propertyId}/ai-summary 요청");
+    return ResponseEntity.ok(
+        propertyAiSummaryService.summarizeProperty(
             authenticatedUser.getId(),
             propertyId
         )
