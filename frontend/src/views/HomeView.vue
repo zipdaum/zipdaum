@@ -107,7 +107,7 @@ const preferenceTypeLabels = {
 };
 
 const searchForm = ref({
-  sggCd: "26350",
+  sggCd: null,
   umdNm: "",
   name: "",
   propertyType: "",
