@@ -1,4 +1,0 @@
-ALTER TABLE users
-    ADD COLUMN role VARCHAR(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ROLE_USER' AFTER updated_at;
-
-INSERT INTO users VALUES ('admin@zipdaum.com','$2a$10$N3SFCleoHkQg98sgAQCXw.EMRI9I91nGL6RgBnpryL3YM26dtgqxC','최성보',0,'2026-06-22 14:36:29','2026-06-23 17:29:23','ROLE_ADMIN');
