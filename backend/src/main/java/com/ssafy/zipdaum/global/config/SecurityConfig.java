@@ -45,6 +45,7 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers("/properties/compare/ai").authenticated()
             .requestMatchers("/properties/recommendations").authenticated()
             .requestMatchers("/properties/*/recommendation-score").authenticated()
             .requestMatchers("/properties/*/interactions").authenticated()

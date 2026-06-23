@@ -1,5 +1,6 @@
 package com.ssafy.zipdaum.property.service;
 
+import com.ssafy.zipdaum.global.dto.PageResponse;
 import com.ssafy.zipdaum.global.error.ErrorCode;
 import com.ssafy.zipdaum.global.exception.BusinessException;
 import com.ssafy.zipdaum.property.domain.DealType;
@@ -8,6 +9,8 @@ import com.ssafy.zipdaum.property.dto.PropertyDetailResponse;
 import com.ssafy.zipdaum.property.dto.PropertySearchRequest;
 import com.ssafy.zipdaum.property.dto.PropertySearchResponse;
 import com.ssafy.zipdaum.property.mapper.PropertyMapper;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,8 @@ public class PropertyServiceImpl implements PropertyService {
     normalizeRequest(request);
     return propertyMapper.selectProperties(request);
   }
+
+
 
   @Override
   public PropertyDetailResponse findPropertyDetail(Long propertyId) {
@@ -112,6 +117,22 @@ public class PropertyServiceImpl implements PropertyService {
         jeonseTotalCount,
         monthlyRentTotalCount
     );
+  }
+
+  @Override
+  public PageResponse<PropertySearchResponse> searchPropertiesByPage(PropertySearchRequest request) {
+    validateSearchRequest(request);
+    normalizeRequest(request);
+
+    long totalElements = propertyMapper.countProperties(request);
+
+    if (totalElements == 0) {
+      return PageResponse.of(Collections.emptyList(), request.getPage(), request.getSize(), 0);
+    }
+
+    List<PropertySearchResponse> content = propertyMapper.selectProperties(request);
+
+    return PageResponse.of(content, request.getPage(), request.getSize(), totalElements);
   }
 
   private void validatePropertyId(Long propertyId) {
