@@ -29,6 +29,7 @@ const dealTypes = [
 ];
 
 const regions = [
+  { label: "부산광역시 전체", value: null },
   { label: "부산광역시 해운대구", value: "26350" },
   { label: "부산광역시 부산진구", value: "26230" },
   { label: "부산광역시 동래구", value: "26260" },
@@ -106,7 +107,7 @@ const preferenceTypeLabels = {
 };
 
 const searchForm = ref({
-  sggCd: "26350",
+  sggCd: null,
   umdNm: "",
   name: "",
   propertyType: "",
@@ -168,6 +169,11 @@ const emptyHistoryMeta = {
 };
 let resultHighlightTimer = null;
 let mapDragStart = null;
+
+const searchPage = ref(1);
+const searchTotalPages = ref(1);
+const searchTotalElements = ref(0);
+const searchPageSize = 10;
 
 function createEmptyRentDealsByType() {
   return {
@@ -328,8 +334,8 @@ const resultCountText = computed(() => {
     return "검색 중";
   }
 
-  if (searchResults.value.length > 0) {
-    return `${searchResults.value.length.toLocaleString()}건`;
+  if (searchTotalElements.value > 0) {
+    return `${searchTotalElements.value.toLocaleString()}건`;
   }
 
   if (hasSearched.value) {
@@ -370,6 +376,7 @@ function selectDealType(dealType) {
 async function handleSearch() {
   homeResultTab.value = "search";
   searchForm.value.sortIndex = 0;
+  searchPage.value = 1;
   await runSearch();
 }
 
@@ -395,10 +402,16 @@ async function runSearch() {
       maxPrice: selectedPriceRange.maxPrice,
       sortBy: selectedSort.sortBy,
       sortDirection: selectedSort.sortDirection,
+      page: searchPage.value,
+      size: searchPageSize,
     });
 
-    const properties = await searchProperties(params);
-    searchResults.value = sortProperties(properties, selectedSort);
+    const response = await searchProperties(params);
+
+    searchResults.value = sortProperties(response.content || [], selectedSort);
+    searchTotalPages.value = response.totalPages || 1;
+    searchTotalElements.value = response.totalElements || 0;
+
   } catch (error) {
     searchResults.value = [];
     errorMessage.value =
@@ -413,11 +426,27 @@ async function runSearch() {
   }
 }
 
+async function changeSearchPage(newPage) {
+  if (newPage < 1 || newPage > searchTotalPages.value || isLoading.value || newPage === searchPage.value) {
+    return;
+  }
+  searchPage.value = newPage;
+  await runSearch();
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function getVisibleSearchPages() {
+  const start = Math.floor((searchPage.value - 1) / 5) * 5 + 1;
+  const end = Math.min(start + 4, searchTotalPages.value);
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
 async function handleSortChange() {
   if (!hasSearched.value) {
     return;
   }
-
+  searchPage.value = 1;
   await runSearch();
 }
 
@@ -2442,6 +2471,43 @@ function formatPrice(price) {
           <em>{{ home.buildYearLabel }}</em>
         </button>
       </div>
+
+      <div
+        v-if="hasSearched && searchTotalPages > 1"
+        class="history-pagination"
+        aria-label="검색 결과 페이지"
+        :aria-busy="isLoading"
+        style="margin-top: 2rem; justify-content: center;"
+      >
+        <button
+          type="button"
+          :disabled="searchPage === 1"
+          @click="changeSearchPage(searchPage - 1)"
+        >
+          이전
+        </button>
+
+        <button
+          v-for="page in getVisibleSearchPages()"
+          :key="`search-page-${page}`"
+          :class="{ active: searchPage === page }"
+          type="button"
+          :aria-current="searchPage === page ? 'page' : undefined"
+          @click="changeSearchPage(page)"
+        >
+           {{ page }}
+        </button>
+
+        <button
+           type="button"
+           :disabled="searchPage === searchTotalPages"
+           @click="changeSearchPage(searchPage + 1)"
+        >
+          다음
+        </button>
+      </div>
+
+
     </section>
 
     <section
