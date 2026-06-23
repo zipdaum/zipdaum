@@ -45,6 +45,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/comparison',
+      name: 'comparison',
+      component: MyPageView,
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/preferences',
       name: 'preferences',
       component: PreferenceSettingView,
