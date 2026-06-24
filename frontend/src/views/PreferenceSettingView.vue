@@ -84,7 +84,7 @@ async function handleSavePreferences() {
   const payload = toPreferencePayload();
 
   if (payload.length === 0) {
-    showMessage("저장할 맞춤 조건을 하나 이상 입력해주세요.");
+    showToast("저장할 맞춤 조건을 하나 이상 입력해주세요.", "notice");
     return;
   }
 
