@@ -148,26 +148,8 @@
         ORDER BY rd.deal_date DESC, rd.id DESC
         LIMIT 1
       ) AS latest_jeonse_deposit,
-      (
-        SELECT rd.deposit
-        FROM rent_deal rd
-        JOIN property p ON p.id = rd.property_id
-        WHERE p.sgg_cd = fr.sgg_cd
-          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
-          AND rd.monthly_rent &gt; 0
-        ORDER BY rd.deal_date DESC, rd.id DESC
-        LIMIT 1
-      ) AS latest_monthly_rent_deposit,
-      (
-        SELECT rd.monthly_rent
-        FROM rent_deal rd
-        JOIN property p ON p.id = rd.property_id
-        WHERE p.sgg_cd = fr.sgg_cd
-          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
-          AND rd.monthly_rent &gt; 0
-        ORDER BY rd.deal_date DESC, rd.id DESC
-        LIMIT 1
-      ) AS latest_monthly_rent,
+      latest_monthly_rent_deal.deposit AS latest_monthly_rent_deposit,
+      latest_monthly_rent_deal.monthly_rent AS latest_monthly_rent,
       (
         SELECT COUNT(*)
         FROM sale_deal sd
@@ -176,24 +158,8 @@
           AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
           AND sd.deal_date &gt;= #{oneYearAgo}
       ) AS sale_deal_count,
-      (
-        SELECT COUNT(*)
-        FROM rent_deal rd
-        JOIN property p ON p.id = rd.property_id
-        WHERE p.sgg_cd = fr.sgg_cd
-          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
-          AND rd.monthly_rent = 0
-          AND rd.deal_date &gt;= #{oneYearAgo}
-      ) AS jeonse_deal_count,
-      (
-        SELECT COUNT(*)
-        FROM rent_deal rd
-        JOIN property p ON p.id = rd.property_id
-        WHERE p.sgg_cd = fr.sgg_cd
-          AND (fr.umd_nm = '' OR p.umd_nm = fr.umd_nm)
-          AND rd.monthly_rent &gt; 0
-          AND rd.deal_date &gt;= #{oneYearAgo}
-      ) AS monthly_rent_deal_count
+      COALESCE(rent_deal_counts.jeonse_deal_count, 0) AS jeonse_deal_count,
+      COALESCE(rent_deal_counts.monthly_rent_deal_count, 0) AS monthly_rent_deal_count
     FROM favorite_region fr
     LEFT JOIN (
       SELECT
@@ -206,6 +172,44 @@
     LEFT JOIN region r
       ON r.sgg_cd = fr.sgg_cd
       AND r.umd_nm = fr.umd_nm
+    LEFT JOIN (
+      SELECT
+        favorite_region_id,
+        deposit,
+        monthly_rent
+      FROM (
+        SELECT
+          fr_inner.id AS favorite_region_id,
+          rd.deposit,
+          rd.monthly_rent,
+          ROW_NUMBER() OVER (
+            PARTITION BY fr_inner.id
+            ORDER BY rd.deal_date DESC, rd.id DESC
+          ) AS rn
+        FROM favorite_region fr_inner
+        JOIN property p
+          ON p.sgg_cd = fr_inner.sgg_cd
+          AND (fr_inner.umd_nm = '' OR p.umd_nm = fr_inner.umd_nm)
+        JOIN rent_deal rd ON rd.property_id = p.id
+        WHERE fr_inner.user_id = #{userId}
+          AND rd.monthly_rent &gt; 0
+      ) latest_monthly_rent_ranked
+      WHERE rn = 1
+    ) latest_monthly_rent_deal ON latest_monthly_rent_deal.favorite_region_id = fr.id
+    LEFT JOIN (
+      SELECT
+        fr_inner.id AS favorite_region_id,
+        SUM(CASE WHEN rd.monthly_rent = 0 THEN 1 ELSE 0 END) AS jeonse_deal_count,
+        SUM(CASE WHEN rd.monthly_rent &gt; 0 THEN 1 ELSE 0 END) AS monthly_rent_deal_count
+      FROM favorite_region fr_inner
+      JOIN property p
+        ON p.sgg_cd = fr_inner.sgg_cd
+        AND (fr_inner.umd_nm = '' OR p.umd_nm = fr_inner.umd_nm)
+      JOIN rent_deal rd ON rd.property_id = p.id
+      WHERE fr_inner.user_id = #{userId}
+        AND rd.deal_date &gt;= #{oneYearAgo}
+      GROUP BY fr_inner.id
+    ) rent_deal_counts ON rent_deal_counts.favorite_region_id = fr.id
     WHERE fr.user_id = #{userId}
     ORDER BY fr.created_at DESC, fr.id DESC
   </select>
