@@ -95,7 +95,7 @@ public class PropertyDataBatch {
             String addressKey = property.getUmdNm() + " " + property.getJibun();
             CoordinateDto coordinate = geoCache.computeIfAbsent(addressKey, k -> geocodeService.getCoordinate(k));
 
-            if (coordinate.latitude() != null && coordinate.longitude() != null) {
+            if (coordinate != null && coordinate.latitude() != null && coordinate.longitude() != null) {
                 property.setLatitude(coordinate.latitude());
                 property.setLongitude(coordinate.longitude());
             }
