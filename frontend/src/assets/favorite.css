@@ -127,6 +127,13 @@
   padding: 8px;
 }
 
+.favorite-search-loading {
+  min-height: 54px;
+  color: #71809d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .region-candidate-button,
 .property-candidate-button {
   display: grid;

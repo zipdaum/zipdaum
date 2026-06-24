@@ -559,7 +559,7 @@ function isFavoriteAlreadyExistsError(error, message) {
           </form>
 
           <div
-            v-if="regionCandidates.length > 0"
+            v-if="regionCandidates.length > 0 && !isSearchingRegions"
             ref="regionCandidateList"
             class="region-candidate-list"
           >
@@ -574,6 +574,13 @@ function isFavoriteAlreadyExistsError(error, message) {
               <strong>추가</strong>
             </button>
           </div>
+          <div
+            v-else-if="isSearchingRegions"
+            class="region-candidate-list favorite-search-loading loading-state-panel"
+          >
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <span>지역 검색 결과를 불러오는 중입니다.</span>
+          </div>
         </div>
 
         <p
@@ -585,7 +592,8 @@ function isFavoriteAlreadyExistsError(error, message) {
           {{ regionMessage }}
         </p>
 
-        <p v-if="isLoadingRegions" class="empty-message">
+        <p v-if="isLoadingRegions" class="empty-message loading-state-panel">
+          <span class="loading-spinner" aria-hidden="true"></span>
           관심 지역을 불러오는 중입니다.
         </p>
 
@@ -719,7 +727,7 @@ function isFavoriteAlreadyExistsError(error, message) {
           </form>
 
           <div
-            v-if="propertyCandidates.length > 0"
+            v-if="propertyCandidates.length > 0 && !isSearchingProperties"
             ref="propertyCandidateList"
             class="property-candidate-list"
           >
@@ -737,9 +745,17 @@ function isFavoriteAlreadyExistsError(error, message) {
               <b>추가</b>
             </button>
           </div>
+          <div
+            v-else-if="isSearchingProperties"
+            class="property-candidate-list favorite-search-loading loading-state-panel"
+          >
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <span>주택 검색 결과를 불러오는 중입니다.</span>
+          </div>
         </div>
 
-        <p v-if="isLoadingProperties" class="empty-message">
+        <p v-if="isLoadingProperties" class="empty-message loading-state-panel">
+          <span class="loading-spinner" aria-hidden="true"></span>
           관심 주택을 불러오는 중입니다.
         </p>
 

@@ -528,7 +528,10 @@ function getErrorMessage(error, fallbackMessage) {
       </button>
     </section>
 
-    <p v-if="isLoading" class="empty-message">맞춤 조건을 불러오는 중입니다.</p>
+    <p v-if="isLoading" class="empty-message loading-state-panel">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      맞춤 조건을 불러오는 중입니다.
+    </p>
 
     <form v-else class="preference-setting-layout" @submit.prevent="handleSavePreferences">
       <div class="preference-main-grid">
@@ -618,7 +621,10 @@ function getErrorMessage(error, fallbackMessage) {
               </label>
 
               <div v-if="shouldShowRegionSearchPanel" class="region-search-panel">
-                <div v-if="regionCandidates.length > 0" class="region-candidate-list">
+                <div
+                  v-if="regionCandidates.length > 0 && !isSearchingRegions"
+                  class="region-candidate-list"
+                >
                   <button
                     v-for="candidate in regionCandidates"
                     :key="`${candidate.sggCd}-${candidate.umdCd || 'sgg'}-${candidate.displayName}`"
@@ -628,7 +634,11 @@ function getErrorMessage(error, fallbackMessage) {
                     {{ candidate.displayName }}
                   </button>
                 </div>
-                <p v-else-if="isSearchingRegions" class="region-search-state">
+                <p
+                  v-else-if="isSearchingRegions"
+                  class="region-search-state loading-state-panel"
+                >
+                  <span class="loading-spinner" aria-hidden="true"></span>
                   지역을 검색하는 중입니다.
                 </p>
               </div>

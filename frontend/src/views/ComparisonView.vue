@@ -281,7 +281,13 @@ function formatKoreanMoney(value) {
               <span>{{ favoriteProperties.length.toLocaleString() }}개</span>
             </div>
 
-            <p v-if="isLoadingFavoriteProperties" class="empty-message">관심 주택을 불러오는 중입니다.</p>
+            <p
+              v-if="isLoadingFavoriteProperties"
+              class="empty-message loading-state-panel"
+            >
+              <span class="loading-spinner" aria-hidden="true"></span>
+              관심 주택을 불러오는 중입니다.
+            </p>
             <div v-else-if="favoritePropertiesErrorMessage" class="compare-load-error">
               <p class="empty-message">{{ favoritePropertiesErrorMessage }}</p>
               <button class="secondary-button" type="button" @click="retryFavoriteProperties">
@@ -326,9 +332,16 @@ function formatKoreanMoney(value) {
               </button>
             </form>
 
-            <p v-if="propertySearchMessage" class="empty-message">{{ propertySearchMessage }}</p>
+            <p
+              v-if="isSearchingProperties"
+              class="empty-message loading-state-panel"
+            >
+              <span class="loading-spinner" aria-hidden="true"></span>
+              주택 검색 결과를 불러오는 중입니다.
+            </p>
+            <p v-else-if="propertySearchMessage" class="empty-message">{{ propertySearchMessage }}</p>
 
-            <div v-if="propertySearchResults.length > 0" class="compare-property-list">
+            <div v-else-if="propertySearchResults.length > 0" class="compare-property-list">
               <button
                 v-for="property in propertySearchResults"
                 :key="`search-${property.propertyId}`"
