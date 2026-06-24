@@ -313,10 +313,10 @@ class RecommendationServiceImplTest {
     PropertyRecommendationCandidateFilter filter = captor.getValue();
     assertThat(filter.getUserId()).isEqualTo(1L);
     assertThat(filter.getRegions()).containsExactly("부산광역시 해운대구 우동");
-    assertThat(filter.getSalePriceMax()).isEqualTo(110_000_000L);
-    assertThat(filter.getDepositMax()).isEqualTo(44_000_000L);
-    assertThat(filter.getMonthlyRentMax()).isEqualTo(880_000L);
-    assertThat(filter.getMinExclusiveArea()).isEqualByComparingTo(new BigDecimal("76.05"));
+    assertThat(filter.getSalePriceMax()).isEqualTo(120_000_000L);
+    assertThat(filter.getDepositMax()).isEqualTo(48_000_000L);
+    assertThat(filter.getMonthlyRentMax()).isEqualTo(960_000L);
+    assertThat(filter.getMinExclusiveArea()).isEqualByComparingTo(new BigDecimal("67.60"));
     assertThat(filter.isMonthlyRentPreferred()).isTrue();
   }
 
@@ -347,7 +347,7 @@ class RecommendationServiceImplTest {
         .containsExactly(1L, 2L);
     assertThat(result)
         .extracting(PropertyRecommendationResponse::getScore)
-        .containsExactly(75, 70);
+        .containsExactly(65, 60);
   }
 
   @Test
@@ -381,7 +381,7 @@ class RecommendationServiceImplTest {
         .containsExactly(1L, 2L);
     assertThat(result)
         .extracting(PropertyRecommendationResponse::getScore)
-        .containsExactly(95, 70);
+        .containsExactly(85, 60);
   }
 
   @Test

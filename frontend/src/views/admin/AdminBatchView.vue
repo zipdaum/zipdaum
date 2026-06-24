@@ -174,7 +174,7 @@ function getValidMonth(value) {
         </div>
 
         <div v-if="isLoading" class="admin-status-box loading" role="status">
-          <span class="admin-loading-spinner" aria-hidden="true"></span>
+          <span class="loading-spinner" aria-hidden="true"></span>
           <div>
             <strong>데이터 수집 중입니다.</strong>
             <p>데이터 수집이 완료될 때까지 잠시만 기다려주세요.</p>
@@ -361,21 +361,6 @@ function getValidMonth(value) {
 .admin-status-box.loading {
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: start;
-}
-
-.admin-loading-spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid #dbe7ff;
-  border-top-color: #0b5cff;
-  border-radius: 999px;
-  animation: admin-spin 0.8s linear infinite;
-}
-
-@keyframes admin-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 900px) {
