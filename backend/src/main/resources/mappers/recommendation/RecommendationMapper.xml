@@ -40,12 +40,7 @@
     p.property_type,
     p.name,
     p.sgg_cd,
-    (
-      SELECT r.sgg_nm
-      FROM region r
-      WHERE r.sgg_cd = p.sgg_cd
-      LIMIT 1
-    ) AS sgg_nm,
+    region_summary.sgg_nm AS sgg_nm,
     p.umd_nm,
     p.jibun,
     p.build_year,
@@ -54,67 +49,11 @@
     p.latest_sale_price,
     p.latest_deposit,
     p.latest_monthly_rent,
-    <!-- TODO: 성능 테스트 후 최신 거래 요약 테이블 또는 캐시 컬럼으로 개선 검토 -->
-    (
-      SELECT rd.deposit
-      FROM rent_deal rd
-      WHERE rd.property_id = p.id
-        AND rd.deposit &gt; 0
-        AND rd.monthly_rent &gt; 0
-      ORDER BY rd.deal_date DESC, rd.id DESC
-      LIMIT 1
-    ) AS latest_monthly_rent_deposit,
-    (
-      SELECT rd.monthly_rent
-      FROM rent_deal rd
-      WHERE rd.property_id = p.id
-        AND rd.deposit &gt; 0
-        AND rd.monthly_rent &gt; 0
-      ORDER BY rd.deal_date DESC, rd.id DESC
-      LIMIT 1
-    ) AS latest_monthly_rent_amount,
-    (
-      SELECT d.price
-      FROM (
-        SELECT sd.deal_amount AS price, sd.deal_date, sd.id
-        FROM sale_deal sd
-        WHERE sd.property_id = p.id
-        UNION ALL
-        SELECT rd.deposit AS price, rd.deal_date, rd.id
-        FROM rent_deal rd
-        WHERE rd.property_id = p.id
-      ) d
-      ORDER BY d.deal_date DESC, d.id DESC
-      LIMIT 1
-    ) AS latest_deal_price,
-    (
-      SELECT d.deal_date
-      FROM (
-        SELECT sd.deal_date, sd.id
-        FROM sale_deal sd
-        WHERE sd.property_id = p.id
-        UNION ALL
-        SELECT rd.deal_date, rd.id
-        FROM rent_deal rd
-        WHERE rd.property_id = p.id
-      ) d
-      ORDER BY d.deal_date DESC, d.id DESC
-      LIMIT 1
-    ) AS latest_deal_date,
-    (
-      SELECT d.exclusive_area
-      FROM (
-        SELECT sd.exclusive_area, sd.deal_date, sd.id
-        FROM sale_deal sd
-        WHERE sd.property_id = p.id
-        UNION ALL
-        SELECT rd.exclusive_area, rd.deal_date, rd.id
-        FROM rent_deal rd
-        WHERE rd.property_id = p.id
-      ) d
-      ORDER BY d.deal_date DESC, d.id DESC
-      LIMIT 1
-    ) AS exclusive_area,
+    latest_monthly_rent_deal.deposit AS latest_monthly_rent_deposit,
+    latest_monthly_rent_deal.monthly_rent AS latest_monthly_rent_amount,
+    latest_deal.price AS latest_deal_price,
+    latest_deal.deal_date AS latest_deal_date,
+    latest_deal.exclusive_area AS exclusive_area,
     upi.view_count AS interaction_view_count,
     upi.total_dwell_time_millis AS interaction_total_dwell_time_millis,
     upi.max_scroll_depth_percent AS interaction_max_scroll_depth_percent,
@@ -122,11 +61,130 @@
     upi.deal_history_click_count AS interaction_deal_history_click_count
   </sql>
 
+  <sql id="propertyRecommendationRegionJoin">
+    LEFT JOIN (
+      SELECT
+        sgg_cd,
+        MIN(sgg_nm) AS sgg_nm
+      FROM region
+      GROUP BY sgg_cd
+    ) region_summary
+      ON region_summary.sgg_cd = p.sgg_cd
+  </sql>
+
+  <sql id="propertyRecommendationCandidateJoins">
+    LEFT JOIN (
+      SELECT
+        property_id,
+        deposit,
+        monthly_rent
+      FROM (
+        SELECT
+          rd.property_id,
+          rd.deposit,
+          rd.monthly_rent,
+          ROW_NUMBER() OVER (
+            PARTITION BY rd.property_id
+            ORDER BY rd.deal_date DESC, rd.id DESC
+          ) AS rn
+        FROM rent_deal rd
+        WHERE rd.deposit &gt; 0
+          AND rd.monthly_rent &gt; 0
+      ) latest_monthly_rent_ranked
+      WHERE rn = 1
+    ) latest_monthly_rent_deal
+      ON latest_monthly_rent_deal.property_id = p.id
+    LEFT JOIN (
+      SELECT
+        property_id,
+        price,
+        deal_date,
+        exclusive_area
+      FROM (
+        SELECT
+          latest_deal_candidates.property_id,
+          latest_deal_candidates.price,
+          latest_deal_candidates.deal_date,
+          latest_deal_candidates.exclusive_area,
+          ROW_NUMBER() OVER (
+            PARTITION BY latest_deal_candidates.property_id
+            ORDER BY latest_deal_candidates.deal_date DESC, latest_deal_candidates.id DESC
+          ) AS rn
+        FROM (
+          SELECT
+            sd.property_id,
+            sd.deal_amount AS price,
+            sd.deal_date,
+            sd.exclusive_area,
+            sd.id
+          FROM sale_deal sd
+
+          UNION ALL
+
+          SELECT
+            rd.property_id,
+            rd.deposit AS price,
+            rd.deal_date,
+            rd.exclusive_area,
+            rd.id
+          FROM rent_deal rd
+        ) latest_deal_candidates
+      ) latest_deal_ranked
+      WHERE rn = 1
+    ) latest_deal
+      ON latest_deal.property_id = p.id
+  </sql>
+
   <select id="selectPropertyRecommendationCandidate"
           resultMap="propertyRecommendationCandidateResultMap">
     SELECT
       <include refid="propertyRecommendationCandidateColumns"/>
     FROM property p
+    <include refid="propertyRecommendationRegionJoin"/>
+    LEFT JOIN (
+      SELECT
+        rd.property_id,
+        rd.deposit,
+        rd.monthly_rent
+      FROM rent_deal rd
+      WHERE rd.property_id = #{propertyId}
+        AND rd.deposit &gt; 0
+        AND rd.monthly_rent &gt; 0
+      ORDER BY rd.deal_date DESC, rd.id DESC
+      LIMIT 1
+    ) latest_monthly_rent_deal
+      ON latest_monthly_rent_deal.property_id = p.id
+    LEFT JOIN (
+      SELECT
+        latest_deal_candidates.property_id,
+        latest_deal_candidates.price,
+        latest_deal_candidates.deal_date,
+        latest_deal_candidates.exclusive_area
+      FROM (
+        SELECT
+          sd.property_id,
+          sd.deal_amount AS price,
+          sd.deal_date,
+          sd.exclusive_area,
+          sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = #{propertyId}
+
+        UNION ALL
+
+        SELECT
+          rd.property_id,
+          rd.deposit AS price,
+          rd.deal_date,
+          rd.exclusive_area,
+          rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = #{propertyId}
+      ) latest_deal_candidates
+      ORDER BY latest_deal_candidates.deal_date DESC, latest_deal_candidates.id DESC
+      LIMIT 1
+    ) latest_deal
+      ON latest_deal.property_id = p.id
     LEFT JOIN user_property_interaction upi
       ON upi.property_id = p.id
       AND upi.user_id = #{userId}
@@ -135,51 +193,62 @@
 
   <select id="selectPropertyRecommendationCandidates"
           resultMap="propertyRecommendationCandidateResultMap">
-    SELECT
-      *
-    FROM (
-      SELECT
-        <include refid="propertyRecommendationCandidateColumns"/>
-      FROM property p
-      LEFT JOIN user_property_interaction upi
-        ON upi.property_id = p.id
-        AND upi.user_id = #{filter.userId}
-    ) candidate
-    <where>
-      <if test="filter.interactedOnly">
-        AND candidate.interaction_view_count IS NOT NULL
-      </if>
-      <if test="filter.regions != null and filter.regions.size() > 0">
-        AND (
-          <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
-            candidate.sgg_nm = #{region}
-            OR CONCAT(candidate.sgg_nm, ' ', candidate.umd_nm) = #{region}
-          </foreach>
-        )
-      </if>
-      <if test="filter.salePriceMax != null">
-        AND candidate.latest_sale_price &gt; 0
-        AND candidate.latest_sale_price &lt;= #{filter.salePriceMax}
-      </if>
-      <if test="filter.depositMax != null">
-        <choose>
-          <when test="filter.monthlyRentPreferred">
+    <choose>
+      <when test="filter.interactedOnly">
+        SELECT
+          <include refid="propertyRecommendationCandidateColumns"/>
+        FROM user_property_interaction upi
+        JOIN property p
+          ON p.id = upi.property_id
+        <include refid="propertyRecommendationRegionJoin"/>
+        <include refid="propertyRecommendationCandidateJoins"/>
+        WHERE upi.user_id = #{filter.userId}
+      </when>
+      <otherwise>
+        SELECT
+          *
+        FROM (
+          SELECT
+            <include refid="propertyRecommendationCandidateColumns"/>
+          FROM property p
+          <include refid="propertyRecommendationRegionJoin"/>
+          <include refid="propertyRecommendationCandidateJoins"/>
+          LEFT JOIN user_property_interaction upi
+            ON upi.property_id = p.id
+            AND upi.user_id = #{filter.userId}
+          <where>
+            <if test="filter.salePriceMax != null">
+              AND p.latest_sale_price &gt; 0
+              AND p.latest_sale_price &lt;= #{filter.salePriceMax}
+            </if>
+            <if test="filter.depositMax != null and !filter.monthlyRentPreferred">
+              AND p.latest_deposit &gt; 0
+              AND p.latest_deposit &lt;= #{filter.depositMax}
+            </if>
+          </where>
+        ) candidate
+        <where>
+          <if test="filter.regions != null and filter.regions.size() > 0">
+            AND (
+              <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
+                candidate.sgg_nm = #{region}
+                OR CONCAT(candidate.sgg_nm, ' ', candidate.umd_nm) = #{region}
+              </foreach>
+            )
+          </if>
+          <if test="filter.depositMax != null and filter.monthlyRentPreferred">
             AND candidate.latest_monthly_rent_deposit &gt; 0
             AND candidate.latest_monthly_rent_deposit &lt;= #{filter.depositMax}
-          </when>
-          <otherwise>
-            AND candidate.latest_deposit &gt; 0
-            AND candidate.latest_deposit &lt;= #{filter.depositMax}
-          </otherwise>
-        </choose>
-      </if>
-      <if test="filter.monthlyRentMax != null">
-        AND candidate.latest_monthly_rent_amount &gt; 0
-        AND candidate.latest_monthly_rent_amount &lt;= #{filter.monthlyRentMax}
-      </if>
-      <if test="filter.minExclusiveArea != null">
-        AND candidate.exclusive_area &gt;= #{filter.minExclusiveArea}
-      </if>
-    </where>
+          </if>
+          <if test="filter.monthlyRentMax != null">
+            AND candidate.latest_monthly_rent_amount &gt; 0
+            AND candidate.latest_monthly_rent_amount &lt;= #{filter.monthlyRentMax}
+          </if>
+          <if test="filter.minExclusiveArea != null">
+            AND candidate.exclusive_area &gt;= #{filter.minExclusiveArea}
+          </if>
+        </where>
+      </otherwise>
+    </choose>
   </select>
 </mapper>
