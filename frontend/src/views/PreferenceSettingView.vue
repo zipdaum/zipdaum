@@ -551,7 +551,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.salePrice"
                 inputmode="numeric"
-                placeholder="80000"
+                placeholder="30000"
                 type="text"
               />
               <span>만원</span>
@@ -561,7 +561,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.deposit"
                 inputmode="numeric"
-                placeholder="50000"
+                placeholder="10000"
                 type="text"
               />
               <span>만원</span>
@@ -571,7 +571,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.monthlyRent"
                 inputmode="numeric"
-                placeholder="300"
+                placeholder="70"
                 type="text"
               />
               <span>만원</span>
@@ -581,7 +581,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.area"
                 inputmode="decimal"
-                placeholder="84.5"
+                placeholder="33"
                 type="text"
               />
               <span>m²</span>
@@ -591,7 +591,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.buildYear"
                 inputmode="numeric"
-                placeholder="2010"
+                placeholder="2015"
                 type="text"
               />
               <span>년</span>
