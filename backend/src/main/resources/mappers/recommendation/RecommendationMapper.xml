@@ -40,12 +40,7 @@
     p.property_type,
     p.name,
     p.sgg_cd,
-    (
-      SELECT r.sgg_nm
-      FROM region r
-      WHERE r.sgg_cd = p.sgg_cd
-      LIMIT 1
-    ) AS sgg_nm,
+    region_summary.sgg_nm AS sgg_nm,
     p.umd_nm,
     p.jibun,
     p.build_year,
@@ -64,6 +59,17 @@
     upi.max_scroll_depth_percent AS interaction_max_scroll_depth_percent,
     upi.recommendation_detail_click_count AS interaction_recommendation_detail_click_count,
     upi.deal_history_click_count AS interaction_deal_history_click_count
+  </sql>
+
+  <sql id="propertyRecommendationRegionJoin">
+    LEFT JOIN (
+      SELECT
+        sgg_cd,
+        MIN(sgg_nm) AS sgg_nm
+      FROM region
+      GROUP BY sgg_cd
+    ) region_summary
+      ON region_summary.sgg_cd = p.sgg_cd
   </sql>
 
   <sql id="propertyRecommendationCandidateJoins">
@@ -134,6 +140,7 @@
     SELECT
       <include refid="propertyRecommendationCandidateColumns"/>
     FROM property p
+    <include refid="propertyRecommendationRegionJoin"/>
     LEFT JOIN (
       SELECT
         rd.property_id,
@@ -186,52 +193,62 @@
 
   <select id="selectPropertyRecommendationCandidates"
           resultMap="propertyRecommendationCandidateResultMap">
-    SELECT
-      *
-    FROM (
-      SELECT
-        <include refid="propertyRecommendationCandidateColumns"/>
-      FROM property p
-      <include refid="propertyRecommendationCandidateJoins"/>
-      LEFT JOIN user_property_interaction upi
-        ON upi.property_id = p.id
-        AND upi.user_id = #{filter.userId}
-    ) candidate
-    <where>
-      <if test="filter.interactedOnly">
-        AND candidate.interaction_view_count IS NOT NULL
-      </if>
-      <if test="filter.regions != null and filter.regions.size() > 0">
-        AND (
-          <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
-            candidate.sgg_nm = #{region}
-            OR CONCAT(candidate.sgg_nm, ' ', candidate.umd_nm) = #{region}
-          </foreach>
-        )
-      </if>
-      <if test="filter.salePriceMax != null">
-        AND candidate.latest_sale_price &gt; 0
-        AND candidate.latest_sale_price &lt;= #{filter.salePriceMax}
-      </if>
-      <if test="filter.depositMax != null">
-        <choose>
-          <when test="filter.monthlyRentPreferred">
+    <choose>
+      <when test="filter.interactedOnly">
+        SELECT
+          <include refid="propertyRecommendationCandidateColumns"/>
+        FROM user_property_interaction upi
+        JOIN property p
+          ON p.id = upi.property_id
+        <include refid="propertyRecommendationRegionJoin"/>
+        <include refid="propertyRecommendationCandidateJoins"/>
+        WHERE upi.user_id = #{filter.userId}
+      </when>
+      <otherwise>
+        SELECT
+          *
+        FROM (
+          SELECT
+            <include refid="propertyRecommendationCandidateColumns"/>
+          FROM property p
+          <include refid="propertyRecommendationRegionJoin"/>
+          <include refid="propertyRecommendationCandidateJoins"/>
+          LEFT JOIN user_property_interaction upi
+            ON upi.property_id = p.id
+            AND upi.user_id = #{filter.userId}
+          <where>
+            <if test="filter.salePriceMax != null">
+              AND p.latest_sale_price &gt; 0
+              AND p.latest_sale_price &lt;= #{filter.salePriceMax}
+            </if>
+            <if test="filter.depositMax != null and !filter.monthlyRentPreferred">
+              AND p.latest_deposit &gt; 0
+              AND p.latest_deposit &lt;= #{filter.depositMax}
+            </if>
+          </where>
+        ) candidate
+        <where>
+          <if test="filter.regions != null and filter.regions.size() > 0">
+            AND (
+              <foreach collection="filter.regions" item="region" open="(" separator=") OR (" close=")">
+                candidate.sgg_nm = #{region}
+                OR CONCAT(candidate.sgg_nm, ' ', candidate.umd_nm) = #{region}
+              </foreach>
+            )
+          </if>
+          <if test="filter.depositMax != null and filter.monthlyRentPreferred">
             AND candidate.latest_monthly_rent_deposit &gt; 0
             AND candidate.latest_monthly_rent_deposit &lt;= #{filter.depositMax}
-          </when>
-          <otherwise>
-            AND candidate.latest_deposit &gt; 0
-            AND candidate.latest_deposit &lt;= #{filter.depositMax}
-          </otherwise>
-        </choose>
-      </if>
-      <if test="filter.monthlyRentMax != null">
-        AND candidate.latest_monthly_rent_amount &gt; 0
-        AND candidate.latest_monthly_rent_amount &lt;= #{filter.monthlyRentMax}
-      </if>
-      <if test="filter.minExclusiveArea != null">
-        AND candidate.exclusive_area &gt;= #{filter.minExclusiveArea}
-      </if>
-    </where>
+          </if>
+          <if test="filter.monthlyRentMax != null">
+            AND candidate.latest_monthly_rent_amount &gt; 0
+            AND candidate.latest_monthly_rent_amount &lt;= #{filter.monthlyRentMax}
+          </if>
+          <if test="filter.minExclusiveArea != null">
+            AND candidate.exclusive_area &gt;= #{filter.minExclusiveArea}
+          </if>
+        </where>
+      </otherwise>
+    </choose>
   </select>
 </mapper>
