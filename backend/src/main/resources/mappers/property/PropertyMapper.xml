@@ -197,12 +197,9 @@
     <where>
       <if test="sggCd != null"> AND sgg_cd = #{sggCd} </if>
       <if test="umdNm != null"> AND umd_nm = #{umdNm} </if>
+      <!--   Full-Text Search 인덱싱 적용   -->
       <if test="name != null">
-        AND (
-          name LIKE CONCAT('%', #{name}, '%')
-          OR umd_nm LIKE CONCAT('%', #{name}, '%')
-          OR jibun LIKE CONCAT('%', #{name}, '%')
-        )
+        AND MATCH(name, umd_nm, jibun) AGAINST(#{name} IN BOOLEAN MODE)
       </if>
       <if test="propertyType != null"> AND property_type = #{propertyType} </if>
     </where>
