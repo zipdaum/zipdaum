@@ -33,6 +33,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
 
+  private static final String AI_SUMMARY_PROMPT_VERSION = "prompt-v2";
+  private static final String DEVELOPER_PROMPT = """
+      당신은 ZipDaum 주택 상세 화면의 AI 요약 도우미입니다.
+      입력으로 제공된 주택 정보, 사용자 맞춤 적합도, 조건별 평가, 주변시설 요약만 근거로 사용합니다.
+      입력에 없는 사실, 미래 가격 전망, 투자 가치, 확정적 안전성, 실제 계약 가능성은 추정하지 않습니다.
+      판단 우선순위는 사용자 선호 조건 및 조건별 평가, 가격 조건, 최근 거래 정보, 입지/주변시설 순서입니다.
+      null, 정보 없음, 빈 조건 목록, 빈 주변시설 요약, 0 값은 사용자에게 유리한 근거로 해석하지 않습니다.
+      0 값이 실제 값인지 결측 대체값인지 불명확하면 유리하거나 불리한 핵심 근거로 사용하지 않습니다.
+      점수와 시설 개수를 과장하지 말고 입력값 그대로 해석합니다.
+      응답 전 내부적으로 다음을 점검합니다: summary 필드가 있는지, 입력 근거만 사용했는지, 한 문장인지, 사고 과정이 노출되지 않았는지.
+      내부 점검 과정이나 단계별 사고 과정은 출력하지 않습니다.
+      응답은 반드시 유효한 JSON 객체 하나로만 작성하고, 마크다운이나 코드블록을 포함하지 않습니다.
+      JSON 스키마는 {"summary":"80자 이상 160자 이하의 한국어 한 문장"} 입니다.
+      """;
+
   private final RecommendationMapper recommendationMapper;
   private final RecommendationService recommendationService;
   private final SurroundingService surroundingService;
@@ -66,11 +81,11 @@ public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
     }
 
     String summary = gmsOpenAiClient.chatCompletion(
-        "Answer in Korean. Keep the answer to one natural sentence.",
+        DEVELOPER_PROMPT,
         prompt,
         "property summary"
     );
-    PropertyAiSummaryResponse response = new PropertyAiSummaryResponse(summary);
+    PropertyAiSummaryResponse response = parseSummaryResponse(summary);
     if (cacheKey != null) {
       cacheResponse(cacheKey, response);
     }
@@ -89,6 +104,7 @@ public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
     try {
       AiSummaryCacheInput input = new AiSummaryCacheInput(
           cacheProperties.getVersion(),
+          AI_SUMMARY_PROMPT_VERSION,
           PropertyCacheInput.from(property),
           ScoreCacheInput.from(score),
           SurroundingCacheInput.from(surroundingSummary)
@@ -120,6 +136,41 @@ public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
     }
   }
 
+  private PropertyAiSummaryResponse parseSummaryResponse(String content) {
+    try {
+      AiSummaryOutput output = objectMapper.readValue(extractJsonObject(content), AiSummaryOutput.class);
+      if (output.summary() == null || output.summary().isBlank()) {
+        throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+      }
+      return new PropertyAiSummaryResponse(output.summary().trim());
+    } catch (JsonProcessingException e) {
+      log.warn("주택 AI 요약 응답 파싱 실패", e);
+      throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+    }
+  }
+
+  private String extractJsonObject(String content) {
+    if (content == null) {
+      throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+    }
+
+    String trimmed = content.trim();
+    if (trimmed.startsWith("```")) {
+      int firstLineEnd = trimmed.indexOf('\n');
+      int lastFenceStart = trimmed.lastIndexOf("```");
+      if (firstLineEnd >= 0 && lastFenceStart > firstLineEnd) {
+        trimmed = trimmed.substring(firstLineEnd + 1, lastFenceStart).trim();
+      }
+    }
+
+    int objectStart = trimmed.indexOf('{');
+    int objectEnd = trimmed.lastIndexOf('}');
+    if (objectStart < 0 || objectEnd < objectStart) {
+      throw new BusinessException(ErrorCode.EXTERNAL_API_ERROR);
+    }
+    return trimmed.substring(objectStart, objectEnd + 1);
+  }
+
   private void cacheResponse(String cacheKey, PropertyAiSummaryResponse response) {
     try {
       redisUtil.setDataWithTTL(
@@ -147,13 +198,8 @@ public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
       PropertyRecommendationScore score,
       SurroundingSummaryResponse surroundingSummary) {
     return """
-        다음 주택이 현재 로그인 사용자의 조건에 얼마나 잘 맞는지 제목 아래에 붙일 한 문장으로 요약해 주세요.
-        조건:
-        - 80자에서 160자 사이의 자연스러운 한국어 문장
-        - 사용자가 이해하기 쉬운 말투
-        - 숫자와 근거가 있으면 반영
-        - 과장하지 말고 제공된 데이터만 사용
-        - JSON이나 마크다운 없이 문장만 출력
+        아래 입력 데이터를 근거로 주택 상세 제목 하단에 표시할 AI 요약을 작성하세요.
+        응답 형식은 developer 지시의 JSON 스키마를 따르세요.
 
         주택 정보:
         - 이름: %s
@@ -252,8 +298,12 @@ public class PropertyAiSummaryServiceImpl implements PropertyAiSummaryService {
     return value == null ? "정보 없음" : value.toString();
   }
 
+  private record AiSummaryOutput(String summary) {
+  }
+
   private record AiSummaryCacheInput(
       String version,
+      String promptVersion,
       PropertyCacheInput property,
       ScoreCacheInput score,
       SurroundingCacheInput surroundingSummary) {

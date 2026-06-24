@@ -36,8 +36,8 @@ public class RecommendationServiceImpl implements RecommendationService {
   private static final int MAX_INTERACTION_SCORE_BONUS = 20;
   private static final long INTERACTION_DWELL_TIME_THRESHOLD_MILLIS = 30_000L;
   private static final int INTERACTION_SCROLL_DEPTH_THRESHOLD_PERCENT = 80;
-  private static final BigDecimal PRICE_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(1.1);
-  private static final BigDecimal AREA_PARTIAL_MATCH_MULTIPLIER = BigDecimal.valueOf(0.9);
+  private static final BigDecimal PRICE_SCORING_MAX_MULTIPLIER = BigDecimal.valueOf(1.2);
+  private static final BigDecimal AREA_SCORING_MIN_MULTIPLIER = BigDecimal.valueOf(0.8);
 
   private final RecommendationMapper recommendationMapper;
   private final UserPreferenceService userPreferenceService;
@@ -274,7 +274,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     if (price == null) {
       return null;
     }
-    return price.multiply(PRICE_PARTIAL_MATCH_MULTIPLIER)
+    return price.multiply(PRICE_SCORING_MAX_MULTIPLIER)
         .setScale(0, RoundingMode.DOWN)
         .longValue();
   }
@@ -284,7 +284,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     if (area == null) {
       return null;
     }
-    return area.multiply(AREA_PARTIAL_MATCH_MULTIPLIER);
+    return area.multiply(AREA_SCORING_MIN_MULTIPLIER);
   }
 
   private SurroundingSummaryResponse findSurroundingSummary(

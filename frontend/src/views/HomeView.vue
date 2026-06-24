@@ -138,6 +138,7 @@ const isRentHistoryLoading = ref(false);
 const historiesErrorMessage = ref("");
 const selectedPropertyDetail = ref(null);
 const activeTrendType = ref("SALE");
+const isTrendChartPreparing = ref(isInitialDetailRoute);
 const hoveredTrendDot = ref(null);
 const activeRentHistoryType = ref("JEONSE");
 const surroundings = ref(null);
@@ -166,6 +167,12 @@ const lockedRecommendationTitle = computed(() =>
 );
 const isRecommendationFeatureLocked = computed(
   () => !isLoggedIn.value || hasNoRecommendationConditions.value,
+);
+const isDealHistoryLoading = computed(
+  () => isSaleHistoryLoading.value || isRentHistoryLoading.value,
+);
+const isTrendChartLoading = computed(
+  () => isDealHistoryLoading.value || isTrendChartPreparing.value,
 );
 const emptyHistoryMeta = {
   salePage: 1,
@@ -701,6 +708,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   detailErrorMessage.value = "";
   historiesErrorMessage.value = "";
   activeTrendType.value = "SALE";
+  isTrendChartPreparing.value = true;
   activeRentHistoryType.value = "JEONSE";
   surroundings.value = null;
   surroundingsErrorMessage.value = "";
@@ -708,6 +716,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
   recommendationScoreErrorMessage.value = "";
   propertyAiSummary.value = "";
   propertyAiSummaryErrorMessage.value = "";
+  isPropertyAiSummaryLoading.value = isLoggedIn.value;
   isPropertyAiSummaryHighlighted.value = false;
   saleHistoryPage.value = 1;
   rentHistoryPage.value = 1;
@@ -739,8 +748,6 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       loadSurroundings(selectedPropertyDetail.value),
       loadRecommendationScore(normalizedPropertyId),
     ]);
-    await loadPropertyAiSummary(normalizedPropertyId);
-
     if (selectedPropertyDetail.value.monthlyRentTotalCount > 0) {
       await loadHistories(selectedPropertyDetail.value.id, {
         rentPage: 1,
@@ -751,6 +758,9 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
     }
 
     activeTrendType.value = getDefaultTrendType(selectedPropertyDetail.value);
+    isTrendChartPreparing.value = false;
+    await loadPropertyAiSummary(normalizedPropertyId);
+
     if (view === "deal-history") {
       activeRentHistoryType.value =
         selectedPropertyDetail.value.jeonseTotalCount > 0
@@ -762,6 +772,7 @@ async function loadPropertyDetailView(propertyId, view = "detail") {
       "거래 상세 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.";
   } finally {
     isDetailLoading.value = false;
+    isTrendChartPreparing.value = false;
   }
 }
 
@@ -813,6 +824,7 @@ async function loadPropertyAiSummary(propertyId) {
   propertyAiSummaryErrorMessage.value = "";
 
   if (isRecommendationFeatureLocked.value) {
+    isPropertyAiSummaryLoading.value = false;
     return;
   }
 
@@ -1536,7 +1548,7 @@ function getConditionStatusIcon(condition) {
     return "✓";
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return "?";
   }
 
@@ -1548,7 +1560,7 @@ function getConditionStatusClass(condition) {
     return "fit";
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return "uncertain";
   }
 
@@ -2401,8 +2413,9 @@ function formatPrice(price) {
 
             <p
               v-else-if="isRecommendationListLoading"
-              class="empty-message compact-empty-message"
+              class="empty-message compact-empty-message loading-state-panel"
             >
+              <span class="loading-spinner" aria-hidden="true"></span>
               맞춤 추천 주택을 불러오고 있습니다.
             </p>
 
@@ -2493,7 +2506,14 @@ function formatPrice(price) {
             </div>
 
             <p
-              v-if="hasSearched && displayedHomes.length === 0"
+              v-if="isLoading"
+              class="empty-message compact-empty-message loading-state-panel"
+            >
+              <span class="loading-spinner" aria-hidden="true"></span>
+              조건에 맞는 실거래가를 조회하고 있습니다.
+            </p>
+            <p
+              v-else-if="hasSearched && displayedHomes.length === 0"
               class="empty-message"
             >
               조건에 맞는 실거래가 검색 결과가 없습니다.
@@ -2579,7 +2599,14 @@ function formatPrice(price) {
         </label>
       </div>
 
-      <p v-if="errorMessage" class="form-message" role="alert">
+      <p
+        v-if="isLoading"
+        class="empty-message compact-empty-message loading-state-panel"
+      >
+        <span class="loading-spinner" aria-hidden="true"></span>
+        조건에 맞는 실거래가를 조회하고 있습니다.
+      </p>
+      <p v-else-if="errorMessage" class="form-message" role="alert">
         {{ errorMessage }}
       </p>
       <p v-else-if="allResultRows.length === 0" class="empty-message">
@@ -2700,8 +2727,9 @@ function formatPrice(price) {
 
       <p
         v-else-if="isRecommendationListLoading"
-        class="empty-message compact-empty-message"
+        class="empty-message compact-empty-message loading-state-panel"
       >
+        <span class="loading-spinner" aria-hidden="true"></span>
         맞춤 추천 주택을 불러오고 있습니다.
       </p>
       <p
@@ -2745,7 +2773,12 @@ function formatPrice(price) {
     </section>
 
     <section v-else class="detail-page" aria-label="집 상세 정보">
-      <p v-if="isDetailLoading" id="deal-detail-title" class="empty-message">
+      <p
+        v-if="isDetailLoading"
+        id="deal-detail-title"
+        class="empty-message loading-state-panel"
+      >
+        <span class="loading-spinner" aria-hidden="true"></span>
         거래 상세 정보를 불러오는 중입니다.
       </p>
       <p v-else-if="detailErrorMessage" class="form-message" role="alert">
@@ -2802,9 +2835,9 @@ function formatPrice(price) {
               </div>
               <p
                 v-else-if="isPropertyAiSummaryLoading"
-                class="property-ai-summary loading"
+                class="property-ai-summary loading loading-state-panel"
               >
-                <span class="property-ai-summary-spinner" aria-hidden="true"></span>
+                <span class="loading-spinner" aria-hidden="true"></span>
                 <span>AI가 이 집의 적합도를 요약하고 있습니다.</span>
               </p>
               <p
@@ -2874,8 +2907,9 @@ function formatPrice(price) {
 
               <p
                 v-else-if="isRecommendationScoreLoading"
-                class="compact-empty-message"
+                class="fit-score-loading loading-state-panel"
               >
+                <span class="loading-spinner" aria-hidden="true"></span>
                 맞춤 적합도를 계산하고 있습니다.
               </p>
 
@@ -2962,8 +2996,15 @@ function formatPrice(price) {
                 </button>
               </div>
               <div class="trend-chart" aria-label="거래 가격 추이 차트">
+                <div
+                  v-if="isTrendChartLoading"
+                  class="panel-loading-content loading-state-panel"
+                >
+                  <span class="loading-spinner" aria-hidden="true"></span>
+                  <span>거래 가격 추이를 불러오는 중입니다.</span>
+                </div>
                 <svg
-                  v-if="getTrendPoints(selectedPropertyDetail, activeTrendType)"
+                  v-else-if="getTrendPoints(selectedPropertyDetail, activeTrendType)"
                   viewBox="0 0 320 140"
                   role="img"
                   aria-label="최근 거래 가격 추이"
@@ -3057,7 +3098,14 @@ function formatPrice(price) {
                   </button>
                 </div>
               </div>
-              <ul class="recent-detail-list">
+              <div
+                v-if="isDealHistoryLoading"
+                class="recent-detail-loading panel-loading-content loading-state-panel"
+              >
+                <span class="loading-spinner" aria-hidden="true"></span>
+                <span>최근 실거래를 불러오는 중입니다.</span>
+              </div>
+              <ul v-else class="recent-detail-list">
                 <li
                   v-for="deal in getRecentDealRows(selectedPropertyDetail)"
                   :key="deal.id"
@@ -3086,7 +3134,11 @@ function formatPrice(price) {
                   >
                 </div>
 
-                <p v-if="isSurroundingsLoading" class="empty-message">
+                <p
+                  v-if="isSurroundingsLoading"
+                  class="empty-message loading-state-panel"
+                >
+                  <span class="loading-spinner" aria-hidden="true"></span>
                   주변 시설 정보를 불러오는 중입니다.
                 </p>
                 <p
@@ -3221,7 +3273,14 @@ function formatPrice(price) {
               </div>
 
               <p
-                v-if="getDealCountByType(selectedPropertyDetail, 'SALE') === 0"
+                v-if="isSaleHistoryLoading"
+                class="empty-message loading-state-panel"
+              >
+                <span class="loading-spinner" aria-hidden="true"></span>
+                매매 거래 이력을 불러오는 중입니다.
+              </p>
+              <p
+                v-else-if="getDealCountByType(selectedPropertyDetail, 'SALE') === 0"
                 class="empty-message"
               >
                 매매 거래 이력이 없습니다.
@@ -3334,7 +3393,14 @@ function formatPrice(price) {
               </div>
 
               <p
-                v-if="
+                v-if="isRentHistoryLoading"
+                class="empty-message loading-state-panel"
+              >
+                <span class="loading-spinner" aria-hidden="true"></span>
+                전월세 거래 이력을 불러오는 중입니다.
+              </p>
+              <p
+                v-else-if="
                   getDealCountByType(
                     selectedPropertyDetail,
                     activeRentHistoryType,

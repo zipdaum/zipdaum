@@ -328,7 +328,10 @@ function formatDateTime(value) {
       {{ errorMessage }}
     </p>
 
-    <p v-if="isLoading" class="empty-message">마이페이지 정보를 불러오는 중입니다.</p>
+    <p v-if="isLoading" class="empty-message loading-state-panel">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      마이페이지 정보를 불러오는 중입니다.
+    </p>
 
     <template v-else>
       <div class="mypage-layout">

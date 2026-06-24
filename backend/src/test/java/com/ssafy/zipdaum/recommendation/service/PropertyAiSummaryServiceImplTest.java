@@ -71,11 +71,28 @@ class PropertyAiSummaryServiceImplTest {
     given(redisUtil.getData(startsWith("property-ai-summary:v1:1:10:")))
         .willReturn(null);
     given(gmsOpenAiClient.chatCompletion(anyString(), anyString(), eq("property summary")))
-        .willReturn("generated summary");
+        .willReturn("{\"summary\":\"generated summary\"}");
 
     PropertyAiSummaryResponse result = service.summarizeProperty(1L, 10L);
 
     assertThat(result.getSummary()).isEqualTo("generated summary");
+    ArgumentCaptor<String> developerPromptCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<String> userPromptCaptor = ArgumentCaptor.forClass(String.class);
+    then(gmsOpenAiClient).should().chatCompletion(
+        developerPromptCaptor.capture(),
+        userPromptCaptor.capture(),
+        eq("property summary")
+    );
+    assertThat(developerPromptCaptor.getValue())
+        .contains("ZipDaum 주택 상세 화면의 AI 요약 도우미")
+        .contains("입력으로 제공된")
+        .contains("null")
+        .contains("JSON 스키마")
+        .contains("사고 과정");
+    assertThat(userPromptCaptor.getValue())
+        .contains("주택 정보")
+        .contains("조건별 평가")
+        .contains("응답 형식은 developer 지시의 JSON 스키마를 따르세요.");
     ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
     then(redisUtil).should().setDataWithTTL(
         startsWith("property-ai-summary:v1:1:10:"),
