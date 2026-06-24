@@ -105,12 +105,9 @@
       <if test="umdNm != null">
         AND umd_nm = #{umdNm}
       </if>
+      <!--   Full-Text Search 인덱싱 적용   -->
       <if test="name != null">
-        AND (
-          name LIKE CONCAT('%', #{name}, '%')
-          OR umd_nm LIKE CONCAT('%', #{name}, '%')
-          OR jibun LIKE CONCAT('%', #{name}, '%')
-        )
+        AND MATCH(name, umd_nm, jibun) AGAINST(#{name} IN BOOLEAN MODE)
       </if>
       <if test="propertyType != null">
         AND property_type = #{propertyType}
@@ -200,12 +197,9 @@
     <where>
       <if test="sggCd != null"> AND sgg_cd = #{sggCd} </if>
       <if test="umdNm != null"> AND umd_nm = #{umdNm} </if>
+      <!--   Full-Text Search 인덱싱 적용   -->
       <if test="name != null">
-        AND (
-          name LIKE CONCAT('%', #{name}, '%')
-          OR umd_nm LIKE CONCAT('%', #{name}, '%')
-          OR jibun LIKE CONCAT('%', #{name}, '%')
-        )
+        AND MATCH(name, umd_nm, jibun) AGAINST(#{name} IN BOOLEAN MODE)
       </if>
       <if test="propertyType != null"> AND property_type = #{propertyType} </if>
     </where>
@@ -409,30 +403,32 @@
     </foreach>
   </insert>
 
+  <!-- ROW_NUMBER() 활용하여 성능 개선 -->
   <update id="syncAllLatestSalePrices">
     UPDATE property p
     JOIN (
-    SELECT property_id, deal_amount
-    FROM sale_deal
-    WHERE (property_id, deal_date) IN (
-    SELECT property_id, MAX(deal_date)
-    FROM sale_deal
-    GROUP BY property_id
-    )
+      SELECT property_id, deal_amount
+      FROM (
+        SELECT property_id, deal_amount,
+          ROW_NUMBER() OVER(PARTITION BY property_id ORDER BY deal_date DESC, id DESC) as rn
+        FROM sale_deal
+      ) t
+      WHERE t.rn = 1
     ) latest_deal ON p.id = latest_deal.property_id
     SET p.latest_sale_price = latest_deal.deal_amount;
   </update>
 
+  <!-- ROW_NUMBER() 활용하여 성능 개선 -->
   <update id="syncAllLatestRentPrices">
     UPDATE property p
     JOIN (
-    SELECT property_id, deposit, monthly_rent
-    FROM rent_deal
-    WHERE (property_id, deal_date) IN (
-    SELECT property_id, MAX(deal_date)
-    FROM rent_deal
-    GROUP BY property_id
-    )
+      SELECT property_id, deposit, monthly_rent
+      FROM (
+        SELECT property_id, deposit, monthly_rent,
+          ROW_NUMBER() OVER(PARTITION BY property_id ORDER BY deal_date DESC, id DESC) as rn
+        FROM rent_deal
+      ) t
+      WHERE t.rn = 1
     ) latest_deal ON p.id = latest_deal.property_id
     SET p.latest_deposit = latest_deal.deposit,
     p.latest_monthly_rent = latest_deal.monthly_rent;
