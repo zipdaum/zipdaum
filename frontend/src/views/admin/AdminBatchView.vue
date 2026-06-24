@@ -54,7 +54,7 @@ async function triggerBatch() {
       startMonth: validStartMonth.value,
       endMonth: validEndMonth.value,
     })
-    statusMessage.value = `${validStartMonth.value} ~ ${validEndMonth.value} 기간의 데이터 수집이 완료되었습니다.`
+    statusMessage.value = `${validStartMonth.value} ~ ${validEndMonth.value} 기간의 데이터 수집이 요청이 완료되었습니다.`
     statusType.value = 'success'
   } catch (error) {
     statusMessage.value =
@@ -161,7 +161,7 @@ function getValidMonth(value) {
           </p>
 
           <button class="primary-button admin-run-button" type="submit" :disabled="!canRunBatch">
-            {{ isLoading ? '실행 요청 중' : '데이터 수집 실행' }}
+            {{ isLoading ? '실행 요청 중' : '데이터 수집 요청' }}
           </button>
         </form>
       </article>
@@ -182,7 +182,7 @@ function getValidMonth(value) {
         </div>
 
         <div v-else-if="statusMessage" :class="['admin-status-box', statusType]" role="status">
-          <strong>{{ statusType === 'success' ? '데이터 수집 완료' : '요청 실패' }}</strong>
+          <strong>{{ statusType === 'success' ? '데이터 수집 요청 완료' : '요청 실패' }}</strong>
           <p>{{ statusMessage }}</p>
         </div>
 

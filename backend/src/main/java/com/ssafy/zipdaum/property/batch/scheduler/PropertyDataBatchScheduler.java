@@ -61,6 +61,7 @@ public class PropertyDataBatchScheduler {
     @Async
     public void runManualPropertyDataJobByRange(String startMonthStr, String endMonthStr) {
         log.info(">>>> [관리자 수동 배치 시작] 수집 기간: {} ~ {}", startMonthStr, endMonthStr);
+        long startTime = System.currentTimeMillis();
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM");
         YearMonth startMonth = YearMonth.parse(startMonthStr, formatter);
@@ -82,6 +83,8 @@ public class PropertyDataBatchScheduler {
         }
 
         log.info("<<<< [관리자 수동 배치 완료] 수집 기간: {} ~ {}", startMonthStr, endMonthStr);
+        long endTime = System.currentTimeMillis();
+        log.info("스케줄러 비동기 호출 소요 시간: {} ms", (endTime - startTime));
     }
 
 }
