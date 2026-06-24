@@ -38,11 +38,11 @@ class RecommendationScoreServiceImplTest {
         surroundingSummary
     );
 
-    assertThat(result.getScore()).isEqualTo(50);
+    assertThat(result.getScore()).isEqualTo(67);
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
-            org.assertj.core.groups.Tuple.tuple("SALE_PRICE", false, 0),
+            org.assertj.core.groups.Tuple.tuple("SALE_PRICE", false, 38),
             org.assertj.core.groups.Tuple.tuple("REGION", true, 100),
             org.assertj.core.groups.Tuple.tuple("SUBWAY", true, 100)
         );
@@ -75,14 +75,14 @@ class RecommendationScoreServiceImplTest {
         null
     );
 
-    assertThat(result.getScore()).isEqualTo(63);
+    assertThat(result.getScore()).isEqualTo(77);
     assertThat(result.getConditions())
         .extracting("code", "matched", "score")
         .containsExactly(
             org.assertj.core.groups.Tuple.tuple("AREA", true, 100),
             org.assertj.core.groups.Tuple.tuple("BUS", false, 0),
             org.assertj.core.groups.Tuple.tuple("REGION", true, 100),
-            org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 70),
+            org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 80),
             org.assertj.core.groups.Tuple.tuple("PARK", false, 0)
         );
     assertThat(result.getConditions())
@@ -91,7 +91,7 @@ class RecommendationScoreServiceImplTest {
   }
 
   @Test
-  void calculateMatchScore_건축연도는_희망연도보다_오래되면_부분점수를_준다() {
+  void calculateMatchScore_건축연도는_희망연도보다_오래되면_연속점수로_감점한다() {
     PropertyRecommendationCandidate property = property(
         "26110",
         "우동",
@@ -108,10 +108,36 @@ class RecommendationScoreServiceImplTest {
         null
     );
 
-    assertThat(result.getScore()).isEqualTo(70);
+    assertThat(result.getScore()).isEqualTo(60);
     assertThat(result.getConditions())
         .extracting("code", "matched", "score", "reason")
-        .containsExactly(org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 70, null));
+        .containsExactly(org.assertj.core.groups.Tuple.tuple("BUILD_YEAR", true, 60, null));
+  }
+
+  @Test
+  void calculateMatchScore_사용자_priority가_아닌_조건별_기본_가중치로_계산한다() {
+    PropertyRecommendationCandidate property = property(
+        "26350",
+        "우동",
+        2018,
+        450_000_000L,
+        0L,
+        0L,
+        null
+    );
+    SurroundingSummaryResponse surroundingSummary = new SurroundingSummaryResponse(3, 1, 0, 2, 0);
+
+    PropertyRecommendationScore result = service.calculateMatchScore(
+        property,
+        List.of(
+            preference("SALE_PRICE", "400000000", 3),
+            preference("REGION", "부산광역시 해운대구 우동", 1),
+            preference("SUBWAY", "true", 2)
+        ),
+        surroundingSummary
+    );
+
+    assertThat(result.getScore()).isEqualTo(67);
   }
 
   @Test

@@ -1548,7 +1548,7 @@ function getConditionStatusIcon(condition) {
     return "✓";
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return "?";
   }
 
@@ -1560,7 +1560,7 @@ function getConditionStatusClass(condition) {
     return "fit";
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return "uncertain";
   }
 
