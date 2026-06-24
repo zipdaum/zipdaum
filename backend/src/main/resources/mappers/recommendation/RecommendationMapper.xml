@@ -134,7 +134,50 @@
     SELECT
       <include refid="propertyRecommendationCandidateColumns"/>
     FROM property p
-    <include refid="propertyRecommendationCandidateJoins"/>
+    LEFT JOIN (
+      SELECT
+        rd.property_id,
+        rd.deposit,
+        rd.monthly_rent
+      FROM rent_deal rd
+      WHERE rd.property_id = #{propertyId}
+        AND rd.deposit &gt; 0
+        AND rd.monthly_rent &gt; 0
+      ORDER BY rd.deal_date DESC, rd.id DESC
+      LIMIT 1
+    ) latest_monthly_rent_deal
+      ON latest_monthly_rent_deal.property_id = p.id
+    LEFT JOIN (
+      SELECT
+        latest_deal_candidates.property_id,
+        latest_deal_candidates.price,
+        latest_deal_candidates.deal_date,
+        latest_deal_candidates.exclusive_area
+      FROM (
+        SELECT
+          sd.property_id,
+          sd.deal_amount AS price,
+          sd.deal_date,
+          sd.exclusive_area,
+          sd.id
+        FROM sale_deal sd
+        WHERE sd.property_id = #{propertyId}
+
+        UNION ALL
+
+        SELECT
+          rd.property_id,
+          rd.deposit AS price,
+          rd.deal_date,
+          rd.exclusive_area,
+          rd.id
+        FROM rent_deal rd
+        WHERE rd.property_id = #{propertyId}
+      ) latest_deal_candidates
+      ORDER BY latest_deal_candidates.deal_date DESC, latest_deal_candidates.id DESC
+      LIMIT 1
+    ) latest_deal
+      ON latest_deal.property_id = p.id
     LEFT JOIN user_property_interaction upi
       ON upi.property_id = p.id
       AND upi.user_id = #{userId}
