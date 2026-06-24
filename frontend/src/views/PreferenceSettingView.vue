@@ -34,7 +34,7 @@ const selectedFacilityCount = computed(() =>
   Object.values(form.value.facilities).filter(Boolean).length,
 );
 const shouldShowRegionSearchPanel = computed(() =>
-  regionKeyword.value.trim().length >= 2 || regionCandidates.value.length > 0,
+  isSearchingRegions.value || regionCandidates.value.length > 0,
 );
 const toastLabel = computed(() => {
   if (toastVariant.value === "error") {
