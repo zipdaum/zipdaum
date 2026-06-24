@@ -34,7 +34,7 @@ const selectedFacilityCount = computed(() =>
   Object.values(form.value.facilities).filter(Boolean).length,
 );
 const shouldShowRegionSearchPanel = computed(() =>
-  regionKeyword.value.trim().length >= 2 || regionCandidates.value.length > 0,
+  isSearchingRegions.value || regionCandidates.value.length > 0,
 );
 const toastLabel = computed(() => {
   if (toastVariant.value === "error") {
@@ -84,7 +84,7 @@ async function handleSavePreferences() {
   const payload = toPreferencePayload();
 
   if (payload.length === 0) {
-    showMessage("저장할 맞춤 조건을 하나 이상 입력해주세요.");
+    showToast("저장할 맞춤 조건을 하나 이상 입력해주세요.", "notice");
     return;
   }
 
@@ -528,7 +528,10 @@ function getErrorMessage(error, fallbackMessage) {
       </button>
     </section>
 
-    <p v-if="isLoading" class="empty-message">맞춤 조건을 불러오는 중입니다.</p>
+    <p v-if="isLoading" class="empty-message loading-state-panel">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      맞춤 조건을 불러오는 중입니다.
+    </p>
 
     <form v-else class="preference-setting-layout" @submit.prevent="handleSavePreferences">
       <div class="preference-main-grid">
@@ -548,7 +551,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.salePrice"
                 inputmode="numeric"
-                placeholder="80000"
+                placeholder="30000"
                 type="text"
               />
               <span>만원</span>
@@ -558,7 +561,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.deposit"
                 inputmode="numeric"
-                placeholder="50000"
+                placeholder="10000"
                 type="text"
               />
               <span>만원</span>
@@ -568,7 +571,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.monthlyRent"
                 inputmode="numeric"
-                placeholder="300"
+                placeholder="70"
                 type="text"
               />
               <span>만원</span>
@@ -578,7 +581,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.area"
                 inputmode="decimal"
-                placeholder="84.5"
+                placeholder="33"
                 type="text"
               />
               <span>m²</span>
@@ -588,7 +591,7 @@ function getErrorMessage(error, fallbackMessage) {
               <input
                 v-model.trim="form.buildYear"
                 inputmode="numeric"
-                placeholder="2010"
+                placeholder="2015"
                 type="text"
               />
               <span>년</span>
@@ -618,7 +621,10 @@ function getErrorMessage(error, fallbackMessage) {
               </label>
 
               <div v-if="shouldShowRegionSearchPanel" class="region-search-panel">
-                <div v-if="regionCandidates.length > 0" class="region-candidate-list">
+                <div
+                  v-if="regionCandidates.length > 0 && !isSearchingRegions"
+                  class="region-candidate-list"
+                >
                   <button
                     v-for="candidate in regionCandidates"
                     :key="`${candidate.sggCd}-${candidate.umdCd || 'sgg'}-${candidate.displayName}`"
@@ -628,7 +634,11 @@ function getErrorMessage(error, fallbackMessage) {
                     {{ candidate.displayName }}
                   </button>
                 </div>
-                <p v-else-if="isSearchingRegions" class="region-search-state">
+                <p
+                  v-else-if="isSearchingRegions"
+                  class="region-search-state loading-state-panel"
+                >
+                  <span class="loading-spinner" aria-hidden="true"></span>
                   지역을 검색하는 중입니다.
                 </p>
               </div>

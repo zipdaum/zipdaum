@@ -324,7 +324,7 @@ function getConditionStatusIcon(condition) {
     return "✓";
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return "?";
   }
 
@@ -336,7 +336,7 @@ function getConditionStatusClass(condition) {
     return "fit";
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return "uncertain";
   }
 
@@ -425,7 +425,7 @@ function getConditionDescription(condition) {
     return getFullMatchDescription(condition);
   }
 
-  if (condition.score >= 70) {
+  if (condition.score >= 40) {
     return getPartialMatchDescription(condition);
   }
 
@@ -617,7 +617,10 @@ function formatDistance(distanceMeters) {
     <AppHeader @home="goHome" />
 
     <section v-if="isLoading" class="panel recommendation-loading-panel">
-      <p class="compact-empty-message">적합도 상세 정보를 불러오고 있습니다.</p>
+      <p class="compact-empty-message loading-state-panel">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        적합도 상세 정보를 불러오고 있습니다.
+      </p>
     </section>
 
     <section v-else-if="errorMessage" class="panel recommendation-loading-panel">
@@ -637,7 +640,7 @@ function formatDistance(distanceMeters) {
             ]"
           >
             <template v-if="isPropertyAiSummaryLoading">
-              <span class="property-ai-summary-spinner" aria-hidden="true"></span>
+              <span class="loading-spinner" aria-hidden="true"></span>
               <span>AI가 이 집의 적합도를 요약하고 있습니다.</span>
             </template>
             <template v-else>

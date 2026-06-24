@@ -19,7 +19,10 @@ import org.springframework.stereotype.Service;
 public class RecommendationScoreServiceImpl implements RecommendationScoreService {
 
   private static final int FULL_MATCH_SCORE = 100;
-  private static final int PARTIAL_MATCH_SCORE = 70;
+  private static final int MATCHED_SCORE_THRESHOLD = 40;
+  private static final double PRICE_ZERO_SCORE_OVER_RATIO = 0.2;
+  private static final double AREA_ZERO_SCORE_UNDER_RATIO = 0.2;
+  private static final int BUILD_YEAR_ZERO_SCORE_YEAR_GAP = 10;
 
   @Override
   public PropertyRecommendationScore calculateMatchScore(
@@ -57,18 +60,12 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
       return noEvaluableConditionScore();
     }
 
-    int maxPriority = scoredPreferences.stream()
-        .map(ScoredPreference::priority)
-        .filter(priority -> priority != null && priority > 0)
-        .max(Comparator.naturalOrder())
-        .orElse(1);
-
     int weightedScoreSum = 0;
     int weightSum = 0;
     List<PropertyRecommendationCondition> conditions = new ArrayList<>();
 
     for (ScoredPreference scoredPreference : scoredPreferences) {
-      int weight = calculateWeight(scoredPreference.priority(), maxPriority);
+      int weight = defaultWeight(parseType(scoredPreference.code()));
       weightedScoreSum += scoredPreference.score() * weight;
       weightSum += weight;
 
@@ -191,10 +188,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     if (actualPrice <= preferredPrice) {
       return scored(preference, type, FULL_MATCH_SCORE, reason);
     }
-    if (actualPrice <= preferredPrice * 1.1) {
-      return scored(preference, type, PARTIAL_MATCH_SCORE, null);
-    }
-    return scored(preference, type, 0, null);
+    return scored(preference, type, calculatePriceScore(actualPrice, preferredPrice), null);
   }
 
   private ScoredPreference scoreMonthlyRent(
@@ -232,13 +226,15 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
   }
 
   private int calculatePriceScore(Long actualPrice, Long preferredPrice) {
+    if (preferredPrice == null || preferredPrice <= 0 || actualPrice == null || actualPrice <= 0) {
+      return 0;
+    }
     if (actualPrice <= preferredPrice) {
       return FULL_MATCH_SCORE;
     }
-    if (actualPrice <= preferredPrice * 1.1) {
-      return PARTIAL_MATCH_SCORE;
-    }
-    return 0;
+    double overAmount = actualPrice - preferredPrice;
+    double zeroScoreAmount = preferredPrice * PRICE_ZERO_SCORE_OVER_RATIO;
+    return linearScore(overAmount, zeroScoreAmount);
   }
 
   private Long selectDepositForScoring(
@@ -267,10 +263,9 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     if (exclusiveArea.compareTo(preferredArea) >= 0) {
       return scored(preference, UserPreferenceType.AREA, FULL_MATCH_SCORE, "희망 면적과 일치");
     }
-    if (exclusiveArea.compareTo(preferredArea.multiply(BigDecimal.valueOf(0.9))) >= 0) {
-      return scored(preference, UserPreferenceType.AREA, PARTIAL_MATCH_SCORE, null);
-    }
-    return scored(preference, UserPreferenceType.AREA, 0, null);
+    double shortage = preferredArea.subtract(exclusiveArea).doubleValue();
+    double zeroScoreShortage = preferredArea.doubleValue() * AREA_ZERO_SCORE_UNDER_RATIO;
+    return scored(preference, UserPreferenceType.AREA, linearScore(shortage, zeroScoreShortage), null);
   }
 
   private ScoredPreference scoreBuildYear(
@@ -285,10 +280,13 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
     if (buildYear >= preferredBuildYear) {
       return scored(preference, UserPreferenceType.BUILD_YEAR, FULL_MATCH_SCORE, "희망 건축연도와 일치");
     }
-    if (buildYear >= preferredBuildYear - 5) {
-      return scored(preference, UserPreferenceType.BUILD_YEAR, PARTIAL_MATCH_SCORE, null);
-    }
-    return scored(preference, UserPreferenceType.BUILD_YEAR, 0, null);
+    int yearGap = preferredBuildYear - buildYear;
+    return scored(
+        preference,
+        UserPreferenceType.BUILD_YEAR,
+        linearScore(yearGap, BUILD_YEAR_ZERO_SCORE_YEAR_GAP),
+        null
+    );
   }
 
   private ScoredPreference scoreRegion(
@@ -375,7 +373,7 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
         scoredPreference.name(),
         scoredPreference.value(),
         scoredPreference.priority(),
-        scoredPreference.score() > 0,
+        scoredPreference.score() >= MATCHED_SCORE_THRESHOLD,
         scoredPreference.score(),
         scoredPreference.reason()
     );
@@ -402,11 +400,29 @@ public class RecommendationScoreServiceImpl implements RecommendationScoreServic
         .orElse(null);
   }
 
-  private int calculateWeight(Integer priority, int maxPriority) {
-    if (priority == null || priority < 1) {
+  private int defaultWeight(UserPreferenceType type) {
+    if (type == null) {
       return 1;
     }
-    return Math.max(maxPriority - priority + 1, 1);
+    return switch (type) {
+      case SALE_PRICE -> 35;
+      case DEPOSIT, MONTHLY_RENT -> 30;
+      case REGION -> 25;
+      case AREA -> 15;
+      case BUILD_YEAR -> 10;
+      case BUS, SUBWAY, HOSPITAL, CCTV, PARK -> 6;
+    };
+  }
+
+  private int linearScore(double gap, double zeroScoreGap) {
+    if (gap <= 0) {
+      return FULL_MATCH_SCORE;
+    }
+    if (zeroScoreGap <= 0 || gap >= zeroScoreGap) {
+      return 0;
+    }
+    int score = Math.round((float) (FULL_MATCH_SCORE * (1 - gap / zeroScoreGap)));
+    return Math.max(0, Math.min(FULL_MATCH_SCORE, score));
   }
 
   private String normalize(String value) {
